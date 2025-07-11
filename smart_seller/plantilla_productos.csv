@@ -1,0 +1,16 @@
+CÓDIGO,NOMBRE,DESCRIPCIÓN,PRECIO,COSTO,STOCK,STOCK MÍNIMO,CATEGORÍA,UNIDAD
+PROD001,Manzana Roja,Manzana roja fresca,1.50,1.00,100,10,Frutas y Verduras,kg
+PROD002,Leche Entera,Leche entera 1L,2.50,2.00,50,5,Lácteos,litro
+PROD003,Pan Integral,Pan integral fresco,0.80,0.60,200,20,Panadería,unidad
+PROD004,Coca Cola,Coca Cola 500ml,1.20,0.90,150,15,Bebidas,unidad
+PROD005,Arroz,Arroz blanco 1kg,3.00,2.50,80,8,Abarrotes,kg
+PROD006,Detergente,Detergente líquido,4.50,3.50,30,3,Limpieza,unidad
+PROD007,Jabón,Jabón de baño,1.80,1.40,60,6,Cuidado Personal,unidad
+PROD008,Pollo,Pollo entero,8.00,6.50,25,3,Carnes,kg
+PROD009,Queso,Queso fresco,5.00,4.00,40,4,Lácteos,kg
+PROD010,Tomate,Tomate fresco,2.00,1.60,70,7,Frutas y Verduras,kg
+PROD011,Plátano,Plátano maduro,1.20,0.90,120,12,Frutas y Verduras,kg
+PROD012,Yogurt,Yogurt natural,1.80,1.40,45,5,Lácteos,unidad
+PROD013,Croissant,Croissant fresco,1.50,1.20,80,8,Panadería,unidad
+PROD014,Agua Mineral,Agua mineral 500ml,0.80,0.60,200,20,Bebidas,unidad
+PROD015,Aceite,Aceite de cocina 1L,4.00,3.20,60,6,Abarrotes,litro 
