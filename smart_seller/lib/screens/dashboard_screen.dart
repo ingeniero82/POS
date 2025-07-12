@@ -64,16 +64,6 @@ class DashboardScreen extends StatelessWidget {
                             Get.toNamed('/pos');
                           },
                         ),
-                      // POS Optimizado - Solo si tiene permisos
-                      if (authService.hasPermission(Permission.accessPOS))
-                        _SidebarButton(
-                          icon: Icons.keyboard,
-                          label: 'POS Rápido',
-                          selected: controller.selectedMenu.value == DashboardMenu.puntoDeVenta,
-                          onTap: () {
-                            Get.toNamed('/pos-optimized');
-                          },
-                        ),
                       // Inventario - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewInventory))
                         _SidebarButton(
@@ -599,9 +589,10 @@ class _DashboardContent extends StatelessWidget {
       }
         }
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         // Header azul
         Container(
           width: double.infinity,
@@ -851,6 +842,7 @@ class _DashboardContent extends StatelessWidget {
           },
         ),
       ],
+      ),
     );
   }
 } 

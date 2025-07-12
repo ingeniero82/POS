@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/pos_screen.dart';
-import 'screens/pos_optimized_screen.dart';
 import 'screens/inventory_movements_screen.dart';
 import 'screens/sales_history_screen.dart';
 import 'screens/products_screen.dart';
@@ -98,11 +97,6 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/pos', 
           page: () => const PosScreen(),
-          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
-        ),
-        GetPage(
-          name: '/pos-optimized', 
-          page: () => const PosOptimizedScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
