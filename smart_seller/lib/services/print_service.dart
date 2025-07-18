@@ -259,8 +259,9 @@ class PrintService {
       // Productos
       final NumberFormat currencyFormat = NumberFormat.currency(
         locale: 'es_CO', 
-        symbol: '\$', 
-        decimalDigits: 0
+        symbol: '\$ ', 
+        decimalDigits: 0,
+        customPattern: '\u00A4#,##0'
       );
       
       for (CartItem item in items) {
@@ -466,8 +467,9 @@ class PrintService {
     final formatter = DateFormat('dd/MM/yyyy HH:mm:ss');
     final NumberFormat currencyFormat = NumberFormat.currency(
       locale: 'es_CO', 
-      symbol: '\$', 
-      decimalDigits: 0
+      symbol: '\$ ', 
+      decimalDigits: 0,
+      customPattern: '\u00A4#,##0'
     );
     
     print('');
