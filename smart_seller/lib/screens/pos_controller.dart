@@ -476,10 +476,29 @@ class PosController extends GetxController {
     final FocusNode yesButtonFocus = FocusNode();
     final FocusNode noButtonFocus = FocusNode();
     
+    // Variable para prevenir ejecución duplicada
+    bool isProcessing = false;
+    
     // Enfocar el botón "SÍ" automáticamente
     WidgetsBinding.instance.addPostFrameCallback((_) {
       yesButtonFocus.requestFocus();
     });
+    
+    // Función para imprimir (solo se ejecuta una vez)
+    void handlePrint() {
+      if (isProcessing) return;
+      isProcessing = true;
+      Get.back();
+      _printReceipt(sale, method, copFormat);
+    }
+    
+    // Función para no imprimir (solo se ejecuta una vez)
+    void handleNoPrint() {
+      if (isProcessing) return;
+      isProcessing = true;
+      Get.back();
+      clearCart();
+    }
     
     Get.dialog(
       Dialog(
@@ -490,12 +509,10 @@ class PosController extends GetxController {
             if (event is RawKeyDownEvent) {
               if (event.logicalKey == LogicalKeyboardKey.enter) {
                 // Enter imprime el recibo
-                Get.back();
-                _printReceipt(sale, method, copFormat);
+                handlePrint();
               } else if (event.logicalKey == LogicalKeyboardKey.escape) {
                 // Escape no imprime
-                Get.back();
-                clearCart();
+                handleNoPrint();
               }
             }
           },
@@ -540,10 +557,7 @@ class PosController extends GetxController {
                     Expanded(
                       child: ElevatedButton(
                         focusNode: yesButtonFocus,
-                        onPressed: () {
-                          Get.back();
-                          _printReceipt(sale, method, copFormat);
-                        },
+                        onPressed: handlePrint,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF4CAF50),
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -565,10 +579,7 @@ class PosController extends GetxController {
                     Expanded(
                       child: ElevatedButton(
                         focusNode: noButtonFocus,
-                        onPressed: () {
-                          Get.back();
-                          clearCart();
-                        },
+                        onPressed: handleNoPrint,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.grey[300],
                           padding: const EdgeInsets.symmetric(vertical: 16),
