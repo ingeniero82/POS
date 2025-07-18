@@ -677,9 +677,16 @@ class PosController extends GetxController {
       
       if (success) {
         print('✅ Recibo impreso exitosamente');
+        
+        // Abrir cajón monedero automáticamente
+        final drawerOpened = await printService.openCashDrawer();
+        if (drawerOpened) {
+          print('💰 Cajón monedero abierto');
+        }
+        
         Get.snackbar(
           'Recibo impreso',
-          'El recibo se imprimió correctamente',
+          'El recibo se imprimió correctamente${drawerOpened ? ' y el cajón se abrió' : ''}',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green,
           colorText: Colors.white,

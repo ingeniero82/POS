@@ -14,6 +14,7 @@ class AuthorizationService {
   static const String PRICE_CHANGE = 'price_change';
   static const String WEIGHT_MANUAL = 'weight_manual';
   static const String DISCOUNT_APPLY = 'discount_apply';
+  static const String CASH_DRAWER_OPEN = 'cash_drawer_open';
 
   // Claves de autorización (en producción deberían estar en base de datos)
   static const String ADMIN_CODE = 'ADMIN123';
@@ -36,6 +37,11 @@ class AuthorizationService {
                  currentUser.role == UserRole.manager;
         
         case DISCOUNT_APPLY:
+          return currentUser.role == UserRole.admin || 
+                 currentUser.role == UserRole.manager;
+        
+        case CASH_DRAWER_OPEN:
+          // Solo supervisores y administradores pueden abrir el cajón manualmente
           return currentUser.role == UserRole.admin || 
                  currentUser.role == UserRole.manager;
         
@@ -99,6 +105,10 @@ class AuthorizationService {
           // Para descuentos, permitir a gerentes y administradores
           return user.role == UserRole.admin || user.role == UserRole.manager;
         
+        case CASH_DRAWER_OPEN:
+          // Para cajón monedero, solo supervisores y administradores
+          return user.role == UserRole.admin || user.role == UserRole.manager;
+        
         default:
           return false;
       }
@@ -116,7 +126,7 @@ class AuthorizationService {
       case SUPERVISOR_CODE:
         return action != PRICE_CHANGE; // Supervisores no pueden cambiar precios
       case MANAGER_CODE:
-        return action == DISCOUNT_APPLY || action == PRICE_CHANGE;
+        return action == DISCOUNT_APPLY || action == PRICE_CHANGE || action == CASH_DRAWER_OPEN;
       default:
         return false;
     }
@@ -133,9 +143,9 @@ class AuthorizationService {
 
       // Si no es código de usuario, verificar códigos de barras predefinidos
       final authorizedBarcodes = {
-        'ADMIN001': [PRICE_CHANGE, WEIGHT_MANUAL, DISCOUNT_APPLY],
-        'SUPER001': [WEIGHT_MANUAL, DISCOUNT_APPLY],
-        'MANAGER001': [DISCOUNT_APPLY, PRICE_CHANGE],
+        'ADMIN001': [PRICE_CHANGE, WEIGHT_MANUAL, DISCOUNT_APPLY, CASH_DRAWER_OPEN],
+        'SUPER001': [WEIGHT_MANUAL, DISCOUNT_APPLY, CASH_DRAWER_OPEN],
+        'MANAGER001': [DISCOUNT_APPLY, PRICE_CHANGE, CASH_DRAWER_OPEN],
       };
 
       final allowedActions = authorizedBarcodes[barcode];
@@ -181,6 +191,8 @@ class AuthorizationService {
         return 'No tienes permisos para ingresar peso manual. Contacta a un supervisor.';
       case DISCOUNT_APPLY:
         return 'No tienes permisos para aplicar descuentos. Contacta a un supervisor.';
+      case CASH_DRAWER_OPEN:
+        return 'No tienes permisos para abrir el cajón monedero manualmente. Contacta a un supervisor.';
       default:
         return 'Acción no autorizada.';
     }
@@ -195,6 +207,8 @@ class AuthorizationService {
         return 'Autorización para Peso Manual';
       case DISCOUNT_APPLY:
         return 'Autorización para Descuento';
+      case CASH_DRAWER_OPEN:
+        return 'Autorización para Abrir Cajón';
       default:
         return 'Autorización Requerida';
     }
@@ -209,6 +223,8 @@ class AuthorizationService {
         return 'Para ingresar el peso manualmente, necesitas autorización. Escanea el código de barras de un supervisor o ingresa su código de usuario.';
       case DISCOUNT_APPLY:
         return 'Para aplicar un descuento, necesitas autorización. Escanea el código de barras de un supervisor o ingresa su código de usuario.';
+      case CASH_DRAWER_OPEN:
+        return 'Para abrir el cajón monedero manualmente, necesitas autorización de un supervisor. Esta acción quedará registrada en el sistema de auditoría.';
       default:
         return 'Esta acción requiere autorización.';
     }

@@ -48,6 +48,10 @@ class PrintService {
   static const List<int> _underlineOn = [0x1B, 0x2D, 0x01]; // ESC - 1
   static const List<int> _underlineOff = [0x1B, 0x2D, 0x00]; // ESC - 0
   
+  // Comandos para cajón monedero
+  static const List<int> _openDrawer1 = [0x1B, 0x70, 0x00, 0x32, 0x96]; // ESC p 0 50 150 (cajón 1)
+  static const List<int> _openDrawer2 = [0x1B, 0x70, 0x01, 0x32, 0x96]; // ESC p 1 50 150 (cajón 2)
+  
   // Inicializar servicio
   Future<void> initialize() async {
     try {
@@ -504,6 +508,39 @@ class PrintService {
     print('Impreso: ${formatter.format(DateTime.now())}');
     print('=====================================');
     print('');
+  }
+
+  // Abrir cajón monedero
+  Future<bool> openCashDrawer({int drawer = 1}) async {
+    try {
+      print('💰 Abriendo cajón monedero ${drawer}...');
+      
+      if (!_isConnected) {
+        print('❌ Impresora no conectada - Simulando apertura de cajón');
+        print('💰 SIMULACIÓN: Cajón monedero abierto');
+        return true;
+      }
+
+      List<int> commands = [];
+      
+      // Seleccionar cajón (1 o 2)
+      if (drawer == 2) {
+        commands.addAll(_openDrawer2);
+      } else {
+        commands.addAll(_openDrawer1);
+      }
+      
+      // Enviar comando a la impresora
+      await _channel.invokeMethod('printRaw', {
+        'data': Uint8List.fromList(commands),
+      });
+      
+      print('✅ Comando de apertura de cajón enviado');
+      return true;
+    } catch (e) {
+      print('❌ Error abriendo cajón monedero: $e');
+      return false;
+    }
   }
 
   // Limpiar recursos

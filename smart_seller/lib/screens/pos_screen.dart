@@ -5,7 +5,9 @@ import 'pos_controller.dart';
 import '../models/product.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/authorization_service.dart';
+import '../services/print_service.dart';
 import '../widgets/authorization_modal.dart';
+import '../services/auth_service.dart';
 import 'package:intl/intl.dart';
 
 class PosScreen extends StatefulWidget {
@@ -678,6 +680,18 @@ class _PosScreenState extends State<PosScreen> {
         ),
         const SizedBox(width: 8),
         Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => _openCashDrawer(),
+            icon: const Icon(Icons.account_balance_wallet),
+            label: const Text('Abrir Cajón (F5)'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
           flex: 2,
           child: ElevatedButton.icon(
             onPressed: () => _finalizeSale(),
@@ -712,6 +726,9 @@ class _PosScreenState extends State<PosScreen> {
           case 'F4':
             _clearCart();
             break;
+          case 'F5':
+            _openCashDrawer();
+            break;
           case 'F6':
             _finalizeSale();
             break;
@@ -740,6 +757,9 @@ class _PosScreenState extends State<PosScreen> {
           break;
         case 'F4':
           _clearCart();
+          break;
+        case 'F5':
+          _openCashDrawer();
           break;
         case 'F6':
           _finalizeSale();
@@ -1112,6 +1132,98 @@ class _PosScreenState extends State<PosScreen> {
     _posController.processPayment();
   }
   
+  void _openCashDrawer() async {
+    // Verificar si el usuario actual tiene permisos
+    final authService = AuthorizationService();
+    final currentUser = AuthService.to.currentUser;
+    
+    if (currentUser == null) {
+      Get.snackbar(
+        'Error',
+        'No hay usuario autenticado',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    
+    // Verificar permisos del usuario actual
+    final hasPermission = await authService.hasPermission(AuthorizationService.CASH_DRAWER_OPEN);
+    
+    if (!hasPermission) {
+      // Mostrar modal de autorización
+      _showAuthorizationModal();
+      return;
+    }
+    
+    // Si tiene permisos, abrir cajón directamente
+    await _performCashDrawerOpen('Apertura directa por ${currentUser.fullName}');
+  }
+  
+  void _showAuthorizationModal() {
+    Get.dialog(
+      AuthorizationModal(
+        action: AuthorizationService.CASH_DRAWER_OPEN,
+        onAuthorized: (code) async {
+          final authService = AuthorizationService();
+          
+          // Obtener información del autorizador
+          final authorizerInfo = await authService.getAuthorizerInfo(code);
+          
+          // Registrar autorización
+          await authService.logAuthorization(
+            AuthorizationService.CASH_DRAWER_OPEN,
+            code,
+            'Apertura manual del cajón monedero'
+          );
+          
+          await _performCashDrawerOpen('Autorizado por: $authorizerInfo');
+        },
+        onCancelled: () {
+          // No hacer nada, el modal se cierra automáticamente
+        },
+      ),
+    );
+  }
+  
+  Future<void> _performCashDrawerOpen(String reason) async {
+    try {
+      final printService = PrintService.instance;
+      await printService.initialize();
+      
+      final opened = await printService.openCashDrawer();
+      
+      if (opened) {
+        // Registrar en auditoría
+        print('🔓 AUDITORÍA: Cajón abierto manualmente - $reason - ${DateTime.now()}');
+        
+        Get.snackbar(
+          'Cajón abierto',
+          'El cajón monedero se abrió correctamente\n$reason',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      } else {
+        Get.snackbar(
+          'Error',
+          'No se pudo abrir el cajón monedero',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Error al abrir el cajón: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+  
   void _cancelCurrentOperation() {
     setState(() {
       _selectedProduct = null;
@@ -1149,6 +1261,7 @@ class _PosScreenState extends State<PosScreen> {
             SizedBox(height: 16),
             Text('F1: Mostrar ayuda'),
             Text('F4: Limpiar carrito'),
+            Text('F5: Abrir cajón monedero'),
             Text('F6: Finalizar venta'),
             Text('ESC: Cancelar operación actual'),
             Text('ENTER: Confirmar acción'),
