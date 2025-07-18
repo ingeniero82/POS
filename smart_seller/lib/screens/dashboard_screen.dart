@@ -72,6 +72,16 @@ class DashboardScreen extends StatelessWidget {
                           selected: controller.selectedMenu.value == DashboardMenu.inventario,
                           onTap: () => controller.selectMenu(DashboardMenu.inventario),
                         ),
+                      // Módulo de Peso - Solo si tiene permisos
+                      if (authService.hasPermission(Permission.viewInventory))
+                        _SidebarButton(
+                          icon: Icons.scale,
+                          label: 'Productos por Peso',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/peso');
+                          },
+                        ),
                       // Clientes - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewClients))
                         _SidebarButton(

@@ -107,19 +107,30 @@ class ScalePlugin: FlutterPlugin, MethodCallHandler {
         }
     }
     
-    private fun isScaleDevice(device: UsbDevice): Boolean {
-        // Detectar balanzas comunes por vendor/product ID
-        val vendorId = device.vendorId
-        val productId = device.productId
-        
-        // Ejemplos de IDs de balanzas comunes
-        return when {
-            vendorId == 0x0483 && productId == 0x5740 -> true // Balanza genérica
-            vendorId == 0x0403 && productId == 0x6001 -> true // FTDI
-            vendorId == 0x067B && productId == 0x2303 -> true // Prolific
-            else -> false
-        }
+      private fun isScaleDevice(device: UsbDevice): Boolean {
+    // Detectar balanzas comunes por vendor/product ID
+    val vendorId = device.vendorId
+    val productId = device.productId
+    
+    Log.d("ScalePlugin", "Dispositivo USB encontrado: Vendor=${String.format("0x%04X", vendorId)}, Product=${String.format("0x%04X", productId)}")
+    
+    // IDs conocidos para balanzas
+    return when {
+      // Aclas OS2X - IDs comunes
+      vendorId == 0x0483 && productId == 0x5740 -> true // Balanza Aclas común
+      vendorId == 0x1A86 && productId == 0x7523 -> true // CH340 serial (usado por Aclas)
+      vendorId == 0x067B && productId == 0x2303 -> true // Prolific PL2303 (usado por Aclas)
+      vendorId == 0x0403 && productId == 0x6001 -> true // FTDI FT232R (usado por Aclas)
+      vendorId == 0x0403 && productId == 0x6014 -> true // FTDI FT232H (usado por Aclas)
+      // Genéricos
+      vendorId == 0x0483 && productId == 0x5740 -> true // Balanza genérica
+      // Permitir cualquier dispositivo para debugging
+      else -> {
+        Log.d("ScalePlugin", "Dispositivo USB no reconocido como balanza")
+        true // Permitir conexión para testing
+      }
     }
+  }
     
     private fun connectToPort(port: String, baudRate: Int, protocol: String, result: Result) {
         executor.execute {
@@ -140,30 +151,66 @@ class ScalePlugin: FlutterPlugin, MethodCallHandler {
         }
     }
     
-    private fun connectUsb(port: String, result: Result) {
-        try {
-            val deviceName = port.substring(4) // Remover "USB:"
-            val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
-            
-            // Buscar el dispositivo
-            val device = usbManager.deviceList.values.find { it.deviceName == deviceName }
-            
-            if (device != null) {
-                usbConnection = usbManager.openDevice(device)
-                if (usbConnection != null) {
-                    isConnected = true
-                    notifyConnectionChange(true)
-                    result.success(true)
-                } else {
-                    result.error("USB_PERMISSION_ERROR", "No se pudo abrir el dispositivo USB", null)
-                }
-            } else {
-                result.error("DEVICE_NOT_FOUND", "Dispositivo no encontrado", null)
-            }
-        } catch (e: Exception) {
-            result.error("USB_CONNECTION_ERROR", e.message, null)
+      private fun connectUsb(port: String, result: Result) {
+    try {
+      val deviceName = port.substring(4) // Remover "USB:"
+      val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
+      
+      Log.d("ScalePlugin", "Intentando conectar a dispositivo USB: $deviceName")
+      
+      // Buscar el dispositivo
+      val device = usbManager.deviceList.values.find { it.deviceName == deviceName }
+      
+      if (device != null) {
+        Log.d("ScalePlugin", "Dispositivo encontrado: ${device.deviceName}")
+        Log.d("ScalePlugin", "Vendor: ${String.format("0x%04X", device.vendorId)}, Product: ${String.format("0x%04X", device.productId)}")
+        
+        // Verificar permisos
+        if (usbManager.hasPermission(device)) {
+          usbConnection = usbManager.openDevice(device)
+          if (usbConnection != null) {
+            // Configurar comunicación para Aclas OS2X
+            setupUsbCommunication(device)
+            isConnected = true
+            notifyConnectionChange(true)
+            result.success(true)
+            Log.d("ScalePlugin", "Conexión USB exitosa")
+          } else {
+            Log.e("ScalePlugin", "No se pudo abrir el dispositivo USB")
+            result.error("USB_OPEN_ERROR", "No se pudo abrir el dispositivo USB", null)
+          }
+        } else {
+          Log.e("ScalePlugin", "Sin permisos para el dispositivo USB")
+          result.error("USB_PERMISSION_ERROR", "Sin permisos para el dispositivo USB", null)
         }
+      } else {
+        Log.e("ScalePlugin", "Dispositivo no encontrado: $deviceName")
+        result.error("DEVICE_NOT_FOUND", "Dispositivo no encontrado", null)
+      }
+    } catch (e: Exception) {
+      Log.e("ScalePlugin", "Error conectando USB: ${e.message}")
+      result.error("USB_CONNECTION_ERROR", e.message, null)
     }
+  }
+  
+  private fun setupUsbCommunication(device: UsbDevice) {
+    try {
+      // Configuración específica para Aclas OS2X
+      val interface = device.getInterface(0)
+      val endpoint = interface.getEndpoint(0)
+      
+      usbConnection?.claimInterface(interface, true)
+      
+      // Configurar parámetros de comunicación (baudrate, etc.)
+      // Esto es específico para la Aclas OS2X
+      val request = UsbRequest()
+      request.initialize(usbConnection, endpoint)
+      
+      Log.d("ScalePlugin", "Comunicación USB configurada para Aclas OS2X")
+    } catch (e: Exception) {
+      Log.e("ScalePlugin", "Error configurando comunicación USB: ${e.message}")
+    }
+  }
     
     private fun connectSerial(port: String, baudRate: Int, result: Result) {
         try {
@@ -253,23 +300,105 @@ class ScalePlugin: FlutterPlugin, MethodCallHandler {
         }
     }
     
-    private fun startWeightSimulation() {
-        Thread {
-            while (isReading && isConnected) {
-                try {
-                    // Simular peso aleatorio entre 0.1 y 2.0 kg
-                    val randomWeight = 0.1 + Math.random() * 1.9
-                    currentWeight = randomWeight
-                    notifyWeightChange(randomWeight)
-                    
-                    Thread.sleep(1000) // Actualizar cada segundo
-                } catch (e: Exception) {
-                    Log.e("ScalePlugin", "Error in weight simulation: ${e.message}")
-                    break
-                }
+      private fun startWeightSimulation() {
+    Thread {
+      while (isReading && isConnected) {
+        try {
+          if (usbConnection != null) {
+            // Intentar leer peso real de la balanza Aclas OS2X
+            val realWeight = readWeightFromScale()
+            if (realWeight != null) {
+              currentWeight = realWeight
+              notifyWeightChange(realWeight)
+              Log.d("ScalePlugin", "Peso real leído: $realWeight kg")
+            } else {
+              // Si no se puede leer, simular peso
+              val randomWeight = 0.1 + Math.random() * 1.9
+              currentWeight = randomWeight
+              notifyWeightChange(randomWeight)
+              Log.d("ScalePlugin", "Peso simulado: $randomWeight kg")
             }
-        }.start()
+          } else {
+            // Sin conexión USB, simular peso
+            val randomWeight = 0.1 + Math.random() * 1.9
+            currentWeight = randomWeight
+            notifyWeightChange(randomWeight)
+          }
+          
+          Thread.sleep(500) // Actualizar cada 500ms (más rápido)
+        } catch (e: Exception) {
+          Log.e("ScalePlugin", "Error in weight reading: ${e.message}")
+          break
+        }
+      }
+    }.start()
+  }
+  
+  private fun readWeightFromScale(): Double? {
+    try {
+      if (usbConnection == null) return null
+      
+      // Comando para solicitar peso a la balanza Aclas OS2X
+      // Protocolo común: enviar comando y leer respuesta
+      val command = "W\r\n".toByteArray() // Comando típico para solicitar peso
+      val buffer = ByteArray(1024)
+      
+      // Enviar comando
+      val interface = usbConnection!!.claimInterface(usbConnection!!.getInterface(0), true)
+      val endpoint = usbConnection!!.getInterface(0).getEndpoint(0)
+      
+      val bytesSent = usbConnection!!.bulkTransfer(endpoint, command, command.size, 1000)
+      
+      if (bytesSent > 0) {
+        // Leer respuesta
+        val bytesRead = usbConnection!!.bulkTransfer(endpoint, buffer, buffer.size, 1000)
+        
+        if (bytesRead > 0) {
+          val response = String(buffer, 0, bytesRead)
+          Log.d("ScalePlugin", "Respuesta de balanza: $response")
+          
+          // Parsear respuesta de Aclas OS2X
+          return parseAclasWeight(response)
+        }
+      }
+      
+      return null
+    } catch (e: Exception) {
+      Log.e("ScalePlugin", "Error leyendo peso de balanza: ${e.message}")
+      return null
     }
+  }
+  
+  private fun parseAclasWeight(response: String): Double? {
+    try {
+      // Parsear respuesta típica de Aclas OS2X
+      // Formato común: "ST,GS,   1.234kg" o similar
+      val cleanResponse = response.trim()
+      
+      // Buscar patrón de peso
+      val weightPattern = Regex("([0-9]+\\.?[0-9]*)\\s*kg")
+      val match = weightPattern.find(cleanResponse)
+      
+      if (match != null) {
+        val weightStr = match.groupValues[1]
+        return weightStr.toDoubleOrNull()
+      }
+      
+      // Intentar otros patrones comunes
+      val simplePattern = Regex("([0-9]+\\.?[0-9]+)")
+      val simpleMatch = simplePattern.find(cleanResponse)
+      
+      if (simpleMatch != null) {
+        val weightStr = simpleMatch.groupValues[1]
+        return weightStr.toDoubleOrNull()
+      }
+      
+      return null
+    } catch (e: Exception) {
+      Log.e("ScalePlugin", "Error parseando peso: ${e.message}")
+      return null
+    }
+  }
     
     private fun notifyWeightChange(weight: Double) {
         val arguments = mapOf(

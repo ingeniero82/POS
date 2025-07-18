@@ -8,6 +8,9 @@ import '../services/authorization_service.dart';
 import '../services/print_service.dart';
 import '../widgets/authorization_modal.dart';
 import '../services/auth_service.dart';
+import '../modules/weight/controllers/weight_controller.dart';
+import '../modules/weight/widgets/scale_widget.dart';
+import '../utils/sample_weight_products.dart';
 import 'package:intl/intl.dart';
 
 class PosScreen extends StatefulWidget {
@@ -32,6 +35,9 @@ class _PosScreenState extends State<PosScreen> {
   // Controlador del POS
   late PosController _posController;
   
+  // Controlador de peso
+  late WeightController _weightController;
+  
   // Variables para autorización
   bool _isAuthorized = false;
   DateTime? _authorizationTime;
@@ -54,6 +60,7 @@ class _PosScreenState extends State<PosScreen> {
   void initState() {
     super.initState();
     _posController = Get.put(PosController());
+    _weightController = Get.put(WeightController());
     _loadProducts();
     
     // Auto-focus al barcode al iniciar
@@ -75,6 +82,14 @@ class _PosScreenState extends State<PosScreen> {
     setState(() => _isLoading = true);
     try {
       _products = await SQLiteDatabaseService.getAllProducts();
+      
+      // Debug: mostrar productos pesados
+      final weightedProducts = _products.where((p) => p.isWeighted).toList();
+      print('🔍 Productos cargados: ${_products.length}');
+      print('⚖️ Productos pesados: ${weightedProducts.length}');
+      for (final product in weightedProducts) {
+        print('   - ${product.name} (${product.code}) - \$${product.pricePerKg}/kg');
+      }
     } catch (e) {
       Get.snackbar('Error', 'Error cargando productos: $e');
     } finally {
@@ -259,6 +274,31 @@ class _PosScreenState extends State<PosScreen> {
                 _buildModeButton('quantity', '⌨️ Cantidad', Icons.keyboard),
                 const SizedBox(width: 8),
                 _buildModeButton('payment', '💳 Pago', Icons.payment),
+                const SizedBox(width: 8),
+                // Botón para crear productos pesados (DEBUG)
+                IconButton(
+                  onPressed: () async {
+                    await SampleWeightProducts.insertSampleProducts();
+                    await _loadProducts();
+                    Get.snackbar(
+                      'Productos Creados',
+                      'Productos pesados de ejemplo creados',
+                      backgroundColor: Colors.green,
+                      colorText: Colors.white,
+                    );
+                  },
+                  icon: const Icon(Icons.scale),
+                  tooltip: 'Crear productos pesados',
+                ),
+                
+                // Botón para debug de balanza
+                IconButton(
+                  onPressed: () async {
+                    await _debugScale();
+                  },
+                  icon: const Icon(Icons.bug_report),
+                  tooltip: 'Debug balanza',
+                ),
               ],
             ),
           ],
@@ -318,9 +358,9 @@ class _PosScreenState extends State<PosScreen> {
               ],
             ),
             Text('Stock: ${_selectedProduct!.stock}'),
-            if (_selectedProduct!.isWeighted) Text('Producto por peso'),
             const SizedBox(height: 16),
-            // Campo de cantidad
+            
+            // Campo de cantidad (siempre visible)
             TextField(
               controller: _quantityController,
               focusNode: _quantityFocus,
@@ -332,17 +372,26 @@ class _PosScreenState extends State<PosScreen> {
                 border: OutlineInputBorder(),
                 suffixIcon: Icon(Icons.keyboard),
               ),
-              onSubmitted: (value) => _addToCart(int.tryParse(value) ?? 1),
+              onSubmitted: (value) => _selectedProduct!.isWeighted 
+                  ? _addWeightedProductToCart() 
+                  : _addToCart(int.tryParse(value) ?? 1),
             ),
+            
+            const SizedBox(height: 16),
+            
+            // Sección de peso (SIEMPRE visible - como POS profesional)
+            _buildWeightDisplay(),
             const SizedBox(height: 12),
             // Botones de acción
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _addToCart(int.tryParse(_quantityController.text) ?? 1),
-                    icon: const Icon(Icons.add_shopping_cart),
-                    label: const Text('Agregar al Carrito'),
+                    onPressed: () => _selectedProduct!.isWeighted 
+                        ? _addWeightedProductToCart() 
+                        : _addToCart(int.tryParse(_quantityController.text) ?? 1),
+                    icon: Icon(_selectedProduct!.isWeighted ? Icons.scale : Icons.add_shopping_cart),
+                    label: Text(_selectedProduct!.isWeighted ? 'Agregar Pesado' : 'Agregar al Carrito'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
@@ -841,6 +890,13 @@ class _PosScreenState extends State<PosScreen> {
       _selectedProduct = product;
       _currentMode = 'quantity';
     });
+    
+    // Debug: verificar si el producto es pesado
+    print('📦 Producto seleccionado: ${product.name}');
+    print('⚖️ Es pesado: ${product.isWeighted}');
+    if (product.isWeighted) {
+      print('💰 Precio por kg: \$${product.pricePerKg}');
+    }
     
     // Configurar el campo de cantidad
     _quantityController.text = '1';
@@ -2070,6 +2126,338 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
   
+  // Método para mostrar el peso SIEMPRE (como POS profesional)
+  Widget _buildWeightDisplay() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        children: [
+          // Título con estado de balanza
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.scale, size: 20, color: Colors.grey.shade700),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Peso',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+              // Estado de conexión
+              Obx(() => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _weightController.isConnected.value ? Colors.green : Colors.red,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _weightController.isConnected.value ? 'Conectada' : 'Desconectada',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Peso actual (SIEMPRE visible)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              children: [
+                // Peso grande
+                Obx(() => Text(
+                  '${_weightController.currentWeight.value.toStringAsFixed(3)} kg',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: _weightController.isConnected.value ? Colors.blue.shade700 : Colors.grey,
+                  ),
+                )),
+                const SizedBox(height: 8),
+                
+                // Indicador de lectura
+                Obx(() => Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _weightController.isReading.value ? Colors.blue : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: _weightController.isReading.value
+                      ? const LinearProgressIndicator(
+                          backgroundColor: Colors.transparent,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                        )
+                      : null,
+                )),
+                
+                const SizedBox(height: 16),
+                
+                // Información del producto pesado (solo si aplica)
+                if (_selectedProduct != null && _selectedProduct!.isWeighted) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Precio/kg:',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            Text(
+                              '\$${(_selectedProduct!.pricePerKg ?? 0).toStringAsFixed(0)}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Obx(() => Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total:',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '\$${_weightController.calculatedPrice.toStringAsFixed(0)}',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.purple.shade700,
+                              ),
+                            ),
+                          ],
+                        )),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 16),
+                
+                // Controles de balanza
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Conectar/Desconectar
+                    Obx(() => ElevatedButton.icon(
+                      onPressed: _weightController.isConnected.value 
+                          ? _weightController.disconnectScale
+                          : _weightController.connectScale,
+                      icon: Icon(
+                        _weightController.isConnected.value 
+                            ? Icons.bluetooth_connected 
+                            : Icons.bluetooth_disabled,
+                        size: 16,
+                      ),
+                      label: Text(
+                        _weightController.isConnected.value ? 'Desconectar' : 'Conectar',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _weightController.isConnected.value ? Colors.red : Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    )),
+                    
+                    // Tare
+                    Obx(() => ElevatedButton.icon(
+                      onPressed: _weightController.isConnected.value ? _weightController.tare : null,
+                      icon: const Icon(Icons.horizontal_rule, size: 16),
+                      label: const Text('Tare', style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    )),
+                    
+                    // Iniciar/Detener
+                    Obx(() => ElevatedButton.icon(
+                      onPressed: _weightController.isConnected.value
+                          ? (_weightController.isReading.value 
+                              ? _weightController.stopReading 
+                              : _weightController.startReading)
+                          : null,
+                      icon: Icon(
+                        _weightController.isReading.value ? Icons.pause : Icons.play_arrow,
+                        size: 16,
+                      ),
+                      label: Text(
+                        _weightController.isReading.value ? 'Detener' : 'Iniciar',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _weightController.isReading.value ? Colors.orange : Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    )),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Método para agregar productos pesados al carrito
+  void _addWeightedProductToCart() {
+    if (_selectedProduct == null) {
+      Get.snackbar('Error', 'No hay producto seleccionado');
+      return;
+    }
+    
+    if (!_weightController.isConnected.value) {
+      Get.snackbar('Error', 'Balanza no conectada');
+      return;
+    }
+    
+    if (_weightController.currentWeight.value <= 0) {
+      Get.snackbar('Error', 'Peso inválido. Coloque el producto en la balanza');
+      return;
+    }
+    
+    // Validar límites de peso
+    if (!_weightController.validateWeight(_selectedProduct!, _weightController.currentWeight.value)) {
+      return; // El mensaje de error ya se muestra en validateWeight
+    }
+    
+    // Crear producto con peso actual
+    final productWithWeight = _selectedProduct!.copyWith(
+      weight: _weightController.currentWeight.value,
+    );
+    
+    // Calcular precio total
+    final totalPrice = productWithWeight.calculatedPrice;
+    
+    // Agregar al carrito
+    _posController.addToCart(
+      productWithWeight.name,
+      totalPrice,
+      productWithWeight.unit,
+      quantity: 1,
+      availableStock: productWithWeight.stock,
+    );
+    
+    // Mostrar confirmación
+    Get.snackbar(
+      'Producto Agregado',
+      '${productWithWeight.name}\n'
+      'Peso: ${_weightController.currentWeight.value.toStringAsFixed(3)} kg\n'
+      'Total: \$${totalPrice.toStringAsFixed(0)}',
+      backgroundColor: Colors.green.shade100,
+      colorText: Colors.green.shade800,
+      duration: const Duration(seconds: 3),
+    );
+    
+    // Limpiar selección
+    _selectedProduct = null;
+    _barcodeController.clear();
+    _quantityController.text = '1';
+    _weightController.selectedProduct.value = null;
+    
+    // Volver al modo de escaneo
+    _currentMode = 'barcode';
+    _barcodeFocus.requestFocus();
+    
+    setState(() {});
+  }
+
+  // Método para debug de balanza
+  Future<void> _debugScale() async {
+    try {
+      print('🔍 INICIANDO DEBUG DE BALANZA');
+      
+      // Verificar si el controlador existe
+      print('⚖️ Controlador de peso: ${_weightController.runtimeType}');
+      print('🔗 Conectada: ${_weightController.isConnected.value}');
+      print('📊 Peso actual: ${_weightController.currentWeight.value}');
+      
+      // Intentar conectar
+      print('🔌 Intentando conectar...');
+      await _weightController.connectScale();
+      
+      // Esperar un momento
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // Verificar estado después de conectar
+      print('🔗 Estado después de conectar: ${_weightController.isConnected.value}');
+      
+      if (_weightController.isConnected.value) {
+        print('✅ Balanza conectada exitosamente');
+        
+        // Iniciar lectura
+        await _weightController.startReading();
+        print('📖 Lectura iniciada');
+        
+        // Esperar para obtener peso
+        await Future.delayed(const Duration(seconds: 3));
+        print('📊 Peso leído: ${_weightController.currentWeight.value} kg');
+        
+        Get.snackbar(
+          'Debug Balanza',
+          'Balanza conectada\nPeso: ${_weightController.currentWeight.value.toStringAsFixed(3)} kg',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+        );
+      } else {
+        print('❌ Error: No se pudo conectar la balanza');
+        Get.snackbar(
+          'Debug Balanza',
+          'Error: No se pudo conectar la balanza\nRevisa la conexión USB',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+        );
+      }
+    } catch (e) {
+      print('❌ Error en debug: $e');
+      Get.snackbar(
+        'Debug Balanza',
+        'Error: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    }
+  }
+
   void _updateCartItemPrice(CartItem cartItem, double newPrice) {
     // Encontrar el índice del elemento en el carrito
     final index = _posController.cartItems.indexWhere((item) => 

@@ -31,13 +31,17 @@ class ScaleService {
   // Inicializar el servicio
   Future<void> initialize() async {
     try {
+      print('🔧 Inicializando ScaleService...');
+      
       // Configurar el canal de método
       _channel.setMethodCallHandler(_handleMethodCall);
+      print('✅ Canal de método configurado');
       
       // Intentar conectar automáticamente
       await _autoConnect();
+      print('✅ ScaleService inicializado');
     } catch (e) {
-      print('Error inicializando ScaleService: $e');
+      print('❌ Error inicializando ScaleService: $e');
     }
   }
   
@@ -92,22 +96,30 @@ class ScaleService {
   // Conectar a un puerto específico
   Future<bool> _connectToPort(String port) async {
     try {
+      print('🔌 Conectando a puerto: $port');
+      print('⚙️ Configuración: baudRate=$_baudRate, protocol=$_protocol');
+      
       final bool connected = await _channel.invokeMethod('connectToPort', {
         'port': port,
         'baudRate': _baudRate,
         'protocol': _protocol,
       });
       
+      print('📡 Respuesta de plugin nativo: $connected');
+      
       if (connected) {
         _port = port;
         _isConnected = true;
         _connectionController.add(true);
+        print('✅ Conexión exitosa al puerto $port');
         return true;
+      } else {
+        print('❌ Fallo en conexión al puerto $port');
       }
       
       return false;
     } catch (e) {
-      print('Error conectando a puerto $port: $e');
+      print('❌ Error conectando a puerto $port: $e');
       return false;
     }
   }
@@ -118,11 +130,35 @@ class ScaleService {
     int? baudRate,
     String? protocol,
   }) async {
-    if (port != null) _port = port;
-    if (baudRate != null) _baudRate = baudRate;
-    if (protocol != null) _protocol = protocol;
-    
-    return await _connectToPort(_port);
+    try {
+      print('🔌 Iniciando conexión manual...');
+      
+      if (port != null) _port = port;
+      if (baudRate != null) _baudRate = baudRate;
+      if (protocol != null) _protocol = protocol;
+      
+      // Si no hay puerto especificado, buscar automáticamente
+      if (_port.isEmpty) {
+        print('🔍 Buscando puertos disponibles...');
+        final ports = await _getAvailablePorts();
+        print('📋 Puertos encontrados: $ports');
+        
+        if (ports.isNotEmpty) {
+          _port = ports.first;
+          print('🎯 Usando puerto: $_port');
+        } else {
+          print('❌ No se encontraron puertos disponibles');
+          return false;
+        }
+      }
+      
+      final result = await _connectToPort(_port);
+      print('🔗 Resultado de conexión: $result');
+      return result;
+    } catch (e) {
+      print('❌ Error en conexión manual: $e');
+      return false;
+    }
   }
   
   // Desconectar

@@ -10,11 +10,14 @@ import 'screens/users_screen.dart';
 import 'screens/debug_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/reports_screen.dart';
+import 'modules/weight/screens/weight_config_screen.dart';
+import 'modules/weight/screens/weight_products_screen.dart';
 import 'services/sqlite_database_service.dart';
 import 'middleware/auth_middleware.dart';
 import 'services/auth_service.dart';
 import 'services/permissions_service.dart';
 import 'services/print_service.dart';
+import 'utils/sample_weight_products.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
@@ -29,8 +32,27 @@ void main() async {
   await PermissionsService.to.restoreDefaultPermissions();
   // Inicializar servicio de impresión
   await PrintService.instance.initialize();
+  // Insertar productos pesados de ejemplo si no existen
+  await _insertSampleWeightProductsIfNeeded();
   
   runApp(const MyApp());
+}
+
+Future<void> _insertSampleWeightProductsIfNeeded() async {
+  try {
+    // Verificar si ya hay productos pesados
+    final allProducts = await SQLiteDatabaseService.getAllProducts();
+    final weightedProducts = allProducts.where((p) => p.isWeighted).toList();
+    
+    if (weightedProducts.isEmpty) {
+      print('📦 No hay productos pesados, insertando productos de ejemplo...');
+      await SampleWeightProducts.insertSampleProducts();
+    } else {
+      print('✅ Ya hay ${weightedProducts.length} productos pesados configurados');
+    }
+  } catch (e) {
+    print('❌ Error verificando productos pesados: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -135,6 +157,16 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/reportes', 
           page: () => const ReportsScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/peso', 
+          page: () => const WeightProductsScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/peso/configuracion', 
+          page: () => const WeightConfigScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
       ],

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Filtros para balanzas Aclas OS2X -->
+    
+    <!-- Aclas OS2X con chip CH340 -->
+    <usb-device vendor-id="6790" product-id="29987" />
+    
+    <!-- Aclas OS2X con chip PL2303 -->
+    <usb-device vendor-id="1659" product-id="8963" />
+    
+    <!-- Aclas OS2X con chip FTDI FT232R -->
+    <usb-device vendor-id="1027" product-id="24577" />
+    
+    <!-- Aclas OS2X con chip FTDI FT232H -->
+    <usb-device vendor-id="1027" product-id="24596" />
+    
+    <!-- Balanzas genéricas -->
+    <usb-device vendor-id="1155" product-id="22336" />
+    
+    <!-- Permitir cualquier dispositivo USB para testing -->
+    <usb-device class="255" />
+</resources> 
