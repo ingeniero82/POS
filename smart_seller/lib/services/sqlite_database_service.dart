@@ -8,6 +8,7 @@ import '../models/sale.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:convert'; // Added for jsonDecode
 import '../models/customer.dart'; // Added for Customer model
+import '../models/client.dart'; // Added for Client model
 
 class SQLiteDatabaseService {
   static Database? _database;
@@ -136,6 +137,29 @@ class SQLiteDatabaseService {
         membershipLevel TEXT,
         lastPurchase TEXT,
         totalPurchases REAL NOT NULL DEFAULT 0.0
+      )
+    ''');
+
+    // Tabla de clientes para facturación electrónica DIAN
+    await db.execute('''
+      CREATE TABLE clients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        documentType TEXT NOT NULL,
+        documentNumber TEXT UNIQUE NOT NULL,
+        businessName TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        address TEXT,
+        fiscalResponsibility TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isActive INTEGER NOT NULL DEFAULT 1,
+        city TEXT,
+        department TEXT,
+        country TEXT,
+        postalCode TEXT,
+        contactPerson TEXT,
+        notes TEXT
       )
     ''');
     
@@ -454,6 +478,19 @@ class SQLiteDatabaseService {
       updateData,
       where: 'id = ?',
       whereArgs: [product.id],
+    );
+  }
+  
+  // Actualizar precio de producto
+  static Future<void> updateProductPrice(int id, double newPrice) async {
+    await _database!.update(
+      'products',
+      {
+        'price': newPrice,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
   
@@ -807,5 +844,98 @@ class SQLiteDatabaseService {
   // Cerrar base de datos
   static Future<void> close() async {
     await _database?.close();
+  }
+
+  // ================== CLIENTES FACTURACIÓN ELECTRÓNICA DIAN ==================
+  
+  // Crear cliente para facturación electrónica
+  static Future<void> createClient(Client client) async {
+    await _database!.insert('clients', client.toMap());
+  }
+  
+  // Obtener todos los clientes para facturación electrónica
+  static Future<List<Client>> getAllClients() async {
+    final results = await _database!.query(
+      'clients',
+      where: 'isActive = ?',
+      whereArgs: [1],
+      orderBy: 'businessName ASC',
+    );
+    
+    return results.map((clientData) => Client.fromMap(clientData)).toList();
+  }
+  
+  // Buscar cliente por ID
+  static Future<Client?> getClientById(int id) async {
+    final results = await _database!.query(
+      'clients',
+      where: 'id = ? AND isActive = ?',
+      whereArgs: [id, 1],
+    );
+    
+    if (results.isNotEmpty) {
+      return Client.fromMap(results.first);
+    }
+    return null;
+  }
+  
+  // Buscar cliente por número de documento
+  static Future<Client?> getClientByDocument(String documentNumber) async {
+    final results = await _database!.query(
+      'clients',
+      where: 'documentNumber = ? AND isActive = ?',
+      whereArgs: [documentNumber, 1],
+    );
+    
+    if (results.isNotEmpty) {
+      return Client.fromMap(results.first);
+    }
+    return null;
+  }
+  
+  // Actualizar cliente
+  static Future<void> updateClient(Client client) async {
+    await _database!.update(
+      'clients',
+      client.toMap(),
+      where: 'id = ?',
+      whereArgs: [client.id],
+    );
+  }
+  
+  // Eliminar cliente (marcar como inactivo)
+  static Future<void> deleteClient(int id) async {
+    await _database!.update(
+      'clients',
+      {'isActive': 0, 'updatedAt': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+  
+  // Buscar clientes por nombre de negocio
+  static Future<List<Client>> searchClientsByBusinessName(String businessName) async {
+    final results = await _database!.query(
+      'clients',
+      where: 'businessName LIKE ? AND isActive = ?',
+      whereArgs: ['%$businessName%', 1],
+      orderBy: 'businessName ASC',
+    );
+    
+    return results.map((clientData) => Client.fromMap(clientData)).toList();
+  }
+  
+  // Verificar si existe un cliente con el documento dado
+  static Future<bool> clientDocumentExists(String documentNumber, {int? excludeId}) async {
+    String whereClause = 'documentNumber = ? AND isActive = ?';
+    List<dynamic> whereArgs = [documentNumber.trim(), 1];
+    
+    if (excludeId != null) {
+      whereClause += ' AND id != ?';
+      whereArgs.add(excludeId);
+    }
+    
+    final results = await _database!.query('clients', where: whereClause, whereArgs: whereArgs);
+    return results.isNotEmpty;
   }
 } 

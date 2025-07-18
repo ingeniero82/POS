@@ -30,6 +30,24 @@ class _PosScreenState extends State<PosScreen> {
   // Controlador del POS
   late PosController _posController;
   
+  // Variables para autorización
+  bool _isAuthorized = false;
+  DateTime? _authorizationTime;
+  String? _authorizedUser;
+  
+  // Códigos de autorización válidos
+  static const List<String> _validBarcodes = [
+    'BARCODE001', // Tarjeta Admin
+    'BARCODE002', // Tarjeta Supervisor  
+    'BARCODE003', // Tarjeta Gerente
+  ];
+  
+  static const Map<String, String> _validPersonalCodes = {
+    'ADMIN123': 'Administrador',
+    'SUPER456': 'Supervisor',
+    'MANAGER789': 'Gerente',
+  };
+  
   @override
   void initState() {
     super.initState();
@@ -127,6 +145,35 @@ class _PosScreenState extends State<PosScreen> {
               ],
             ),
           ),
+          // Indicador de autorización
+          if (_isAuthorized && _authorizationTime != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                border: Border.all(color: Colors.green.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.verified_user, color: Colors.green.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Autorizado: ${_authorizedUser ?? 'Usuario'} - ${_getTimeRemaining()}',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _clearAuthorization,
+                    child: Text('Cerrar', style: TextStyle(color: Colors.green.shade700)),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: RawKeyboardListener(
               focusNode: FocusNode(),
@@ -256,7 +303,18 @@ class _PosScreenState extends State<PosScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text('Código: ${_selectedProduct!.code}'),
-            Text('Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
+                  tooltip: 'Editar precio',
+                  onPressed: () => _showPriceEditDialog(_selectedProduct!),
+                ),
+              ],
+            ),
             Text('Stock: ${_selectedProduct!.stock}'),
             if (_selectedProduct!.isWeighted) Text('Producto por peso'),
             const SizedBox(height: 16),
@@ -382,9 +440,25 @@ class _PosScreenState extends State<PosScreen> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            '\$${product.price.toStringAsFixed(0)}',
-                            style: const TextStyle(fontSize: 13, color: Colors.blue),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '\$${product.price.toStringAsFixed(0)}',
+                                style: const TextStyle(fontSize: 13, color: Colors.blue),
+                              ),
+                              GestureDetector(
+                                onTap: () => _showPriceEditDialog(product),
+                                child: Container(
+                                  margin: const EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.edit,
+                                    size: 16,
+                                    color: Colors.blue[600],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -560,7 +634,21 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   ),
                   title: Text(item.name),
-                  subtitle: Text('${item.quantity} x \$${NumberFormat('#,###').format(item.price)}'),
+                  subtitle: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${item.quantity} x \$${NumberFormat('#,###').format(item.price)}'),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _showCartItemPriceEditDialog(item),
+                        child: Icon(
+                          Icons.edit,
+                          size: 16,
+                          color: Colors.blue[600],
+                        ),
+                      ),
+                    ],
+                  ),
                   trailing: Text(
                     '\$${NumberFormat('#,###').format(item.price * item.quantity)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -876,14 +964,27 @@ class _PosScreenState extends State<PosScreen> {
                                   Text('Stock: ${product.stock}'),
                                 ],
                               ),
-                              trailing: Text(
-                                '\$${NumberFormat('#,###').format(product.price)}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: isSelected ? Colors.blue[800] : Colors.black,
-                                ),
-                              ),
+                                            trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '\$${NumberFormat('#,###').format(product.price)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: isSelected ? Colors.blue[800] : Colors.black,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.edit, color: Colors.blue[600], size: 18),
+                    tooltip: 'Editar precio',
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _showPriceEditDialog(product);
+                    },
+                  ),
+                ],
+              ),
                               onTap: () {
                                 Navigator.of(context).pop();
                                 _selectProductDirectly(product);
@@ -977,10 +1078,21 @@ class _PosScreenState extends State<PosScreen> {
   }
   
   void _clearCart() {
+    // Verificar si ya está autorizado y la autorización es válida
+    if (_isAuthorizationValid()) {
+      _performClearCart();
+      return;
+    }
+    
+    // Si no está autorizado, mostrar diálogo de autorización
+    _showAuthorizationDialog();
+  }
+  
+  void _performClearCart() {
     _posController.clearCart();
     Get.snackbar(
       'Carrito limpiado',
-      'Se han removido todos los productos',
+      'Se han removido todos los productos${_authorizedUser != null ? ' (Autorizado por: $_authorizedUser)' : ''}',
       backgroundColor: Colors.orange,
       colorText: Colors.white,
     );
@@ -1050,5 +1162,815 @@ class _PosScreenState extends State<PosScreen> {
         ],
       ),
     );
+  }
+  
+  // Funciones de autorización
+  bool _isAuthorizationValid() {
+    if (!_isAuthorized || _authorizationTime == null) {
+      return false;
+    }
+    
+    final now = DateTime.now();
+    final timeDifference = now.difference(_authorizationTime!);
+    
+    // Autorización válida por 5 minutos
+    if (timeDifference.inMinutes >= 5) {
+      _clearAuthorization();
+      return false;
+    }
+    
+    return true;
+  }
+  
+  void _clearAuthorization() {
+    setState(() {
+      _isAuthorized = false;
+      _authorizationTime = null;
+      _authorizedUser = null;
+    });
+  }
+  
+  String _getTimeRemaining() {
+    if (_authorizationTime == null) return '';
+    
+    final now = DateTime.now();
+    final timeDifference = now.difference(_authorizationTime!);
+    final remainingMinutes = 5 - timeDifference.inMinutes;
+    final remainingSeconds = 60 - (timeDifference.inSeconds % 60);
+    
+    if (remainingMinutes <= 0) {
+      return 'Expirado';
+    }
+    
+    return '${remainingMinutes}m ${remainingSeconds}s restantes';
+  }
+  
+  void _setAuthorization(String user) {
+    setState(() {
+      _isAuthorized = true;
+      _authorizationTime = DateTime.now();
+      _authorizedUser = user;
+    });
+  }
+  
+  bool _validateBarcode(String barcode) {
+    return _validBarcodes.contains(barcode.toUpperCase());
+  }
+  
+  bool _validatePersonalCode(String code) {
+    return _validPersonalCodes.containsKey(code.toUpperCase());
+  }
+  
+  void _showAuthorizationDialog() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🔐 Autorización Requerida'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Limpiar carrito requiere autorización'),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                Get.back();
+                _showBarcodeInput();
+              },
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Escanear Código de Barras'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () {
+                Get.back();
+                _showPersonalCodeInput();
+              },
+              icon: const Icon(Icons.keyboard),
+              label: const Text('Código Personal'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPriceAuthorizationDialog(Product product) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🔐 Autorización Requerida'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Modificar precio requiere autorización'),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                Get.back();
+                _showPriceBarcodeInput(product);
+              },
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Escanear Código de Barras'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () {
+                Get.back();
+                _showPricePersonalCodeInput(product);
+              },
+              icon: const Icon(Icons.keyboard),
+              label: const Text('Código Personal'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPriceEditDialog(Product product) {
+    // Verificar si ya está autorizado y la autorización es válida
+    if (_isAuthorizationValid()) {
+      _showPriceEditForm(product);
+      return;
+    }
+    
+    // Si no está autorizado, mostrar diálogo de autorización
+    _showPriceAuthorizationDialog(product);
+  }
+  
+  void _showPriceEditForm(Product product) {
+    final TextEditingController priceController = TextEditingController();
+    priceController.text = product.price.toString();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('💰 Editar Precio'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Producto: ${product.name}'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: priceController,
+              autofocus: true,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Nuevo Precio',
+                hintText: 'Ingrese el nuevo precio',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.attach_money),
+              ),
+              onSubmitted: (value) {
+                final newPrice = double.tryParse(value);
+                if (newPrice != null && newPrice > 0) {
+                  _updateProductPrice(product, newPrice);
+                  Get.back();
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Precio inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newPrice = double.tryParse(priceController.text);
+              if (newPrice != null && newPrice > 0) {
+                _updateProductPrice(product, newPrice);
+                Get.back();
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Precio inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Actualizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPriceBarcodeInput(Product product) {
+    final TextEditingController barcodeController = TextEditingController();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🏷️ Escanear Código de Barras'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Escanee o ingrese el código de barras:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: barcodeController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Código de Barras',
+                hintText: 'BARCODE001, BARCODE002, BARCODE003',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.qr_code_scanner),
+              ),
+              onSubmitted: (value) {
+                if (_validateBarcode(value)) {
+                  _setAuthorization('Autorizado por código de barras');
+                  Get.back();
+                  _showPriceEditForm(product);
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Código de barras inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_validateBarcode(barcodeController.text)) {
+                _setAuthorization('Autorizado por código de barras');
+                Get.back();
+                _showPriceEditForm(product);
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Código de barras inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Autorizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPricePersonalCodeInput(Product product) {
+    final TextEditingController codeController = TextEditingController();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🔑 Código Personal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ingrese su código personal:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: codeController,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Código Personal',
+                hintText: 'ADMIN123, SUPER456, MANAGER789',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
+              ),
+              onSubmitted: (value) {
+                if (_validatePersonalCode(value)) {
+                  final user = _validPersonalCodes[value.toUpperCase()]!;
+                  _setAuthorization(user);
+                  Get.back();
+                  _showPriceEditForm(product);
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Código personal inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_validatePersonalCode(codeController.text)) {
+                final user = _validPersonalCodes[codeController.text.toUpperCase()]!;
+                _setAuthorization(user);
+                Get.back();
+                _showPriceEditForm(product);
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Código personal inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Autorizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _updateProductPrice(Product product, double newPrice) async {
+    try {
+      // Verificar que el producto tenga ID
+      if (product.id == null) {
+        Get.snackbar(
+          'Error',
+          'No se puede actualizar el precio: producto sin ID',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      
+      // Actualizar en la base de datos
+      await SQLiteDatabaseService.updateProductPrice(product.id!, newPrice);
+      
+      // Actualizar en la lista local
+      final index = _products.indexWhere((p) => p.id == product.id);
+      if (index != -1) {
+        setState(() {
+          _products[index] = Product(
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            code: product.code,
+            shortCode: product.shortCode,
+            price: newPrice,
+            cost: product.cost,
+            stock: product.stock,
+            minStock: product.minStock,
+            category: product.category,
+            unit: product.unit,
+            isWeighted: product.isWeighted,
+            pricePerKg: product.pricePerKg,
+            weight: product.weight,
+            minWeight: product.minWeight,
+            maxWeight: product.maxWeight,
+            isActive: product.isActive,
+            imageUrl: product.imageUrl,
+            createdAt: product.createdAt,
+            updatedAt: DateTime.now(),
+          );
+          
+          // Si es el producto seleccionado, actualizarlo también
+          if (_selectedProduct?.id == product.id) {
+            _selectedProduct = _products[index];
+          }
+        });
+      }
+      
+      Get.snackbar(
+        'Precio actualizado',
+        'Nuevo precio: \$${NumberFormat('#,###').format(newPrice)} (Autorizado por: ${_authorizedUser ?? 'Usuario'})',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Error actualizando precio: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+  
+  void _showBarcodeInput() {
+    final TextEditingController barcodeController = TextEditingController();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🏷️ Escanear Código de Barras'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Escanee o ingrese el código de barras:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: barcodeController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Código de Barras',
+                hintText: 'BARCODE001, BARCODE002, BARCODE003',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.qr_code_scanner),
+              ),
+              onSubmitted: (value) {
+                if (_validateBarcode(value)) {
+                  _setAuthorization('Autorizado por código de barras');
+                  Get.back();
+                  _clearCart();
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Código de barras inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_validateBarcode(barcodeController.text)) {
+                _setAuthorization('Autorizado por código de barras');
+                Get.back();
+                _clearCart();
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Código de barras inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Autorizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showPersonalCodeInput() {
+    final TextEditingController codeController = TextEditingController();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🔑 Código Personal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ingrese su código personal:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: codeController,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Código Personal',
+                hintText: 'ADMIN123, SUPER456, MANAGER789',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
+              ),
+              onSubmitted: (value) {
+                if (_validatePersonalCode(value)) {
+                  final user = _validPersonalCodes[value.toUpperCase()]!;
+                  _setAuthorization(user);
+                  Get.back();
+                  _clearCart();
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Código personal inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_validatePersonalCode(codeController.text)) {
+                final user = _validPersonalCodes[codeController.text.toUpperCase()]!;
+                _setAuthorization(user);
+                Get.back();
+                _clearCart();
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Código personal inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Autorizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // ================== EDICIÓN DE PRECIOS EN CARRITO ==================
+  
+  void _showCartItemPriceEditDialog(CartItem cartItem) {
+    // Verificar si ya está autorizado y la autorización es válida
+    if (_isAuthorizationValid()) {
+      _showCartItemPriceEditForm(cartItem);
+      return;
+    }
+    
+    // Si no está autorizado, mostrar diálogo de autorización
+    _showCartItemPriceAuthorizationDialog(cartItem);
+  }
+  
+  void _showCartItemPriceEditForm(CartItem cartItem) {
+    final TextEditingController priceController = TextEditingController();
+    priceController.text = cartItem.price.toString();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('💰 Editar Precio'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Producto: ${cartItem.name}'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: priceController,
+              autofocus: true,
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Nuevo Precio',
+                hintText: 'Ingrese el nuevo precio',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.attach_money),
+              ),
+              onSubmitted: (value) {
+                final newPrice = double.tryParse(value);
+                if (newPrice != null && newPrice > 0) {
+                  _updateCartItemPrice(cartItem, newPrice);
+                  Get.back();
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Precio inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newPrice = double.tryParse(priceController.text);
+              if (newPrice != null && newPrice > 0) {
+                _updateCartItemPrice(cartItem, newPrice);
+                Get.back();
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Precio inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Actualizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showCartItemPriceAuthorizationDialog(CartItem cartItem) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🔐 Autorización Requerida'),
+        content: const Text('Se requiere autorización para editar precios. ¿Cómo desea autorizar?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              _showCartItemPriceBarcodeInput(cartItem);
+            },
+            child: const Text('Código de Barras'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              _showCartItemPricePersonalCodeInput(cartItem);
+            },
+            child: const Text('Código Personal'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showCartItemPriceBarcodeInput(CartItem cartItem) {
+    final TextEditingController barcodeController = TextEditingController();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🏷️ Escanear Código de Barras'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Escanee o ingrese el código de barras:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: barcodeController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Código de Barras',
+                hintText: 'BARCODE001, BARCODE002, BARCODE003',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.qr_code_scanner),
+              ),
+              onSubmitted: (value) {
+                if (_validateBarcode(value)) {
+                  _setAuthorization('Autorizado por código de barras');
+                  Get.back();
+                  _showCartItemPriceEditForm(cartItem);
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Código de barras inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_validateBarcode(barcodeController.text)) {
+                _setAuthorization('Autorizado por código de barras');
+                Get.back();
+                _showCartItemPriceEditForm(cartItem);
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Código de barras inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Autorizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showCartItemPricePersonalCodeInput(CartItem cartItem) {
+    final TextEditingController codeController = TextEditingController();
+    
+    Get.dialog(
+      AlertDialog(
+        title: const Text('🔢 Código Personal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ingrese su código personal:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: codeController,
+              autofocus: true,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Código Personal',
+                hintText: 'ADMIN123, SUPER456, MANAGER789',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.vpn_key),
+              ),
+              onSubmitted: (value) {
+                if (_validatePersonalCode(value)) {
+                  final user = _validPersonalCodes[value.toUpperCase()]!;
+                  _setAuthorization(user);
+                  Get.back();
+                  _showCartItemPriceEditForm(cartItem);
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Código personal inválido',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_validatePersonalCode(codeController.text)) {
+                final user = _validPersonalCodes[codeController.text.toUpperCase()]!;
+                _setAuthorization(user);
+                Get.back();
+                _showCartItemPriceEditForm(cartItem);
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'Código personal inválido',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Autorizar'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _updateCartItemPrice(CartItem cartItem, double newPrice) {
+    // Encontrar el índice del elemento en el carrito
+    final index = _posController.cartItems.indexWhere((item) => 
+      item.name == cartItem.name && item.price == cartItem.price);
+    
+    if (index >= 0) {
+      _posController.changeItemPrice(index, newPrice);
+    } else {
+      Get.snackbar(
+        'Error',
+        'No se pudo encontrar el elemento en el carrito',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 } 

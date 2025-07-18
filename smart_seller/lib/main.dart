@@ -14,6 +14,7 @@ import 'services/sqlite_database_service.dart';
 import 'middleware/auth_middleware.dart';
 import 'services/auth_service.dart';
 import 'services/permissions_service.dart';
+import 'services/print_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
@@ -26,6 +27,8 @@ void main() async {
   Get.put(PermissionsService());
   // Restaurar permisos por defecto
   await PermissionsService.to.restoreDefaultPermissions();
+  // Inicializar servicio de impresión
+  await PrintService.instance.initialize();
   
   runApp(const MyApp());
 }

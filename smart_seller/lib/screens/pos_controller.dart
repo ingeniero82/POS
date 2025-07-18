@@ -1,10 +1,12 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/sale.dart';
 import '../models/product.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/auth_service.dart';
 import '../services/scale_service.dart';
+import '../services/print_service.dart';
 import 'package:intl/intl.dart';
 
 class CartItem {
@@ -455,11 +457,50 @@ class PosController extends GetxController {
       
       // El stock se actualiza automáticamente en saveSale
       
-      // Mostrar confirmación
-      Get.dialog(
-        Dialog(
+      // Mostrar confirmación con opción de imprimir
+      _showPrintConfirmationDialog(sale, method, copFormat);
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Error al procesar la venta: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+  
+  // Mostrar diálogo de confirmación con opción de imprimir
+  void _showPrintConfirmationDialog(Sale sale, String method, NumberFormat copFormat) {
+    // Nodos de foco para los botones
+    final FocusNode yesButtonFocus = FocusNode();
+    final FocusNode noButtonFocus = FocusNode();
+    
+    // Enfocar el botón "SÍ" automáticamente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      yesButtonFocus.requestFocus();
+    });
+    
+    Get.dialog(
+      Dialog(
+        child: RawKeyboardListener(
+          focusNode: FocusNode(),
+          autofocus: true,
+          onKey: (RawKeyEvent event) {
+            if (event is RawKeyDownEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.enter) {
+                // Enter imprime el recibo
+                Get.back();
+                _printReceipt(sale, method, copFormat);
+              } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+                // Escape no imprime
+                Get.back();
+                clearCart();
+              }
+            }
+          },
           child: Container(
-            width: 400,
+            width: 450,
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -485,36 +526,181 @@ class PosController extends GetxController {
                   style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
                 const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Get.back();
-                      clearCart();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                
+                // Pregunta sobre imprimir
+                const Text(
+                  '¿Desea imprimir el recibo?',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 20),
+                
+                // Botones de respuesta
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        focusNode: yesButtonFocus,
+                        onPressed: () {
+                          Get.back();
+                          _printReceipt(sale, method, copFormat);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4CAF50),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'SÍ',
+                          style: TextStyle(
+                            color: Colors.white, 
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                    child: const Text('Continuar', style: TextStyle(color: Colors.white)),
-                  ),
-              ),
-            ],
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        focusNode: noButtonFocus,
+                        onPressed: () {
+                          Get.back();
+                          clearCart();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[300],
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'NO',
+                          style: TextStyle(
+                            color: Colors.black87, 
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Texto de ayuda
+                const Text(
+                  'Presiona Enter para imprimir o Escape para continuar',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
           ),
         ),
       ),
+      barrierDismissible: false,
     );
+  }
+  
+  // Imprimir recibo
+  void _printReceipt(Sale sale, String method, NumberFormat copFormat) async {
+    try {
+      print('🖨️ Iniciando proceso de impresión...');
+      
+      // Mostrar diálogo de imprimiendo
+      Get.dialog(
+        Dialog(
+          child: Container(
+            width: 300,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                const Text(
+                  'Imprimiendo recibo...',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      
+      // Inicializar servicio de impresión
+      final printService = PrintService.instance;
+      await printService.initialize();
+      
+      print('🔍 Estado de la impresora: ${printService.isConnected ? 'Conectada' : 'No conectada'}');
+      print('🔌 Puerto: ${printService.printerPort}');
+      
+      // Verificar si la impresora está conectada
+      if (!printService.isConnected) {
+        Get.back(); // Cerrar diálogo de imprimiendo
+        Get.snackbar(
+          'Error de impresión',
+          'Impresora Citizen TZ30-M01 no detectada. Verifique la conexión.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+        clearCart();
+        return;
+      }
+      
+      // Imprimir recibo
+      final success = await printService.printReceipt(
+        sale, 
+        cartItems, 
+        subtotal, 
+        taxes, 
+        total
+      );
+      
+      Get.back(); // Cerrar diálogo de imprimiendo
+      
+      if (success) {
+        print('✅ Recibo impreso exitosamente');
+        Get.snackbar(
+          'Recibo impreso',
+          'El recibo se imprimió correctamente',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      } else {
+        print('❌ Error al imprimir el recibo');
+        Get.snackbar(
+          'Error de impresión',
+          'Hubo un problema al imprimir el recibo',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      }
+      
+      clearCart();
     } catch (e) {
+      Get.back(); // Cerrar diálogo de imprimiendo
       Get.snackbar(
         'Error',
-        'Error al procesar la venta: $e',
+        'Error al imprimir: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
+      clearCart();
     }
   }
-  
+
   @override
   void onClose() {
     _scaleService.dispose();
