@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/sale.dart';
 import '../models/product.dart';
+import '../models/customer.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/auth_service.dart';
 import '../services/scale_service.dart';
@@ -48,6 +49,7 @@ class PosController extends GetxController {
   var scaleWeight = 0.0.obs;
   var isScaleConnected = false.obs;
   var isScaleReading = false.obs;
+
   
   late ScaleService _scaleService;
   
@@ -294,6 +296,8 @@ class PosController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
     );
   }
+  
+  
   
   // Conectar balanza
   Future<void> connectScale() async {
@@ -678,19 +682,25 @@ class PosController extends GetxController {
       if (success) {
         print('✅ Recibo impreso exitosamente');
         
+        // Esperar un momento antes de abrir el cajón (para que la impresora termine)
+        await Future.delayed(const Duration(milliseconds: 500));
+        
         // Abrir cajón monedero automáticamente
+        print('💰 Intentando abrir cajón monedero...');
         final drawerOpened = await printService.openCashDrawer();
         if (drawerOpened) {
-          print('💰 Cajón monedero abierto');
+          print('✅ Cajón monedero abierto correctamente');
+        } else {
+          print('❌ Error: El cajón monedero NO se pudo abrir');
         }
         
         Get.snackbar(
-          'Recibo impreso',
-          'El recibo se imprimió correctamente${drawerOpened ? ' y el cajón se abrió' : ''}',
+          'Venta completada',
+          'El recibo se imprimió correctamente${drawerOpened ? ' y el cajón se abrió' : ''}\n¡Listo para la siguiente venta!',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green,
           colorText: Colors.white,
-          duration: const Duration(seconds: 2),
+          duration: const Duration(seconds: 3),
         );
       } else {
         print('❌ Error al imprimir el recibo');
@@ -704,7 +714,12 @@ class PosController extends GetxController {
         );
       }
       
+      // Limpiar el carrito y regresar al POS listo para la siguiente venta
       clearCart();
+      
+      // Asegurar que estamos en la pantalla de POS
+      await Future.delayed(const Duration(milliseconds: 500));
+      Get.offAllNamed('/pos'); // Regresar al POS limpio y listo
     } catch (e) {
       Get.back(); // Cerrar diálogo de imprimiendo
       Get.snackbar(

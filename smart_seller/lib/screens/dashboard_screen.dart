@@ -110,6 +110,16 @@ class DashboardScreen extends StatelessWidget {
                           selected: controller.selectedMenu.value == DashboardMenu.configuracion,
                           onTap: () => controller.selectMenu(DashboardMenu.configuracion),
                         ),
+                      // Configuración de Empresa - Solo si tiene permisos de configuración
+                      if (authService.hasPermission(Permission.accessSettings))
+                        _SidebarButton(
+                          icon: Icons.business,
+                          label: 'Datos de Empresa',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/configuracion-empresa');
+                          },
+                        ),
                       // Usuarios - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewUsers))
                         _SidebarButton(

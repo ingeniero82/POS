@@ -45,6 +45,7 @@ dependencies:
   path: ^1.8.3
   sqflite_common_ffi: ^2.3.6
   flutter_typeahead: ^4.0.0
+  libserialport: ^0.3.0+1
 
 dev_dependencies:
   flutter_test:

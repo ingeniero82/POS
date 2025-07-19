@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/sale.dart';
 import '../models/product.dart';
+import '../models/customer.dart';
 import '../screens/pos_controller.dart';
+import '../services/company_config_service.dart';
+import '../models/company_config.dart';
 
 class PrintService {
   static const MethodChannel _channel = MethodChannel('print_channel');
@@ -199,123 +202,173 @@ class PrintService {
     }
   }
   
-  // Imprimir recibo completo
-  Future<bool> printReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total) async {
+    // Imprimir recibo completo
+  Future<bool> printReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer}) async {
     if (!_isConnected) {
       print('❌ Impresora no conectada');
       return false;
     }
-    
+
     try {
       print('🖨️ Iniciando impresión de recibo...');
       _isPrinting = true;
-      
+
+      // Obtener configuración de empresa con fallback
+      CompanyConfig? companyConfig;
+      try {
+        companyConfig = await CompanyConfigService.getCompanyConfig();
+        print('✅ Configuración de empresa cargada correctamente');
+      } catch (configError) {
+        print('⚠️ Error cargando configuración de empresa: $configError');
+        // Crear configuración por defecto si falla
+        companyConfig = CompanyConfig(
+          companyName: 'SMART SELLER',
+          address: 'Dirección de la empresa',
+          phone: 'Teléfono de contacto',
+          headerText: 'FACTURA DE VENTA',
+          footerText: 'Gracias por su compra\nVuelva pronto',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
+
       // Si está en modo simulación, simular la impresión
       if (_printerPort == 'SIMULATION') {
         print('📝 Simulando impresión del recibo:');
-        _simulatePrintReceipt(sale, items, subtotal, taxes, total);
+        _simulatePrintReceipt(sale, items, subtotal, taxes, total, companyConfig: companyConfig, customer: customer);
         _isPrinting = false;
         return true;
       }
-      
+
       List<int> commands = [];
-      
+
       // Inicializar impresora
       commands.addAll(_initPrinter);
-      
-      // Encabezado
+
+      // Encabezado personalizado con datos de empresa
       commands.addAll(_alignCenter);
       commands.addAll(_boldOn);
       commands.addAll(_doubleHeight);
-      commands.addAll(_formatText('SMART SELLER'));
+      commands.addAll(_formatText(companyConfig.companyName));
       commands.addAll(_newLine());
       commands.addAll(_normalSize);
-      commands.addAll(_formatText('Sistema POS'));
+      commands.addAll(_formatText(companyConfig.address));
       commands.addAll(_newLine());
-      commands.addAll(_boldOff);
-      commands.addAll(_formatText('Recibo de Venta'));
+      commands.addAll(_formatText('Tel: ${companyConfig.phone}'));
       commands.addAll(_newLine());
-      
-      // Línea separadora
-      commands.addAll(_alignLeft);
-      commands.addAll(_formatText(_createLine()));
+      if (companyConfig.email != null) {
+        commands.addAll(_formatText(companyConfig.email!));
+        commands.addAll(_newLine());
+      }
+      if (companyConfig.taxId != null) {
+        commands.addAll(_formatText('NIT: ${companyConfig.taxId}'));
+        commands.addAll(_newLine());
+      }
       commands.addAll(_newLine());
-      
-      // Información de la venta
-      final formatter = DateFormat('dd/MM/yyyy HH:mm:ss');
-      commands.addAll(_formatText('Fecha: ${formatter.format(sale.date)}'));
-      commands.addAll(_newLine());
-      commands.addAll(_formatText('Cajero: ${sale.user}'));
-      commands.addAll(_newLine());
-      commands.addAll(_formatText('Método: ${sale.paymentMethod}'));
-      commands.addAll(_newLine());
-      commands.addAll(_formatText(_createLine()));
-      commands.addAll(_newLine());
-      
-      // Encabezado de productos
       commands.addAll(_boldOn);
-      commands.addAll(_formatText(_formatLine('PRODUCTO', 'CANT', 'PRECIO')));
+      commands.addAll(_formatText(companyConfig.headerText));
+      commands.addAll(_newLine());
+      commands.addAll(_formatText('No. ${_generateInvoiceNumber()}'));
       commands.addAll(_newLine());
       commands.addAll(_boldOff);
-      commands.addAll(_formatText(_createLine()));
+
+      // Fecha y información de caja
+      final dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
+      commands.addAll(_alignLeft);
+      commands.addAll(_formatText('${dateFormatter.format(sale.date)} Caja: 01 Us.: ${sale.user.toUpperCase()}'));
       commands.addAll(_newLine());
       
-      // Productos
-      final NumberFormat currencyFormat = NumberFormat.currency(
-        locale: 'es_CO', 
-        symbol: '\$ ', 
-        decimalDigits: 0,
-        customPattern: '\u00A4#,##0'
-      );
-      
-      for (CartItem item in items) {
-        // Nombre del producto
-        commands.addAll(_formatText(item.name));
+      // Información del cliente (si está seleccionado)
+      if (customer != null) {
         commands.addAll(_newLine());
-        
-        // Cantidad, precio unitario y total
-        String quantityStr = item.displayInfo;
-        String priceStr = currencyFormat.format(item.price);
-        String totalStr = currencyFormat.format(item.total);
-        
-        commands.addAll(_formatText(_formatLine(quantityStr, priceStr, totalStr)));
+        commands.addAll(_boldOn);
+        commands.addAll(_formatText('CLIENTE:'));
+        commands.addAll(_boldOff);
         commands.addAll(_newLine());
+        commands.addAll(_formatText('${customer.name}'));
+      commands.addAll(_newLine());
+        if (customer.documentNumber != null) {
+          commands.addAll(_formatText('Doc: ${customer.documentNumber}'));
+      commands.addAll(_newLine());
+        }
+        commands.addAll(_formatText('Tel: ${customer.phone}'));
+      commands.addAll(_newLine());
       }
       
       // Línea separadora
       commands.addAll(_formatText(_createLine()));
       commands.addAll(_newLine());
       
-      // Totales
-      commands.addAll(_alignRight);
-      commands.addAll(_formatText('Subtotal: ${currencyFormat.format(subtotal)}'));
+      // Encabezado de productos estilo MURICATA
+      commands.addAll(_formatText('DESCRIPCION PRECIO_ MED CANT._ SUBTOTAL_'));
       commands.addAll(_newLine());
-      commands.addAll(_formatText('IVA (19%): ${currencyFormat.format(taxes)}'));
-      commands.addAll(_newLine());
-      commands.addAll(_boldOn);
-      commands.addAll(_doubleHeight);
-      commands.addAll(_formatText('TOTAL: ${currencyFormat.format(total)}'));
-      commands.addAll(_newLine());
-      commands.addAll(_normalSize);
-      commands.addAll(_boldOff);
-      
-      // Pie de página
-      commands.addAll(_alignCenter);
-      commands.addAll(_newLine());
-      commands.addAll(_formatText('¡Gracias por su compra!'));
-      commands.addAll(_newLine());
-      commands.addAll(_formatText('Vuelva pronto'));
-      commands.addAll(_newLine());
+              commands.addAll(_formatText(_createEqualsLine()));
       commands.addAll(_newLine());
       
-      // Línea separadora final
-      commands.addAll(_alignLeft);
+      // Productos estilo MURICATA
+      final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
+      
+      for (CartItem item in items) {
+        // Formato: AVENA        4.000 KG 3.00      12.000
+        String productName = item.name.toUpperCase().padRight(12);
+        String unitPrice = '${currencyFormat.format(item.price)}'.padLeft(7);
+        String measure = item.isWeighted ? 'KG ' : 'UND'; // Mostrar medida real: KG o UNIDAD  
+        String medUnit = '$measure ${item.quantity.toStringAsFixed(2)}'.padRight(9);
+        String subtotalItem = currencyFormat.format(item.total).padLeft(10);
+        
+        commands.addAll(_formatText('$productName$unitPrice $medUnit$subtotalItem'));
+        commands.addAll(_newLine());
+      }
+      
+      // Línea separadora y totales estilo MURICATA
       commands.addAll(_formatText(_createLine()));
       commands.addAll(_newLine());
       
-      // Fecha y hora actual
+      // Totales detallados
+      commands.addAll(_alignLeft);
+      String subtotalStr = currencyFormat.format(subtotal);
+      String taxesStr = currencyFormat.format(taxes);
+      String totalStr = currencyFormat.format(total);
+      
+      commands.addAll(_formatText('SUB.T.: \$ $subtotalStr -DESC.: \$        0'));
+      commands.addAll(_newLine());
+      commands.addAll(_formatText('+IVA : \$        0 AJUST.: \$        0'));
+      commands.addAll(_newLine());
+      commands.addAll(_boldOn);
+      commands.addAll(_formatText('         TOTAL: \$ $totalStr'));
+      commands.addAll(_newLine());
+      commands.addAll(_boldOff);
+      commands.addAll(_formatText('VENDED.: GENERICO    CAJERO: ${sale.user.toUpperCase()}'));
+      commands.addAll(_newLine());
+      commands.addAll(_formatText('CAJA : 001                CAMBIO: \$        0'));
+      commands.addAll(_newLine());
+      commands.addAll(_formatText('RECIBE: \$ $totalStr'));
+      commands.addAll(_newLine());
+      commands.addAll(_formatText(_createLine()));
+      commands.addAll(_newLine());
+      commands.addAll(_formatText('EFECTIVO O CONTADO'));
+      commands.addAll(_newLine());
       commands.addAll(_alignCenter);
-      commands.addAll(_formatText('Impreso: ${formatter.format(DateTime.now())}'));
+      commands.addAll(_formatText('<< FORMAS DE PAGO >>     \$ $totalStr'));
+      commands.addAll(_newLine());
+      commands.addAll(_formatText(_createLine()));
+      commands.addAll(_newLine());
+      
+      // Pie de página personalizado
+      commands.addAll(_alignCenter);
+      commands.addAll(_newLine());
+      
+      // Usar texto de pie personalizable
+      final footerLines = companyConfig.footerText.split('\n');
+      for (final line in footerLines) {
+        commands.addAll(_formatText('***${line.toUpperCase()}***'));
+        commands.addAll(_newLine());
+      }
+      
+      commands.addAll(_formatText(_createLine()));
+      commands.addAll(_newLine());
+      commands.addAll(_newLine());
+      commands.addAll(_formatText('Software POS: SMART SELLER'));
       commands.addAll(_newLine());
       
       // Alimentar papel y cortar
@@ -327,6 +380,8 @@ class PrintService {
         'data': Uint8List.fromList(commands),
       });
       
+      _isPrinting = false; // Resetear estado de impresión
+      print('✅ Impresión completada, resultado: $result');
       return result == true;
     } catch (e) {
       print('Error imprimiendo recibo: $e');
@@ -417,6 +472,17 @@ class PrintService {
     return '=' * _paperWidth;
   }
   
+  String _createEqualsLine() {
+    return '=' * _paperWidth;
+  }
+  
+  // Generar número de factura incremental
+  String _generateInvoiceNumber() {
+    final now = DateTime.now();
+    final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+    return timestamp;
+  }
+  
   String _formatLine(String left, String center, String right) {
     int leftWidth = 16;
     int centerWidth = 12;
@@ -466,46 +532,78 @@ class PrintService {
     }
   }
   
-  // Simular impresión para pruebas
-  void _simulatePrintReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total) {
-    final formatter = DateFormat('dd/MM/yyyy HH:mm:ss');
-    final NumberFormat currencyFormat = NumberFormat.currency(
-      locale: 'es_CO', 
-      symbol: '\$ ', 
-      decimalDigits: 0,
-      customPattern: '\u00A4#,##0'
-    );
+  // Simular impresión para pruebas - Formato personalizado
+  void _simulatePrintReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {CompanyConfig? companyConfig, Customer? customer}) {
+    final dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
+    final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
     
     print('');
     print('=====================================');
-    print('           SMART SELLER');
-    print('            Sistema POS');
-    print('          Recibo de Venta');
-    print('=====================================');
-    print('Fecha: ${formatter.format(sale.date)}');
-    print('Cajero: ${sale.user}');
-    print('Método: ${sale.paymentMethod}');
-    print('=====================================');
-    print('PRODUCTO         CANT      PRECIO');
+    print('        ${companyConfig?.companyName ?? 'SMART SELLER'}');
+    print('        ${companyConfig?.address ?? 'Dirección'}');
+    print('        Tel: ${companyConfig?.phone ?? 'Teléfono'}');
+    if (companyConfig?.email != null) {
+      print('        ${companyConfig!.email}');
+    }
+    if (companyConfig?.taxId != null) {
+      print('        NIT: ${companyConfig!.taxId}');
+    }
+    print('');
+    print('   ${companyConfig?.headerText ?? 'FACTURA DE VENTA'} No. ${_generateInvoiceNumber()}');
+    print('${dateFormatter.format(sale.date)} Caja: 01 Us.: ${sale.user.toUpperCase()}');
+    
+    // Información del cliente (si está seleccionado)
+    if (customer != null) {
+      print('');
+      print('CLIENTE:');
+      print('${customer.name}');
+      if (customer.documentNumber != null) {
+        print('Doc: ${customer.documentNumber}');
+      }
+      print('Tel: ${customer.phone}');
+    }
+    
+    print('-------------------------------------');
+    print('DESCRIPCION PRECIO_ MED CANT._ SUBTOTAL_');
     print('=====================================');
     
     for (CartItem item in items) {
-      print('${item.name}');
-      print('${item.displayInfo.padRight(16)}${currencyFormat.format(item.price).padLeft(10)}${currencyFormat.format(item.total).padLeft(10)}');
+      String productName = item.name.toUpperCase().padRight(12);
+      String unitPrice = '${currencyFormat.format(item.price)}'.padLeft(7);
+      String measure = item.isWeighted ? 'KG ' : 'UND'; // Mostrar medida real: KG o UNIDAD  
+      String medUnit = '$measure ${item.quantity.toStringAsFixed(2)}'.padRight(9);
+      String subtotalItem = currencyFormat.format(item.total).padLeft(10);
+    
+      print('$productName$unitPrice $medUnit$subtotalItem');
     }
     
-    print('=====================================');
-    print('                Subtotal: ${currencyFormat.format(subtotal)}');
-    print('                IVA(19%): ${currencyFormat.format(taxes)}');
+    String subtotalStr = currencyFormat.format(subtotal);
+    String totalStr = currencyFormat.format(total);
+    
+    print('-------------------------------------');
+    print('SUB.T.: \$ $subtotalStr -DESC.: \$        0');
+    print('+IVA : \$        0 AJUST.: \$        0');
+    print('         TOTAL: \$ $totalStr');
+    print('VENDED.: GENERICO    CAJERO: ${sale.user.toUpperCase()}');
+    print('CAJA : 001                CAMBIO: \$        0');
+    print('RECIBE: \$ $totalStr');
+    print('-------------------------------------');
+    print('EFECTIVO O CONTADO');
+    print('<< FORMAS DE PAGO >>     \$ $totalStr');
+    print('-------------------------------------');
     print('');
-    print('                TOTAL: ${currencyFormat.format(total)}');
-    print('=====================================');
+    print('         CALLE 123 #45-67');
+    print('       TU CIUDAD - COLOMBIA');
+    print('         Tel.: 300-123-4567');
     print('');
-    print('        ¡Gracias por su compra!');
-    print('            Vuelva pronto');
+    // Usar texto de pie personalizable
+    final footerLines = (companyConfig?.footerText ?? 'GRACIAS POR SU COMPRA\nREGRESE PRONTO').split('\n');
+    for (final line in footerLines) {
+      print('        ***${line.toUpperCase()}***');
+    }
+    print('-------------------------------------');
     print('');
-    print('=====================================');
-    print('Impreso: ${formatter.format(DateTime.now())}');
+    print('        Software POS: SMART SELLER');
     print('=====================================');
     print('');
   }
@@ -531,12 +629,12 @@ class PrintService {
       }
       
       // Enviar comando a la impresora
-      await _channel.invokeMethod('printRaw', {
+      final result = await _channel.invokeMethod('printRaw', {
         'data': Uint8List.fromList(commands),
       });
       
-      print('✅ Comando de apertura de cajón enviado');
-      return true;
+      print('✅ Comando de apertura de cajón enviado, resultado: $result');
+      return result == true;
     } catch (e) {
       print('❌ Error abriendo cajón monedero: $e');
       return false;

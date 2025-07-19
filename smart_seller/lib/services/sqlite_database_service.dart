@@ -9,6 +9,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:convert'; // Added for jsonDecode
 import '../models/customer.dart'; // Added for Customer model
 import '../models/client.dart'; // Added for Client model
+import '../models/company_config.dart'; // Added for CompanyConfig model
 
 class SQLiteDatabaseService {
   static Database? _database;
@@ -24,7 +25,7 @@ class SQLiteDatabaseService {
     
     _database = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -140,6 +141,23 @@ class SQLiteDatabaseService {
       )
     ''');
 
+    // Tabla de configuración de empresa
+    await db.execute('''
+      CREATE TABLE company_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        address TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT,
+        website TEXT,
+        tax_id TEXT,
+        header_text TEXT NOT NULL,
+        footer_text TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
     // Tabla de clientes para facturación electrónica DIAN
     await db.execute('''
       CREATE TABLE clients (
@@ -169,7 +187,27 @@ class SQLiteDatabaseService {
   // Actualizar base de datos
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     print('🔄 Actualizando base de datos de v$oldVersion a v$newVersion');
-    // Aquí irían las migraciones futuras
+    
+    // Migración de versión 1 a 2: Agregar tabla de configuración de empresa
+    if (oldVersion < 2) {
+      print('🔧 Creando tabla company_config...');
+      await db.execute('''
+        CREATE TABLE company_config (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          company_name TEXT NOT NULL,
+          address TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          email TEXT,
+          website TEXT,
+          tax_id TEXT,
+          header_text TEXT NOT NULL,
+          footer_text TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      print('✅ Tabla company_config creada');
+    }
   }
   
   // Crear usuario admin por defecto
@@ -844,6 +882,32 @@ class SQLiteDatabaseService {
   // Cerrar base de datos
   static Future<void> close() async {
     await _database?.close();
+  }
+
+  // ================== CONFIGURACIÓN DE EMPRESA ==================
+
+  // Obtener configuración de empresa
+  static Future<List<CompanyConfig>> getCompanyConfig() async {
+    final List<Map<String, dynamic>> results = await _database!.query('company_config');
+    return results.map((configData) => CompanyConfig.fromMap(configData)).toList();
+  }
+
+  // Crear o actualizar configuración de empresa (siempre hay una sola)
+  static Future<void> createOrUpdateCompanyConfig(CompanyConfig config) async {
+    final existing = await _database!.query('company_config');
+    
+    if (existing.isEmpty) {
+      // Crear nueva configuración
+      await _database!.insert('company_config', config.toMap());
+    } else {
+      // Actualizar configuración existente
+      await _database!.update(
+        'company_config',
+        config.toMap(),
+        where: 'id = ?',
+        whereArgs: [existing.first['id']],
+      );
+    }
   }
 
   // ================== CLIENTES FACTURACIÓN ELECTRÓNICA DIAN ==================

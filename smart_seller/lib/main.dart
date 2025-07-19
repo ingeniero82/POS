@@ -10,6 +10,7 @@ import 'screens/users_screen.dart';
 import 'screens/debug_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/reports_screen.dart';
+import 'screens/company_config_screen.dart';
 import 'modules/weight/screens/weight_config_screen.dart';
 import 'modules/weight/screens/weight_products_screen.dart';
 import 'services/sqlite_database_service.dart';
@@ -17,6 +18,7 @@ import 'middleware/auth_middleware.dart';
 import 'services/auth_service.dart';
 import 'services/permissions_service.dart';
 import 'services/print_service.dart';
+import 'services/company_config_service.dart';
 import 'utils/sample_weight_products.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -34,13 +36,15 @@ void main() async {
   await PrintService.instance.initialize();
   // Insertar productos pesados de ejemplo si no existen
   await _insertSampleWeightProductsIfNeeded();
+  // Inicializar configuración de empresa
+  await CompanyConfigService.initializeCompanyConfig();
   
   runApp(const MyApp());
 }
 
 Future<void> _insertSampleWeightProductsIfNeeded() async {
   try {
-    // Verificar si ya hay productos pesados
+    //  Verificar si ya hay productos pesados
     final allProducts = await SQLiteDatabaseService.getAllProducts();
     final weightedProducts = allProducts.where((p) => p.isWeighted).toList();
     
@@ -157,6 +161,11 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/reportes', 
           page: () => const ReportsScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/configuracion-empresa', 
+          page: () => const CompanyConfigScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(

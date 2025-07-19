@@ -360,7 +360,8 @@ class _PosScreenState extends State<PosScreen> {
             Text('Stock: ${_selectedProduct!.stock}'),
             const SizedBox(height: 16),
             
-            // Campo de cantidad (siempre visible)
+            // Campo de cantidad SOLO para productos NO pesados
+            if (!_selectedProduct!.isWeighted) ...[
             TextField(
               controller: _quantityController,
               focusNode: _quantityFocus,
@@ -372,10 +373,38 @@ class _PosScreenState extends State<PosScreen> {
                 border: OutlineInputBorder(),
                 suffixIcon: Icon(Icons.keyboard),
               ),
-              onSubmitted: (value) => _selectedProduct!.isWeighted 
-                  ? _addWeightedProductToCart() 
-                  : _addToCart(int.tryParse(value) ?? 1),
+              onSubmitted: (value) => _addToCart(int.tryParse(value) ?? 1),
             ),
+              const SizedBox(height: 16),
+            ],
+            
+            // Para productos pesados, mostrar mensaje informativo
+            if (_selectedProduct!.isWeighted) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.orange.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Producto por peso: La cantidad se determina automáticamente según el peso de la balanza',
+                        style: TextStyle(
+                          color: Colors.orange.shade800,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             
             const SizedBox(height: 16),
             
@@ -383,15 +412,49 @@ class _PosScreenState extends State<PosScreen> {
             _buildWeightDisplay(),
             const SizedBox(height: 12),
             // Botones de acción
+            if (_selectedProduct!.isWeighted) ...[
+              // Botones para productos pesados
+              Column(
+                children: [
+                  // Botón principal para agregar producto pesado
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _addWeightedProductToCart(),
+                      icon: const Icon(Icons.scale, size: 20),
+                      label: const Text('Agregar Producto Pesado'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Botón cancelar
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _cancelCurrentOperation(),
+                      icon: const Icon(Icons.cancel),
+                      label: const Text('Cancelar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              // Botones para productos normales
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _selectedProduct!.isWeighted 
-                        ? _addWeightedProductToCart() 
-                        : _addToCart(int.tryParse(_quantityController.text) ?? 1),
-                    icon: Icon(_selectedProduct!.isWeighted ? Icons.scale : Icons.add_shopping_cart),
-                    label: Text(_selectedProduct!.isWeighted ? 'Agregar Pesado' : 'Agregar al Carrito'),
+                    onPressed: () => _addToCart(int.tryParse(_quantityController.text) ?? 1),
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: const Text('Agregar al Carrito'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
@@ -412,6 +475,7 @@ class _PosScreenState extends State<PosScreen> {
                 ),
               ],
             ),
+            ],
           ],
         ),
       ),
@@ -714,7 +778,12 @@ class _PosScreenState extends State<PosScreen> {
   }
   
   Widget _buildActionButtons() {
-    return Row(
+    return Column(
+      children: [
+
+        
+        // Fila de botones principales
+        Row(
       children: [
         Expanded(
           child: ElevatedButton.icon(
@@ -751,6 +820,8 @@ class _PosScreenState extends State<PosScreen> {
               foregroundColor: Colors.white,
             ),
           ),
+            ),
+          ],
         ),
       ],
     );
@@ -772,6 +843,7 @@ class _PosScreenState extends State<PosScreen> {
           case 'F1':
             _showHelp();
             break;
+
           case 'F4':
             _clearCart();
             break;
@@ -804,6 +876,7 @@ class _PosScreenState extends State<PosScreen> {
         case 'F1':
           _showHelp();
           break;
+
         case 'F4':
           _clearCart();
           break;
@@ -2362,27 +2435,29 @@ class _PosScreenState extends State<PosScreen> {
       weight: _weightController.currentWeight.value,
     );
     
-    // Calcular precio total
+    // Calcular precio total basado en peso
     final totalPrice = productWithWeight.calculatedPrice;
+    final weight = _weightController.currentWeight.value;
     
-    // Agregar al carrito
+    // Agregar al carrito con descripción del peso
     _posController.addToCart(
-      productWithWeight.name,
+      '${productWithWeight.name} (${weight.toStringAsFixed(3)} kg)',
       totalPrice,
-      productWithWeight.unit,
-      quantity: 1,
+      'kg',
+      quantity: 1, // Siempre 1 para productos pesados
       availableStock: productWithWeight.stock,
     );
     
     // Mostrar confirmación
     Get.snackbar(
-      'Producto Agregado',
+      'Producto Pesado Agregado',
       '${productWithWeight.name}\n'
-      'Peso: ${_weightController.currentWeight.value.toStringAsFixed(3)} kg\n'
+      'Peso: ${weight.toStringAsFixed(3)} kg\n'
+      'Precio/kg: \$${(productWithWeight.pricePerKg ?? 0).toStringAsFixed(0)}\n'
       'Total: \$${totalPrice.toStringAsFixed(0)}',
       backgroundColor: Colors.green.shade100,
       colorText: Colors.green.shade800,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 4),
     );
     
     // Limpiar selección
@@ -2457,7 +2532,7 @@ class _PosScreenState extends State<PosScreen> {
       );
     }
   }
-
+  
   void _updateCartItemPrice(CartItem cartItem, double newPrice) {
     // Encontrar el índice del elemento en el carrito
     final index = _posController.cartItems.indexWhere((item) => 
