@@ -13,6 +13,7 @@ import 'screens/reports_screen.dart';
 import 'screens/company_config_screen.dart';
 import 'modules/weight/screens/weight_config_screen.dart';
 import 'modules/weight/screens/weight_products_screen.dart';
+import 'modules/electronic_invoicing/screens/electronic_invoice_screen.dart';
 import 'services/sqlite_database_service.dart';
 import 'middleware/auth_middleware.dart';
 import 'services/auth_service.dart';
@@ -44,7 +45,7 @@ void main() async {
 
 Future<void> _insertSampleWeightProductsIfNeeded() async {
   try {
-    //  Verificar si ya hay productos pesados
+    //   Verificar si ya hay productos pesados
     final allProducts = await SQLiteDatabaseService.getAllProducts();
     final weightedProducts = allProducts.where((p) => p.isWeighted).toList();
     
@@ -176,6 +177,11 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/peso/configuracion', 
           page: () => const WeightConfigScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/facturacion-electronica', 
+          page: () => const ElectronicInvoiceScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
       ],

@@ -10,6 +10,7 @@ import '../widgets/authorization_modal.dart';
 import '../services/auth_service.dart';
 import '../modules/weight/controllers/weight_controller.dart';
 import '../modules/weight/widgets/scale_widget.dart';
+import '../modules/electronic_invoicing/controllers/electronic_invoice_controller.dart';
 import '../utils/sample_weight_products.dart';
 import 'package:intl/intl.dart';
 
@@ -1258,7 +1259,389 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     
-    _posController.processPayment();
+    // Mostrar selección de tipo de documento
+    _showDocumentTypeDialog();
+  }
+
+  // Modal para seleccionar tipo de documento
+  void _showDocumentTypeDialog() {
+    Get.dialog(
+      Dialog(
+        child: Container(
+          width: 450,
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Icono y título
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.description,
+                  size: 32,
+                  color: Colors.blue.shade700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '¿Qué tipo de documento deseas generar?',
+                style: TextStyle(
+                  fontSize: 20, 
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Total: \$${NumberFormat('#,###').format(_posController.total)}',
+                style: const TextStyle(
+                  fontSize: 16, 
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // Opciones de documento
+              Row(
+                children: [
+                  // Nota de Venta
+                  Expanded(
+                    child: _DocumentTypeOption(
+                      icon: Icons.receipt,
+                      title: 'Nota de Venta',
+                      subtitle: 'Documento simple\nsin datos del cliente',
+                      color: Colors.grey.shade700,
+                      onTap: () => _processNotaDeVenta(),
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  // Factura Electrónica
+                  Expanded(
+                    child: _DocumentTypeOption(
+                      icon: Icons.receipt_long,
+                      title: 'Factura Electrónica',
+                      subtitle: 'Documento oficial\ncon datos del cliente',
+                      color: Colors.blue.shade700,
+                      onTap: () => _processFacturaElectronica(),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Botón cancelar
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text(
+                  'Cancelar',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Procesar como Nota de Venta (flujo actual)
+  void _processNotaDeVenta() {
+    Get.back(); // Cerrar diálogo
+    _posController.processPayment(); // Usar flujo actual
+  }
+
+  // Procesar como Factura Electrónica
+  void _processFacturaElectronica() {
+    Get.back(); // Cerrar diálogo
+    _showClientDataDialog(); // Mostrar datos del cliente
+  }
+
+  // Modal para datos del cliente (Factura Electrónica)
+  void _showClientDataDialog() {
+    final TextEditingController nitController = TextEditingController();
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController emailController = TextEditingController();
+    String selectedClientType = 'CUANTIAS MENORES';
+
+    Get.dialog(
+      Dialog(
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Título
+              Row(
+                children: [
+                  Icon(Icons.person, color: Colors.blue.shade700, size: 28),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Datos del Cliente - Factura Electrónica',
+                    style: TextStyle(
+                      fontSize: 20, 
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Tipo de cliente
+              const Text(
+                'Tipo de Cliente *',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedClientType,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
+                items: [
+                  'CUANTIAS MENORES',
+                  'REGIMEN COMUN',
+                  'REGIMEN SIMPLIFICADO',
+                ].map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                onChanged: (value) => selectedClientType = value!,
+              ),
+              const SizedBox(height: 16),
+              
+              // Documento del cliente
+              const Text(
+                'Documento del Cliente *',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nitController,
+                decoration: const InputDecoration(
+                  hintText: 'NIT, CC, CE, etc.',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              
+              // Nombre del cliente
+              const Text(
+                'Nombre del Cliente *',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  hintText: 'Razón social o nombre completo',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Email del cliente
+              const Text(
+                'Email del Cliente',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  hintText: 'email@cliente.com (opcional)',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 24),
+              
+              // Botones
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Get.back(),
+                      child: const Text('Cancelar', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        if (nitController.text.isEmpty || nameController.text.isEmpty) {
+                          Get.snackbar(
+                            'Campos requeridos',
+                            'Completa documento y nombre del cliente',
+                            backgroundColor: Colors.red,
+                            colorText: Colors.white,
+                          );
+                          return;
+                        }
+                        
+                        // Procesar factura electrónica
+                        _processElectronicInvoiceWithClient(
+                          selectedClientType,
+                          nitController.text,
+                          nameController.text,
+                          emailController.text,
+                        );
+                      },
+                      icon: const Icon(Icons.send),
+                      label: const Text('Generar Factura Electrónica'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Procesar factura electrónica con datos del cliente
+  void _processElectronicInvoiceWithClient(String clientType, String clientNit, String clientName, String clientEmail) {
+    Get.back(); // Cerrar diálogo de cliente
+    
+    try {
+      // Crear controlador de facturación electrónica
+      final feController = Get.put(ElectronicInvoiceController());
+      
+      // Configurar datos de la factura
+      feController.updateInvoiceNumber('FE-${DateTime.now().millisecondsSinceEpoch}');
+      final now = DateTime.now();
+      feController.updateIssueDate('${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')}/${now.year}');
+      feController.updateDueDate('${now.month.toString().padLeft(2, '0')}/${now.day.toString().padLeft(2, '0')}/${now.year}');
+      feController.updatePaymentMethod('Efectivo');
+      
+      // Configurar datos del cliente
+      feController.updateClientType(clientType);
+      feController.updateClientNit(clientNit);
+      feController.updateClientName(clientName);
+      if (clientEmail.isNotEmpty) {
+        feController.updateClientEmail(clientEmail);
+      }
+      
+      // Transferir productos del carrito a la factura electrónica
+      feController.invoiceProducts.clear(); // Limpiar productos existentes
+      
+      for (final cartItem in _posController.cartItems) {
+        // Crear objeto Product desde datos del carrito
+        final product = Product(
+          code: 'TEMP-${DateTime.now().millisecondsSinceEpoch}',
+          shortCode: 'TEMP',
+          name: cartItem.name,
+          description: cartItem.name,
+          price: cartItem.price,
+          cost: 0,
+          stock: 1000,
+          minStock: 1,
+          category: ProductCategory.otros,
+          unit: cartItem.unit,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        
+        // Configurar campos específicos para productos pesados
+        if (cartItem.isWeighted && cartItem.weight != null) {
+          product.isWeighted = true;
+          product.weight = cartItem.weight;
+          if (cartItem.weight! > 0) {
+            product.pricePerKg = cartItem.price / cartItem.weight!;
+          }
+        }
+        
+        // Agregar al controlador de facturación electrónica
+        feController.addProduct(product, quantity: cartItem.quantity.toDouble());
+      }
+      
+      // Mostrar confirmación y procesar
+      Get.dialog(
+        Dialog(
+          child: Container(
+            width: 400,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 64),
+                const SizedBox(height: 16),
+                const Text(
+                  'Factura Electrónica Generada',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text('Cliente: $clientName'),
+                Text('NIT/CC: $clientNit'),
+                Text('Total: \$${NumberFormat('#,###').format(_posController.total)}'),
+                const SizedBox(height: 16),
+                Text(
+                  'La factura electrónica ha sido preparada.\nPuedes revisarla en el módulo de Facturación Electrónica.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
+                          Get.back();
+                          _posController.clearCart();
+                        },
+                        child: const Text('Continuar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Get.back();
+                          _posController.clearCart();
+                          // Ir al módulo de facturación electrónica
+                          Get.toNamed('/facturacion-electronica');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Ver Factura'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Error al procesar la factura electrónica: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+    }
   }
   
   void _openCashDrawer() async {
@@ -2548,5 +2931,72 @@ class _PosScreenState extends State<PosScreen> {
         colorText: Colors.white,
       );
     }
+  }
+}
+
+// Widget para opciones de tipo de documento
+class _DocumentTypeOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _DocumentTypeOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 32,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 } 

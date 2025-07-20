@@ -202,13 +202,13 @@ class PrintService {
     }
   }
   
-    // Imprimir recibo completo
+  // Imprimir recibo completo
   Future<bool> printReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer}) async {
     if (!_isConnected) {
       print('❌ Impresora no conectada');
       return false;
     }
-
+    
     try {
       print('🖨️ Iniciando impresión de recibo...');
       _isPrinting = true;
@@ -231,7 +231,7 @@ class PrintService {
           updatedAt: DateTime.now(),
         );
       }
-
+      
       // Si está en modo simulación, simular la impresión
       if (_printerPort == 'SIMULATION') {
         print('📝 Simulando impresión del recibo:');
@@ -239,12 +239,12 @@ class PrintService {
         _isPrinting = false;
         return true;
       }
-
+      
       List<int> commands = [];
-
+      
       // Inicializar impresora
       commands.addAll(_initPrinter);
-
+      
       // Encabezado personalizado con datos de empresa
       commands.addAll(_alignCenter);
       commands.addAll(_boldOn);
@@ -271,7 +271,7 @@ class PrintService {
       commands.addAll(_formatText('No. ${_generateInvoiceNumber()}'));
       commands.addAll(_newLine());
       commands.addAll(_boldOff);
-
+      
       // Fecha y información de caja
       final dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
       commands.addAll(_alignLeft);
