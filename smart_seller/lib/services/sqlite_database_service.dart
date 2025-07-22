@@ -55,7 +55,7 @@ class SQLiteDatabaseService {
     
     // Tabla de usuarios
     await db.execute('''
-      CREATE TABLE users (
+      CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
@@ -69,7 +69,7 @@ class SQLiteDatabaseService {
     
     // Tabla de productos
     await db.execute('''
-      CREATE TABLE products (
+      CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         code TEXT UNIQUE NOT NULL,
         shortCode TEXT UNIQUE NOT NULL,
@@ -95,7 +95,7 @@ class SQLiteDatabaseService {
     
     // Tabla de movimientos de inventario
     await db.execute('''
-      CREATE TABLE inventory_movements (
+      CREATE TABLE IF NOT EXISTS inventory_movements (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         productId INTEGER NOT NULL,
         type TEXT NOT NULL,
@@ -111,7 +111,7 @@ class SQLiteDatabaseService {
     
     // Tabla de ventas
     await db.execute('''
-      CREATE TABLE sales (
+      CREATE TABLE IF NOT EXISTS sales (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,
         total REAL NOT NULL,
@@ -123,7 +123,7 @@ class SQLiteDatabaseService {
     
     // Tabla de clientes
     await db.execute('''
-      CREATE TABLE customers (
+      CREATE TABLE IF NOT EXISTS customers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT NOT NULL,
@@ -143,7 +143,7 @@ class SQLiteDatabaseService {
 
     // Tabla de configuración de empresa
     await db.execute('''
-      CREATE TABLE company_config (
+      CREATE TABLE IF NOT EXISTS company_config (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         company_name TEXT NOT NULL,
         address TEXT NOT NULL,
@@ -160,7 +160,7 @@ class SQLiteDatabaseService {
 
     // Tabla de clientes para facturación electrónica DIAN
     await db.execute('''
-      CREATE TABLE clients (
+      CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         documentType TEXT NOT NULL,
         documentNumber TEXT UNIQUE NOT NULL,
@@ -190,23 +190,34 @@ class SQLiteDatabaseService {
     
     // Migración de versión 1 a 2: Agregar tabla de configuración de empresa
     if (oldVersion < 2) {
-      print('🔧 Creando tabla company_config...');
-      await db.execute('''
-        CREATE TABLE company_config (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          company_name TEXT NOT NULL,
-          address TEXT NOT NULL,
-          phone TEXT NOT NULL,
-          email TEXT,
-          website TEXT,
-          tax_id TEXT,
-          header_text TEXT NOT NULL,
-          footer_text TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      ''');
-      print('✅ Tabla company_config creada');
+      print('🔧 Verificando tabla company_config...');
+      
+      // Verificar si la tabla ya existe antes de crearla
+      final result = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='company_config'"
+      );
+      
+      if (result.isEmpty) {
+        print('🔧 Creando tabla company_config...');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS company_config (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT NOT NULL,
+            address TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            email TEXT,
+            website TEXT,
+            tax_id TEXT,
+            header_text TEXT NOT NULL,
+            footer_text TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        print('✅ Tabla company_config creada');
+      } else {
+        print('✅ Tabla company_config ya existe, saltando creación');
+      }
     }
   }
   
