@@ -3,16 +3,14 @@ import 'package:get/get.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/pos_screen.dart';
-import 'screens/inventory_movements_screen.dart';
-import 'screens/sales_history_screen.dart';
+
 import 'screens/products_screen.dart';
 import 'screens/users_screen.dart';
 import 'screens/debug_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/company_config_screen.dart';
-import 'modules/weight/screens/weight_config_screen.dart';
-import 'modules/weight/screens/weight_products_screen.dart';
+
 import 'modules/electronic_invoicing/screens/electronic_invoice_screen.dart';
 import 'services/sqlite_database_service.dart';
 import 'middleware/auth_middleware.dart';
@@ -129,16 +127,7 @@ class MyApp extends StatelessWidget {
           page: () => const PosScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
-        GetPage(
-          name: '/movimientos', 
-          page: () => const InventoryMovementsScreen(),
-          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
-        ),
-        GetPage(
-          name: '/ventas', 
-          page: () => const SalesHistoryScreen(),
-          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
-        ),
+
         GetPage(
           name: '/productos', 
           page: () => const ProductsScreen(),
@@ -169,16 +158,7 @@ class MyApp extends StatelessWidget {
           page: () => const CompanyConfigScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
-        GetPage(
-          name: '/peso', 
-          page: () => const WeightProductsScreen(),
-          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
-        ),
-        GetPage(
-          name: '/peso/configuracion', 
-          page: () => const WeightConfigScreen(),
-          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
-        ),
+
         GetPage(
           name: '/facturacion-electronica', 
           page: () => const ElectronicInvoiceScreen(),

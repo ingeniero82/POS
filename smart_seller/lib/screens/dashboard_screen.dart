@@ -4,7 +4,6 @@ import 'dashboard_controller.dart';
 import 'pos_screen.dart';
 import 'users_screen.dart';
 import 'products_screen.dart';
-import 'permissions_screen.dart';
 import '../services/auth_service.dart';
 import '../models/permissions.dart';
 import '../models/user.dart';
@@ -72,16 +71,7 @@ class DashboardScreen extends StatelessWidget {
                           selected: controller.selectedMenu.value == DashboardMenu.inventario,
                           onTap: () => controller.selectMenu(DashboardMenu.inventario),
                         ),
-                      // Módulo de Peso - Solo si tiene permisos
-                      if (authService.hasPermission(Permission.viewInventory))
-                        _SidebarButton(
-                          icon: Icons.scale,
-                          label: 'Productos por Peso',
-                          selected: false,
-                          onTap: () {
-                            Get.toNamed('/peso');
-                          },
-                        ),
+
                       // Clientes - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewClients))
                         _SidebarButton(
@@ -128,34 +118,7 @@ class DashboardScreen extends StatelessWidget {
                           selected: controller.selectedMenu.value == DashboardMenu.usuarios,
                           onTap: () => controller.selectMenu(DashboardMenu.usuarios),
                         ),
-                      // Permisos - Solo si tiene permisos de configuración
-                      if (authService.hasPermission(Permission.modifySettings))
-                        _SidebarButton(
-                          icon: Icons.security,
-                          label: 'Permisos',
-                          selected: controller.selectedMenu.value == DashboardMenu.permisos,
-                          onTap: () => controller.selectMenu(DashboardMenu.permisos),
-                        ),
-                      // Movimientos - Solo si tiene permisos
-                      if (authService.hasPermission(Permission.viewMovements))
-                        _SidebarButton(
-                          icon: Icons.history,
-                          label: 'Movimientos',
-                          selected: false,
-                          onTap: () {
-                            Get.toNamed('/movimientos');
-                          },
-                        ),
-                      // Historial de Ventas - Solo si tiene permisos
-                      if (authService.hasPermission(Permission.viewSalesHistory))
-                        _SidebarButton(
-                          icon: Icons.list_alt,
-                          label: 'Historial de Ventas',
-                          selected: false,
-                          onTap: () {
-                            Get.toNamed('/ventas');
-                          },
-                        ),
+
                     ],
                   ),
                 ),
@@ -255,8 +218,6 @@ class DashboardScreen extends StatelessWidget {
                     return Center(child: Text('Configuración', style: TextStyle(fontSize: 28, color: Colors.grey[700])));
                   case DashboardMenu.usuarios:
                     return const UsersScreen();
-                  case DashboardMenu.permisos:
-                    return const PermissionsScreen();
                 }
               }),
             ),

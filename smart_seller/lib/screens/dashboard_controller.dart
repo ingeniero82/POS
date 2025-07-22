@@ -8,7 +8,6 @@ enum DashboardMenu {
   reportes,
   configuracion,
   usuarios,
-  permisos,
 }
 
 class DashboardController extends GetxController {
