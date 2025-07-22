@@ -64,10 +64,8 @@ class _PosScreenState extends State<PosScreen> {
     _weightController = Get.put(WeightController());
     _loadProducts();
     
-    // Auto-focus al barcode al iniciar
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _barcodeFocus.requestFocus();
-    });
+    // ✅ Auto-focus al barcode al iniciar
+    _ensureBarcodeFocus();
   }
   
   @override
@@ -79,22 +77,27 @@ class _PosScreenState extends State<PosScreen> {
     super.dispose();
   }
   
+  // ✅ FUNCIÓN HELPER PARA ASEGURAR FOCUS
+  void _ensureBarcodeFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted && _currentMode == 'barcode') {
+          _barcodeFocus.requestFocus();
+        }
+      });
+    });
+  }
+  
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
       _products = await SQLiteDatabaseService.getAllProducts();
-      
-      // Debug: mostrar productos pesados
-      final weightedProducts = _products.where((p) => p.isWeighted).toList();
-      print('🔍 Productos cargados: ${_products.length}');
-      print('⚖️ Productos pesados: ${weightedProducts.length}');
-      for (final product in weightedProducts) {
-        print('   - ${product.name} (${product.code}) - \$${product.pricePerKg}/kg');
-      }
     } catch (e) {
       Get.snackbar('Error', 'Error cargando productos: $e');
     } finally {
       setState(() => _isLoading = false);
+      // ✅ Asegurar focus después de cargar productos
+      _ensureBarcodeFocus();
     }
   }
   
@@ -116,7 +119,7 @@ class _PosScreenState extends State<PosScreen> {
   Widget build(BuildContext context) {
     return KeyboardListener(
       focusNode: FocusNode(),
-      autofocus: true,
+      autofocus: false, // ❌ Cambiado a false para no interferir
       onKeyEvent: _handleKeyPress,
       child: Scaffold(
         backgroundColor: Colors.grey[100],
@@ -258,7 +261,8 @@ class _PosScreenState extends State<PosScreen> {
             TextField(
               controller: _currentMode == 'barcode' ? _barcodeController : _quantityController,
               focusNode: _currentMode == 'barcode' ? _barcodeFocus : _quantityFocus,
-              autofocus: true,
+              autofocus: false, // ❌ Cambiado a false para evitar conflictos
+              keyboardType: _currentMode == 'quantity' ? TextInputType.number : TextInputType.text,
               decoration: InputDecoration(
                 hintText: _currentMode == 'barcode' 
                     ? (_selectedProduct?.isWeighted == true 
@@ -478,7 +482,7 @@ class _PosScreenState extends State<PosScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Táctil + Teclas 1-9',
+                    'Táctil',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.blue[700],
@@ -502,11 +506,10 @@ class _PosScreenState extends State<PosScreen> {
                       itemCount: _products.take(9).length,
                       itemBuilder: (context, index) {
                         final product = _products[index];
-                        final teclaNumero = '${index + 1}';
                         
                         return _ProductButton(
                           product: product,
-                          teclaNumero: teclaNumero,
+                          teclaNumero: '', // ❌ SIN NÚMERO DE TECLA
                           onTap: () => _selectProduct(product),
                         );
                       },
@@ -983,31 +986,37 @@ class _PosScreenState extends State<PosScreen> {
   }
   
   void _switchMode(String mode) {
+    // Si hay un producto pesado seleccionado, no permitir cambiar a modo cantidad
+    if (mode == 'quantity' && _selectedProduct?.isWeighted == true) {
+      Get.snackbar(
+        'Modo no disponible',
+        'Para productos por peso use la balanza integrada',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+    
     setState(() {
-      // Si hay un producto pesado seleccionado, no permitir cambiar a modo cantidad
-      if (mode == 'quantity' && _selectedProduct?.isWeighted == true) {
-        Get.snackbar(
-          'Modo no disponible',
-          'Para productos por peso use la balanza integrada',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
-        );
-        return;
-      }
-      
       _currentMode = mode;
       if (mode != 'quantity') {
         _selectedProduct = null;
       }
     });
     
-    // Cambiar focus según el modo
-    if (mode == 'barcode') {
-      _barcodeFocus.requestFocus();
-    } else if (mode == 'quantity') {
-      _quantityFocus.requestFocus();
-    }
+    // ✅ MEJORAR FOCUS - Con delay para asegurar que el widget se haya reconstruido
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          if (mode == 'barcode') {
+            _barcodeFocus.requestFocus();
+          } else if (mode == 'quantity') {
+            _quantityFocus.requestFocus();
+          }
+        }
+      });
+    });
   }
   
   void _searchProduct(String code) {
@@ -1025,14 +1034,10 @@ class _PosScreenState extends State<PosScreen> {
     ).toList();
     
     if (nameMatches.isEmpty) {
-      Get.snackbar(
-        'Producto no encontrado',
-        'No se encontró el producto con código: $code',
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
+      // ❌ MENSAJE MOLESTO ELIMINADO - No mostrar nada cuando no encuentre productos
+      // Solo limpiar el campo y mantener el focus
       _barcodeController.clear();
-      _barcodeFocus.requestFocus();
+      _ensureBarcodeFocus();
       return;
     }
     
@@ -1053,13 +1058,8 @@ class _PosScreenState extends State<PosScreen> {
       // Para productos pesados, mantener el modo 'barcode' 
     });
     
-    // Debug: verificar si el producto es pesado
-    print('📦 Producto seleccionado: ${product.name}');
-    print('⚖️ Es pesado: ${product.isWeighted}');
+    // Para productos pesados, actualizar el controlador de peso
     if (product.isWeighted) {
-      print('💰 Precio por kg: \$${product.pricePerKg}');
-      
-      // Para productos pesados, actualizar el controlador de peso
       _weightController.selectProduct(product);
     }
     
@@ -1079,15 +1079,8 @@ class _PosScreenState extends State<PosScreen> {
     
     _barcodeController.clear();
     
-    Get.snackbar(
-      'Producto seleccionado',
-      product.isWeighted 
-        ? '${product.name} - Use la balanza para pesar'
-        : '${product.name} - Ingrese cantidad',
-      backgroundColor: product.isWeighted ? Colors.orange : Colors.green,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 2),
-    );
+    // ❌ MENSAJE ELIMINADO - Era innecesario y molesto
+    // Solo mostrar mensaje cuando efectivamente se agregue al carrito
   }
   
   void _addToCart(int quantity) {
@@ -1110,10 +1103,11 @@ class _PosScreenState extends State<PosScreen> {
     );
     
     Get.snackbar(
-      'Producto agregado',
+      '✅ Agregado',
       '${_selectedProduct!.name} x$quantity',
       backgroundColor: Colors.green,
       colorText: Colors.white,
+      duration: const Duration(seconds: 1), // ⚡ MÁS RÁPIDO
     );
     
     _cancelSelection();
@@ -1156,15 +1150,13 @@ class _PosScreenState extends State<PosScreen> {
       availableStock: _selectedProduct!.stock,
     );
     
-    // Mensaje de confirmación
+    // Mensaje de confirmación optimizado
     Get.snackbar(
-      'Agregado al carrito',
-      '${_selectedProduct!.name}\n'
-      'Peso: ${currentWeight.toStringAsFixed(3)} kg\n'
-      'Precio: \$${totalPrice.toStringAsFixed(0)}',
+      '⚖️ Pesado agregado',
+      '${_selectedProduct!.name} - ${currentWeight.toStringAsFixed(3)} kg - \$${totalPrice.toStringAsFixed(0)}',
       backgroundColor: Colors.green,
       colorText: Colors.white,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 1, milliseconds: 500), // ⚡ MÁS RÁPIDO
     );
     
     // Limpiar selección y volver al modo de escaneo
@@ -1181,8 +1173,8 @@ class _PosScreenState extends State<PosScreen> {
     _quantityController.text = '1';
     _weightController.selectedProduct.value = null;
     
-    // Enfocar campo de búsqueda
-    _barcodeFocus.requestFocus();
+    // ✅ Asegurar focus en búsqueda
+    _ensureBarcodeFocus();
   }
   
   void _showProductSelectionDialog(List<Product> products, String searchTerm) {
@@ -1251,7 +1243,10 @@ class _PosScreenState extends State<PosScreen> {
             onPressed: () {
               Navigator.of(context).pop();
               _barcodeController.clear();
-              _barcodeFocus.requestFocus();
+              // ✅ Asegurar focus después de cerrar dialog
+              Future.delayed(const Duration(milliseconds: 200), () {
+                _ensureBarcodeFocus();
+              });
             },
             child: const Text('Cancelar'),
           ),
@@ -1450,7 +1445,7 @@ class _PosScreenState extends State<PosScreen> {
           height: MediaQuery.of(context).size.height * 0.9,
           child: _ElectronicInvoiceModalContent(
             cartProducts: cartProducts,
-            cartTotal: _posController.total.value,
+            cartTotal: _posController.total,
             onComplete: (success) {
               if (success) {
                 _posController.clearCart();
@@ -1489,10 +1484,14 @@ class _PosScreenState extends State<PosScreen> {
             Text('F1: Mostrar ayuda'),
             Text('F4: Limpiar carrito'),
             Text('F5: Abrir cajón monedero'),
-            Text('F6: Finalizar venta'),
+            Text('F6: Finalizar venta / Facturación electrónica'),
             Text('ESC: Cancelar operación actual'),
             Text('ENTER: Confirmar acción'),
             SizedBox(height: 16),
+            Text('🖱️ PRODUCTOS FRECUENTES:'),
+            Text('• Usa los botones táctiles'),
+            Text('• Selección rápida y fácil'),
+            SizedBox(height: 8),
             Text('⚖️ PRODUCTOS POR PESO:'),
             Text('• Selecciona producto pesado'),
             Text('• Usa balanza integrada en panel derecho'),
@@ -1616,28 +1615,10 @@ class _ProductButton extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Fila superior: Número de tecla
+              // Fila superior: Solo icono de peso si es necesario
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Center(
-                      child: Text(
-                        teclaNumero,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
                   if (isWeighted)
                     Icon(
                       Icons.scale,
@@ -1701,5 +1682,613 @@ class _ProductButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Modal completo para facturación electrónica
+class _ElectronicInvoiceModalContent extends StatefulWidget {
+  final List<Map<String, dynamic>> cartProducts;
+  final double cartTotal;
+  final Function(bool success) onComplete;
+
+  const _ElectronicInvoiceModalContent({
+    required this.cartProducts,
+    required this.cartTotal,
+    required this.onComplete,
+  });
+
+  @override
+  State<_ElectronicInvoiceModalContent> createState() => _ElectronicInvoiceModalContentState();
+}
+
+class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalContent>
+    with SingleTickerProviderStateMixin {
+  
+  late TabController _tabController;
+  
+  // Controladores de formulario
+  final _invoiceNumberController = TextEditingController();
+  final _clientNitController = TextEditingController();
+  final _clientNameController = TextEditingController();
+  final _clientEmailController = TextEditingController();
+  final _clientPhoneController = TextEditingController();
+  final _clientAddressController = TextEditingController();
+  final _observationsController = TextEditingController();
+  
+  String _selectedPaymentMethod = 'Efectivo';
+  String _selectedClientType = 'CUANTIAS MENORES';
+  
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    
+    // Generar número de factura automático
+    final now = DateTime.now();
+    _invoiceNumberController.text = 'FE-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _invoiceNumberController.dispose();
+    _clientNitController.dispose();
+    _clientNameController.dispose();
+    _clientEmailController.dispose();
+    _clientPhoneController.dispose();
+    _clientAddressController.dispose();
+    _observationsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text('Facturación Electrónica DIAN'),
+        backgroundColor: const Color(0xFF1976D2),
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () {
+              Get.back();
+              widget.onComplete(false);
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Header informativo
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF1976D2),
+            child: Row(
+              children: [
+                const Icon(Icons.info, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Total a facturar: \$${NumberFormat('#,###').format(widget.cartTotal)} - ${widget.cartProducts.length} productos',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Pestañas
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: const Color(0xFF1976D2),
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: const Color(0xFF1976D2),
+              tabs: const [
+                Tab(icon: Icon(Icons.description), text: 'Datos Factura'),
+                Tab(icon: Icon(Icons.person), text: 'Cliente'),
+                Tab(icon: Icon(Icons.shopping_cart), text: 'Productos'),
+              ],
+            ),
+          ),
+          
+          // Contenido de las pestañas
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildInvoiceDataTab(),
+                _buildClientTab(),
+                _buildProductsTab(),
+              ],
+            ),
+          ),
+          
+          // Botones de acción
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Get.back();
+                      widget.onComplete(false);
+                    },
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Cancelar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveDraft,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save),
+                    label: Text(_isLoading ? 'Guardando...' : 'Guardar Borrador'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _sendToDIAN,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                    label: Text(_isLoading ? 'Enviando...' : 'Enviar a DIAN'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInvoiceDataTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Información de la Factura',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              
+              TextFormField(
+                controller: _invoiceNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'Número de Factura *',
+                  hintText: 'Ej: FE-001',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              DropdownButtonFormField<String>(
+                value: _selectedPaymentMethod,
+                items: ['Efectivo', 'Tarjeta Débito', 'Tarjeta Crédito', 'Transferencia', 'Cheque']
+                    .map((method) => DropdownMenuItem(value: method, child: Text(method)))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
+                decoration: const InputDecoration(
+                  labelText: 'Método de Pago *',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              TextFormField(
+                controller: _observationsController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Observaciones',
+                  hintText: 'Información adicional (opcional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClientTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Datos del Cliente',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _showCreateClientDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Crear Cliente'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              DropdownButtonFormField<String>(
+                value: _selectedClientType,
+                items: ['CUANTIAS MENORES', 'CLIENTE REGISTRADO']
+                    .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedClientType = value!),
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de Cliente *',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              
+              if (_selectedClientType == 'CLIENTE REGISTRADO') ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _clientNitController,
+                  decoration: const InputDecoration(
+                    labelText: 'NIT/RUT *',
+                    hintText: 'Ej: 123456789-0',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _clientNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Razón Social *',
+                    hintText: 'Nombre completo o razón social',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _clientEmailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    hintText: 'correo@ejemplo.com',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _clientPhoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono',
+                    hintText: 'Ej: 3001234567',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _clientAddressController,
+                  decoration: const InputDecoration(
+                    labelText: 'Dirección',
+                    hintText: 'Dirección completa',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProductsTab() {
+    final subtotal = widget.cartTotal;
+    final iva = subtotal * 0.19;
+    final total = subtotal + iva;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Productos de la Factura',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              
+              // Lista de productos
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: widget.cartProducts.length,
+                itemBuilder: (context, index) {
+                  final product = widget.cartProducts[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Colors.blue,
+                        child: Icon(Icons.inventory_2, color: Colors.white),
+                      ),
+                      title: Text(product['name']),
+                      subtitle: Text('Cantidad: ${product['quantity']} x \$${NumberFormat('#,###').format(product['price'])}'),
+                      trailing: Text(
+                        '\$${NumberFormat('#,###').format(product['total'])}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              const Divider(),
+              
+              // Totales
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Subtotal:'),
+                        Text('\$${NumberFormat('#,###').format(subtotal)}'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('IVA (19%):'),
+                        Text('\$${NumberFormat('#,###').format(iva)}'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Total:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Text(
+                          '\$${NumberFormat('#,###').format(total)}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCreateClientDialog() {
+    final nitController = TextEditingController();
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final phoneController = TextEditingController();
+    final addressController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Crear Nuevo Cliente'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nitController,
+                decoration: const InputDecoration(
+                  labelText: 'NIT/RUT *',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Razón Social *',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Teléfono',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: addressController,
+                decoration: const InputDecoration(
+                  labelText: 'Dirección',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nitController.text.isNotEmpty && nameController.text.isNotEmpty) {
+                // Llenar los campos del cliente
+                setState(() {
+                  _selectedClientType = 'CLIENTE REGISTRADO';
+                  _clientNitController.text = nitController.text;
+                  _clientNameController.text = nameController.text;
+                  _clientEmailController.text = emailController.text;
+                  _clientPhoneController.text = phoneController.text;
+                  _clientAddressController.text = addressController.text;
+                });
+                
+                Get.back();
+                Get.snackbar(
+                  'Cliente Creado',
+                  'Cliente agregado a la factura',
+                  backgroundColor: Colors.green,
+                  colorText: Colors.white,
+                );
+              } else {
+                Get.snackbar(
+                  'Error',
+                  'NIT y Razón Social son obligatorios',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Crear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _saveDraft() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      // Simular guardado de borrador
+      await Future.delayed(const Duration(seconds: 1));
+      
+      Get.snackbar(
+        'Borrador Guardado',
+        'La factura se guardó como borrador',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Error al guardar borrador: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _sendToDIAN() async {
+    // Validaciones
+    if (_invoiceNumberController.text.isEmpty) {
+      Get.snackbar('Error', 'El número de factura es obligatorio');
+      return;
+    }
+
+    if (_selectedClientType == 'CLIENTE REGISTRADO' && 
+        (_clientNitController.text.isEmpty || _clientNameController.text.isEmpty)) {
+      Get.snackbar('Error', 'Los datos del cliente son obligatorios');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    try {
+      // Simular envío a DIAN
+      await Future.delayed(const Duration(seconds: 2));
+      
+      Get.back();
+      widget.onComplete(true);
+      
+      Get.snackbar(
+        'Éxito',
+        'Factura electrónica enviada a DIAN correctamente',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 4),
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Error',
+        'Error al enviar a DIAN: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 } 
