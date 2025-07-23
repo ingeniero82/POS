@@ -9,6 +9,8 @@ import '../services/print_service.dart';
 import '../widgets/authorization_modal.dart';
 import '../services/permissions_service.dart';
 import '../models/permissions.dart';
+import '../widgets/reprint_menu_widget.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../modules/weight/controllers/weight_controller.dart';
 import '../modules/weight/widgets/scale_widget.dart';
@@ -949,6 +951,9 @@ class _PosScreenState extends State<PosScreen> {
         case 'F1':
           _showHelp();
           break;
+        case 'F2':
+          _showReprintMenu(); // ✅ NUEVO: Abrir menú de reimpresión
+          break;
         case 'F4':
           _clearCart();
           break;
@@ -1498,6 +1503,7 @@ class _PosScreenState extends State<PosScreen> {
             Text('💳 PAGO: Seleccionar forma de pago'),
             SizedBox(height: 16),
             Text('F1: Mostrar ayuda'),
+            Text('F2: Reimpresión de facturas'),
             Text('F4: Limpiar carrito'),
             Text('F5: Abrir cajón monedero'),
             Text('F6: Finalizar venta / Facturación electrónica'),
@@ -1589,6 +1595,19 @@ class _PosScreenState extends State<PosScreen> {
     final minutes = remaining.inMinutes;
     final seconds = remaining.inSeconds % 60;
     return '${minutes}m ${seconds}s restantes';
+  }
+
+  void _showReprintMenu() {
+    Get.dialog(
+      Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.95,
+          height: MediaQuery.of(context).size.height * 0.9,
+          child: ReprintMenuWidget(),
+        ),
+      ),
+      barrierDismissible: true,
+    );
   }
 
   // Verificar permisos y ejecutar acción o solicitar autorización
@@ -1889,135 +1908,146 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Facturación Electrónica DIAN'),
-        backgroundColor: const Color(0xFF1976D2),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () {
-              Get.back();
-              widget.onComplete(false);
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Header informativo
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            color: const Color(0xFF1976D2),
-            child: Row(
-              children: [
-                const Icon(Icons.info, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Total a facturar: \$${NumberFormat('#,###').format(widget.cartTotal)} - ${widget.cartProducts.length} productos',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+    return RawKeyboardListener(
+      focusNode: FocusNode(),
+      autofocus: true,
+      onKey: (RawKeyEvent event) {
+        if (event is RawKeyDownEvent) {
+          if (event.logicalKey == LogicalKeyboardKey.f2) {
+            // _showReprintMenu(); // ❌ Eliminado - método no existe en esta clase
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          title: const Text('Facturación Electrónica DIAN'),
+          backgroundColor: const Color(0xFF1976D2),
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                Get.back();
+                widget.onComplete(false);
+              },
             ),
-          ),
-          
-          // Pestañas
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabController,
-              labelColor: const Color(0xFF1976D2),
-              unselectedLabelColor: Colors.grey[600],
-              indicatorColor: const Color(0xFF1976D2),
-              tabs: const [
-                Tab(icon: Icon(Icons.description), text: 'Datos Factura'),
-                Tab(icon: Icon(Icons.person), text: 'Cliente'),
-                Tab(icon: Icon(Icons.shopping_cart), text: 'Productos'),
-              ],
-            ),
-          ),
-          
-          // Contenido de las pestañas
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildInvoiceDataTab(),
-                _buildClientTab(),
-                _buildProductsTab(),
-              ],
-            ),
-          ),
-          
-          // Botones de acción
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Get.back();
-                      widget.onComplete(false);
-                    },
-                    icon: const Icon(Icons.cancel),
-                    label: const Text('Cancelar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+          ],
+        ),
+        body: Column(
+          children: [
+            // Header informativo
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              color: const Color(0xFF1976D2),
+              child: Row(
+                children: [
+                  const Icon(Icons.info, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Total a facturar: \$${NumberFormat('#,###').format(widget.cartTotal)} - ${widget.cartProducts.length} productos',
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _saveDraft,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save),
-                    label: Text(_isLoading ? 'Guardando...' : 'Guardar Borrador'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _sendToDIAN,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send),
-                    label: Text(_isLoading ? 'Enviando...' : 'Enviar a DIAN'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            
+            // Pestañas
+            Container(
+              color: Colors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: const Color(0xFF1976D2),
+                unselectedLabelColor: Colors.grey[600],
+                indicatorColor: const Color(0xFF1976D2),
+                tabs: const [
+                  Tab(icon: Icon(Icons.description), text: 'Datos Factura'),
+                  Tab(icon: Icon(Icons.person), text: 'Cliente'),
+                  Tab(icon: Icon(Icons.shopping_cart), text: 'Productos'),
+                ],
+              ),
+            ),
+            
+            // Contenido de las pestañas
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildInvoiceDataTab(),
+                  _buildClientTab(),
+                  _buildProductsTab(),
+                ],
+              ),
+            ),
+            
+            // Botones de acción
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.white,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Get.back();
+                        widget.onComplete(false);
+                      },
+                      icon: const Icon(Icons.cancel),
+                      label: const Text('Cancelar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _saveDraft,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save),
+                      label: Text(_isLoading ? 'Guardando...' : 'Guardar Borrador'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _sendToDIAN,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send),
+                      label: Text(_isLoading ? 'Enviando...' : 'Enviar a DIAN'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

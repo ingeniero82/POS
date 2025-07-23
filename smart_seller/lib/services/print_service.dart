@@ -203,7 +203,7 @@ class PrintService {
   }
   
   // Imprimir recibo completo
-  Future<bool> printReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer}) async {
+  Future<bool> printReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer, bool isReprint = false, String? reprintReason}) async {
     if (!_isConnected) {
       print('❌ Impresora no conectada');
       return false;
@@ -235,7 +235,7 @@ class PrintService {
       // Si está en modo simulación, simular la impresión
       if (_printerPort == 'SIMULATION') {
         print('📝 Simulando impresión del recibo:');
-        _simulatePrintReceipt(sale, items, subtotal, taxes, total, companyConfig: companyConfig, customer: customer);
+        _simulatePrintReceipt(sale, items, subtotal, taxes, total, companyConfig: companyConfig, customer: customer, isReprint: isReprint, reprintReason: reprintReason);
         _isPrinting = false;
         return true;
       }
@@ -533,7 +533,7 @@ class PrintService {
   }
   
   // Simular impresión para pruebas - Formato personalizado
-  void _simulatePrintReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {CompanyConfig? companyConfig, Customer? customer}) {
+  void _simulatePrintReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {CompanyConfig? companyConfig, Customer? customer, bool isReprint = false, String? reprintReason}) {
     final dateFormatter = DateFormat('dd/MM/yyyy HH:mm');
     final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
     

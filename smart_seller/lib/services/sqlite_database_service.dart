@@ -233,17 +233,17 @@ class SQLiteDatabaseService {
     );
     
     if (adminExists.isEmpty) {
-      print('🔧 Creando usuario admin por defecto...');
-      await _database!.insert('users', {
-        'username': 'admin',
-        'password': '123456',
-        'fullName': 'Administrador',
-        'role': 'admin',
-        'createdAt': DateTime.now().toIso8601String(),
-        'isActive': 1,
+    print('🔧 Creando usuario admin por defecto...');
+    await _database!.insert('users', {
+      'username': 'admin',
+      'password': '123456',
+      'fullName': 'Administrador',
+      'role': 'admin',
+      'createdAt': DateTime.now().toIso8601String(),
+      'isActive': 1,
         'userCode': 'ADM-1001',
-      });
-      print('✅ Usuario admin creado: admin / 123456');
+    });
+    print('✅ Usuario admin creado: admin / 123456');
     }
     
     // Crear usuario supervisor si no existe

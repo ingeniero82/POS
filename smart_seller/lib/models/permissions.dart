@@ -53,6 +53,9 @@ enum Permission {
   changeCartQuantity, // Cambiar cantidad de productos en carrito
   removeCartItem, // Eliminar productos del carrito
   modifyCartPrice, // Modificar precio de productos en carrito
+  
+  // Reimpresión de facturas
+  reprintInvoices, // Reimprimir facturas
 }
 
 // Configuración de permisos por rol
@@ -149,6 +152,7 @@ class RolePermissions {
       Permission.changeCartQuantity,
       Permission.removeCartItem,
       Permission.modifyCartPrice,
+      Permission.reprintInvoices,
     },
     
     UserRole.cashier: {
@@ -162,7 +166,7 @@ class RolePermissions {
       Permission.accessDashboard,
       Permission.viewClients,
       Permission.changeCartQuantity, // Puede cambiar cantidad con autorización
-      // NO tiene removeCartItem ni modifyCartPrice - requiere autorización
+      // NO tiene removeCartItem, modifyCartPrice ni reprintInvoices - requiere autorización
     },
   };
   
@@ -269,6 +273,8 @@ class RolePermissions {
         return 'Eliminar productos del carrito';
       case Permission.modifyCartPrice:
         return 'Modificar precio en carrito';
+      case Permission.reprintInvoices:
+        return 'Reimprimir facturas';
     }
   }
 } 
