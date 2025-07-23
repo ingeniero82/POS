@@ -500,16 +500,66 @@ class PosController extends GetxController {
     void handlePrint() {
       if (isProcessing) return;
       isProcessing = true;
+      
+      print('🖨️ Ejecutando handlePrint()...');
+      
+      // ✅ MEJORADO: Cerrar modal inmediatamente
       Get.back();
-      _printReceipt(sale, method, copFormat);
+      
+      // ✅ MEJORADO: Feedback visual después de cerrar
+      Get.snackbar(
+        '🖨️ Imprimiendo...',
+        'Procesando impresión del recibo',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 1),
+      );
+      
+      // ✅ MEJORADO: Ejecutar impresión después de cerrar modal
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _printReceipt(sale, method, copFormat);
+        // ✅ NUEVO: Notificar que se debe restaurar el foco
+        Get.snackbar(
+          '✅ Listo para siguiente cliente',
+          'Presiona F2 para reimpresión o escanea nuevo producto',
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      });
     }
     
     // Función para no imprimir (solo se ejecuta una vez)
     void handleNoPrint() {
       if (isProcessing) return;
       isProcessing = true;
+      
+      print('❌ Ejecutando handleNoPrint()...');
+      
+      // ✅ MEJORADO: Cerrar modal inmediatamente
       Get.back();
-      clearCart();
+      
+      // ✅ MEJORADO: Feedback visual después de cerrar
+      Get.snackbar(
+        '✅ Venta completada',
+        'Recibo no impreso - Venta guardada',
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 1),
+      );
+      
+      // ✅ MEJORADO: Limpiar carrito después de cerrar modal
+      Future.delayed(const Duration(milliseconds: 100), () {
+        clearCart();
+        // ✅ NUEVO: Notificar que se debe restaurar el foco
+        Get.snackbar(
+          '✅ Listo para siguiente cliente',
+          'Presiona F2 para reimpresión o escanea nuevo producto',
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      });
     }
     
     Get.dialog(
@@ -519,11 +569,34 @@ class PosController extends GetxController {
           autofocus: true,
           onKey: (RawKeyEvent event) {
             if (event is RawKeyDownEvent) {
+              // ✅ TECLAS DE ACCESO RÁPIDO PARA IMPRESIÓN:
+              // - Enter: Imprimir recibo
+              // - S: Imprimir recibo (acceso rápido)
+              // - Escape: No imprimir
+              // - N: No imprimir (acceso rápido)
+              
+              // Debug: Imprimir la tecla presionada
+              print('🔍 Tecla presionada: ${event.logicalKey.keyLabel}');
+              
               if (event.logicalKey == LogicalKeyboardKey.enter) {
-                // Enter imprime el recibo
+                print('✅ Enter detectado - Imprimiendo...');
                 handlePrint();
               } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-                // Escape no imprime
+                print('❌ Escape detectado - No imprimir...');
+                handleNoPrint();
+              } else if (event.logicalKey == LogicalKeyboardKey.keyS || 
+                         event.logicalKey.keyLabel == 'S' ||
+                         event.logicalKey.keyLabel == 's' ||
+                         event.character == 'S' ||
+                         event.character == 's') {
+                print('✅ S detectado - Imprimiendo...');
+                handlePrint();
+              } else if (event.logicalKey == LogicalKeyboardKey.keyN || 
+                         event.logicalKey.keyLabel == 'N' ||
+                         event.logicalKey.keyLabel == 'n' ||
+                         event.character == 'N' ||
+                         event.character == 'n') {
+                print('❌ N detectado - No imprimir...');
                 handleNoPrint();
               }
             }
@@ -578,7 +651,7 @@ class PosController extends GetxController {
                           ),
                         ),
                         child: const Text(
-                          'SÍ',
+                          'SÍ (S)',
                           style: TextStyle(
                             color: Colors.white, 
                             fontSize: 16,
@@ -600,7 +673,7 @@ class PosController extends GetxController {
                           ),
                         ),
                         child: const Text(
-                          'NO',
+                          'NO (N)',
                           style: TextStyle(
                             color: Colors.black87, 
                             fontSize: 16,
@@ -613,9 +686,9 @@ class PosController extends GetxController {
                 ),
                 const SizedBox(height: 16),
                 
-                // Texto de ayuda
+                // Texto de ayuda actualizado
                 const Text(
-                  'Presiona Enter para imprimir o Escape para continuar',
+                  'Presiona Enter/S para imprimir o Escape/N para continuar',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
@@ -624,6 +697,8 @@ class PosController extends GetxController {
         ),
       ),
       barrierDismissible: false,
+      // ✅ MEJORADO: Asegurar que el modal se cierre correctamente
+      transitionDuration: const Duration(milliseconds: 200),
     );
   }
   
