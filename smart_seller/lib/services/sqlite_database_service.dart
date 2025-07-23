@@ -47,6 +47,7 @@ class SQLiteDatabaseService {
     // Llama a la migración después de abrir la base de datos
     await migrateAddPricePerKg();
     await migrateAddWeightColumns();
+    await migrateAddElectronicInvoiceFields(); // ✅ NUEVO: Campos para facturación electrónica
   }
   
   // Crear las tablas
@@ -1031,5 +1032,50 @@ class SQLiteDatabaseService {
     
     final results = await _database!.query('clients', where: whereClause, whereArgs: whereArgs);
     return results.isNotEmpty;
+  }
+  
+  // ✅ NUEVO: Migración para campos de facturación electrónica
+  static Future<void> migrateAddElectronicInvoiceFields() async {
+    if (_database == null) return;
+    
+    try {
+      // Verificar si las columnas ya existen
+      final result = await _database!.rawQuery("PRAGMA table_info(products)");
+      final columnNames = result.map((row) => row['name'] as String).toList();
+      
+      // Lista de campos a agregar para facturación electrónica
+      final fields = [
+        'taxCode TEXT',
+        'taxRate REAL DEFAULT 19.0',
+        'isExempt INTEGER DEFAULT 0',
+        'productType TEXT',
+        'brand TEXT',
+        'model TEXT',
+        'barcode TEXT',
+        'manufacturer TEXT',
+        'countryOfOrigin TEXT',
+        'customsCode TEXT',
+        'netWeight REAL',
+        'grossWeight REAL',
+        'dimensions TEXT',
+        'material TEXT',
+        'warranty TEXT',
+        'expirationDate TEXT',
+        'isService INTEGER DEFAULT 0',
+        'serviceCode TEXT',
+      ];
+      
+      for (final field in fields) {
+        final fieldName = field.split(' ')[0];
+        if (!columnNames.contains(fieldName)) {
+          print('🔧 Agregando columna $fieldName a productos...');
+          await _database!.execute('ALTER TABLE products ADD COLUMN $field');
+        }
+      }
+      
+      print('✅ Campos de facturación electrónica agregados correctamente');
+    } catch (e) {
+      print('❌ Error agregando campos de facturación electrónica: $e');
+    }
   }
 } 

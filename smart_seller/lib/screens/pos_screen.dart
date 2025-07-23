@@ -1185,19 +1185,106 @@ class _PosScreenState extends State<PosScreen> {
   }
   
   void _showProductSelectionDialog(List<Product> products, String searchTerm) {
+    // ✅ NUEVO: Controlador para el ListView
+    final ScrollController scrollController = ScrollController();
+    
+    // ✅ NUEVO: Variable para el índice seleccionado (inicia en 0)
+    int selectedIndex = 0;
+    
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => AlertDialog(
-        title: Text('Seleccionar Producto (${products.length} encontrados)'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => RawKeyboardListener(
+          focusNode: FocusNode(),
+          autofocus: true,
+          onKey: (RawKeyEvent event) {
+            if (event is RawKeyDownEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                setState(() {
+                  selectedIndex = (selectedIndex - 1).clamp(0, products.length - 1);
+                });
+                // Scroll al elemento seleccionado
+                Future.delayed(const Duration(milliseconds: 50), () {
+                  scrollController.animateTo(
+                    selectedIndex * 80.0, // Altura aproximada de cada item
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                  );
+                });
+              } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                setState(() {
+                  selectedIndex = (selectedIndex + 1).clamp(0, products.length - 1);
+                });
+                // Scroll al elemento seleccionado
+                Future.delayed(const Duration(milliseconds: 50), () {
+                  scrollController.animateTo(
+                    selectedIndex * 80.0, // Altura aproximada de cada item
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                  );
+                });
+              } else if (event.logicalKey == LogicalKeyboardKey.enter) {
+                // Seleccionar el producto actual
+                final selectedProduct = products[selectedIndex];
+                Navigator.of(context).pop();
+                _selectProduct(selectedProduct);
+              } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+                // Cancelar selección
+                Navigator.of(context).pop();
+                _barcodeController.clear();
+                Future.delayed(const Duration(milliseconds: 200), () {
+                  _ensureBarcodeFocus();
+                });
+              }
+            }
+          },
+          child: AlertDialog(
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text('Seleccionar Producto (${products.length} encontrados)'),
+                ),
+                // ✅ NUEVO: Indicador de selección inicial
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'PRIMER ELEMENTO SELECCIONADO',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
         content: SizedBox(
           width: double.maxFinite,
           height: 400,
           child: ListView.builder(
+              controller: scrollController,
             itemCount: products.length,
             itemBuilder: (context, index) {
               final product = products[index];
+                final isSelected = index == selectedIndex;
+                
               return ListTile(
+                  // ✅ MEJORADO: Color de fondo según selección
+                  tileColor: isSelected ? Colors.blue.shade50 : null,
+                  selectedTileColor: Colors.blue.shade100,
+                  selected: isSelected,
+                  // ✅ NUEVO: Borde para elemento seleccionado
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: isSelected 
+                      ? BorderSide(color: Colors.blue.shade300, width: 2)
+                      : BorderSide.none,
+                  ),
                 leading: CircleAvatar(
                   backgroundColor: product.isWeighted ? Colors.orange[100] : Colors.blue[100],
                   child: Icon(
@@ -1207,7 +1294,10 @@ class _PosScreenState extends State<PosScreen> {
                 ),
                 title: Text(
                   product.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.blue.shade700 : null,
+                    ),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1220,8 +1310,28 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   ],
                 ),
-                trailing: product.isWeighted
-                  ? Container(
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ✅ NUEVO: Indicador de selección
+                      if (isSelected)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'SELECCIONADO',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ),
+                      if (product.isWeighted)
+                        Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.orange[100],
@@ -1235,17 +1345,46 @@ class _PosScreenState extends State<PosScreen> {
                           color: Colors.orange[700],
                         ),
                       ),
-                    )
-                  : null,
+                        ),
+                    ],
+                  ),
                 onTap: () {
+                    setState(() {
+                      selectedIndex = index;
+                    });
+                    // ✅ MEJORADO: Pequeño delay para mostrar la selección
+                    Future.delayed(const Duration(milliseconds: 100), () {
                   Navigator.of(context).pop();
                   _selectProduct(product);
+                    });
                 },
               );
             },
           ),
         ),
         actions: [
+              // ✅ NUEVO: Instrucciones de navegación
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.keyboard, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Text(
+                      '↑↓ Navegar • Enter Seleccionar • ESC Cancelar',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
@@ -1258,6 +1397,8 @@ class _PosScreenState extends State<PosScreen> {
             child: const Text('Cancelar'),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
@@ -1919,134 +2060,134 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          title: const Text('Facturación Electrónica DIAN'),
-          backgroundColor: const Color(0xFF1976D2),
-          foregroundColor: Colors.white,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                Get.back();
-                widget.onComplete(false);
-              },
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        title: const Text('Facturación Electrónica DIAN'),
+        backgroundColor: const Color(0xFF1976D2),
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () {
+              Get.back();
+              widget.onComplete(false);
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Header informativo
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF1976D2),
+            child: Row(
+              children: [
+                const Icon(Icons.info, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Total a facturar: \$${NumberFormat('#,###').format(widget.cartTotal)} - ${widget.cartProducts.length} productos',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        body: Column(
-          children: [
-            // Header informativo
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              color: const Color(0xFF1976D2),
-              child: Row(
-                children: [
-                  const Icon(Icons.info, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Total a facturar: \$${NumberFormat('#,###').format(widget.cartTotal)} - ${widget.cartProducts.length} productos',
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          
+          // Pestañas
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: const Color(0xFF1976D2),
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: const Color(0xFF1976D2),
+              tabs: const [
+                Tab(icon: Icon(Icons.description), text: 'Datos Factura'),
+                Tab(icon: Icon(Icons.person), text: 'Cliente'),
+                Tab(icon: Icon(Icons.shopping_cart), text: 'Productos'),
+              ],
+            ),
+          ),
+          
+          // Contenido de las pestañas
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildInvoiceDataTab(),
+                _buildClientTab(),
+                _buildProductsTab(),
+              ],
+            ),
+          ),
+          
+          // Botones de acción
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Get.back();
+                      widget.onComplete(false);
+                    },
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Cancelar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
-                ],
-              ),
-            ),
-            
-            // Pestañas
-            Container(
-              color: Colors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: const Color(0xFF1976D2),
-                unselectedLabelColor: Colors.grey[600],
-                indicatorColor: const Color(0xFF1976D2),
-                tabs: const [
-                  Tab(icon: Icon(Icons.description), text: 'Datos Factura'),
-                  Tab(icon: Icon(Icons.person), text: 'Cliente'),
-                  Tab(icon: Icon(Icons.shopping_cart), text: 'Productos'),
-                ],
-              ),
-            ),
-            
-            // Contenido de las pestañas
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildInvoiceDataTab(),
-                  _buildClientTab(),
-                  _buildProductsTab(),
-                ],
-              ),
-            ),
-            
-            // Botones de acción
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Get.back();
-                        widget.onComplete(false);
-                      },
-                      icon: const Icon(Icons.cancel),
-                      label: const Text('Cancelar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _saveDraft,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save),
+                    label: Text(_isLoading ? 'Guardando...' : 'Guardar Borrador'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _saveDraft,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Icon(Icons.save),
-                      label: Text(_isLoading ? 'Guardando...' : 'Guardar Borrador'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoading ? null : _sendToDIAN,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                    label: Text(_isLoading ? 'Enviando...' : 'Enviar a DIAN'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _sendToDIAN,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send),
-                      label: Text(_isLoading ? 'Enviando...' : 'Enviar a DIAN'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
         ),
       ),
     );

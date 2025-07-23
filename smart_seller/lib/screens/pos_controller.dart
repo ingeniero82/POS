@@ -517,7 +517,7 @@ class PosController extends GetxController {
       
       // ✅ MEJORADO: Ejecutar impresión después de cerrar modal
       Future.delayed(const Duration(milliseconds: 100), () {
-        _printReceipt(sale, method, copFormat);
+        _printReceiptWithMethod(sale, method, copFormat);
         // ✅ NUEVO: Notificar que se debe restaurar el foco
         Get.snackbar(
           '✅ Listo para siguiente cliente',
@@ -629,10 +629,41 @@ class PosController extends GetxController {
                 ),
                 const SizedBox(height: 24),
                 
-                // Pregunta sobre imprimir
-                const Text(
-                  '¿Desea imprimir el recibo?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                // Pregunta sobre imprimir (mejorada para métodos no efectivos)
+                Column(
+                  children: [
+                    Text(
+                      method == 'Efectivo' ? '¿Desea imprimir el recibo?' : '¿Desea imprimir la factura doble?',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                    ),
+                    if (method != 'Efectivo') ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info, size: 16, color: Colors.blue.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Método: $method - Se imprimirá Original + Copia',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 20),
                 
@@ -650,9 +681,9 @@ class PosController extends GetxController {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          'SÍ (S)',
-                          style: TextStyle(
+                        child: Text(
+                          method == 'Efectivo' ? 'SÍ (S)' : 'SÍ (S) - Doble',
+                          style: const TextStyle(
                             color: Colors.white, 
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -687,9 +718,12 @@ class PosController extends GetxController {
                 const SizedBox(height: 16),
                 
                 // Texto de ayuda actualizado
-                const Text(
-                  'Presiona Enter/S para imprimir o Escape/N para continuar',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                Text(
+                  method == 'Efectivo' 
+                    ? 'Presiona Enter/S para imprimir o Escape/N para continuar'
+                    : 'Presiona Enter/S para imprimir factura doble o Escape/N para continuar',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -702,7 +736,172 @@ class PosController extends GetxController {
     );
   }
   
-  // Imprimir recibo
+  // ✅ NUEVO: Imprimir recibo con lógica de método de pago
+  void _printReceiptWithMethod(Sale sale, String method, NumberFormat copFormat) async {
+    try {
+      print('🖨️ Iniciando proceso de impresión para método: $method');
+      
+      // ✅ NUEVO: Determinar si se necesita impresión doble
+      final needsDoublePrint = method != 'Efectivo';
+      
+      if (needsDoublePrint) {
+        print('📄 Método no efectivo detectado - Imprimiendo factura doble');
+        _printDoubleReceipt(sale, method, copFormat);
+      } else {
+        print('💵 Método efectivo detectado - Imprimiendo recibo simple');
+        _printReceipt(sale, method, copFormat);
+      }
+    } catch (e) {
+      print('❌ Error en _printReceiptWithMethod: $e');
+      Get.snackbar(
+        'Error de impresión',
+        'Error al procesar la impresión: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+  
+  // ✅ NUEVO: Imprimir factura doble para métodos no efectivos
+  void _printDoubleReceipt(Sale sale, String method, NumberFormat copFormat) async {
+    try {
+      print('🖨️ Iniciando impresión doble...');
+      
+      // Mostrar diálogo de imprimiendo
+      Get.dialog(
+        Dialog(
+          child: Container(
+            width: 300,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  'Imprimiendo factura doble...\nMétodo: $method',
+                  style: const TextStyle(fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Original + Copia',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+        barrierDismissible: false,
+      );
+      
+      // Inicializar servicio de impresión
+      final printService = PrintService.instance;
+      await printService.initialize();
+      
+      print('🔍 Estado de la impresora: ${printService.isConnected ? 'Conectada' : 'No conectada'}');
+      
+      // Verificar si la impresora está conectada
+      if (!printService.isConnected) {
+        Get.back(); // Cerrar diálogo de imprimiendo
+        Get.snackbar(
+          'Error de impresión',
+          'Impresora no detectada. Verifique la conexión.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+        clearCart();
+        return;
+      }
+      
+      // ✅ IMPRESIÓN DOBLE: Original + Copia
+      print('📄 Imprimiendo ORIGINAL...');
+      final successOriginal = await printService.printReceipt(
+        sale, 
+        cartItems, 
+        subtotal, 
+        taxes, 
+        total,
+        isReprint: false,
+        reprintReason: 'ORIGINAL - Método: $method',
+      );
+      
+      if (!successOriginal) {
+        Get.back(); // Cerrar diálogo de imprimiendo
+        Get.snackbar(
+          'Error de impresión',
+          'No se pudo imprimir la factura original',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        clearCart();
+        return;
+      }
+      
+      // Esperar entre impresiones
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      print('📄 Imprimiendo COPIA...');
+      final successCopy = await printService.printReceipt(
+        sale, 
+        cartItems, 
+        subtotal, 
+        taxes, 
+        total,
+        isReprint: false,
+        reprintReason: 'COPIA - Método: $method',
+      );
+      
+      Get.back(); // Cerrar diálogo de imprimiendo
+      
+      if (successOriginal && successCopy) {
+        print('✅ Factura doble impresa exitosamente');
+        
+        // Esperar un momento antes de abrir el cajón
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Abrir cajón monedero automáticamente
+        print('💰 Intentando abrir cajón monedero...');
+        final drawerOpened = await printService.openCashDrawer();
+        
+        Get.snackbar(
+          '✅ Factura doble completada',
+          'Original + Copia impresas correctamente\nMétodo: $method',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+      } else {
+        print('❌ Error al imprimir factura doble');
+        Get.snackbar(
+          'Error de impresión',
+          'Hubo un problema al imprimir la factura doble',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      }
+      
+      // Limpiar el carrito
+      clearCart();
+      
+    } catch (e) {
+      Get.back(); // Cerrar cualquier diálogo abierto
+      print('❌ Error en _printDoubleReceipt: $e');
+      Get.snackbar(
+        'Error de impresión',
+        'Error al imprimir factura doble: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      clearCart();
+    }
+  }
+  
+  // Imprimir recibo simple (método original)
   void _printReceipt(Sale sale, String method, NumberFormat copFormat) async {
     try {
       print('🖨️ Iniciando proceso de impresión...');
