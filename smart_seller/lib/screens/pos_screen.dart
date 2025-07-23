@@ -7,6 +7,8 @@ import '../services/sqlite_database_service.dart';
 import '../services/authorization_service.dart';
 import '../services/print_service.dart';
 import '../widgets/authorization_modal.dart';
+import '../services/permissions_service.dart';
+import '../models/permissions.dart';
 import '../services/auth_service.dart';
 import '../modules/weight/controllers/weight_controller.dart';
 import '../modules/weight/widgets/scale_widget.dart';
@@ -1587,6 +1589,134 @@ class _PosScreenState extends State<PosScreen> {
     final minutes = remaining.inMinutes;
     final seconds = remaining.inSeconds % 60;
     return '${minutes}m ${seconds}s restantes';
+  }
+
+  // Verificar permisos y ejecutar acción o solicitar autorización
+  void _checkPermissionAndExecute(String action, VoidCallback executeAction) {
+    final currentUser = AuthService.to.currentUser;
+    if (currentUser == null) return;
+
+    Permission? requiredPermission;
+    String actionDescription = '';
+    
+    switch (action) {
+      case 'changeCartQuantity':
+        requiredPermission = Permission.changeCartQuantity;
+        actionDescription = 'Cambiar cantidad en carrito';
+        break;
+      case 'removeCartItem':
+        requiredPermission = Permission.removeCartItem;
+        actionDescription = 'Eliminar producto del carrito';
+        break;
+      case 'modifyCartPrice':
+        requiredPermission = Permission.modifyCartPrice;
+        actionDescription = 'Modificar precio en carrito';
+        break;
+    }
+
+    if (requiredPermission == null) {
+      executeAction();
+      return;
+    }
+
+    // Verificar si el usuario actual tiene el permiso
+    final permissionsService = PermissionsService.to;
+    if (permissionsService.hasPermission(currentUser.role, requiredPermission)) {
+      executeAction();
+      return;
+    }
+
+    // Si no tiene permiso, solicitar autorización
+    _requestAuthorization(action, actionDescription, executeAction);
+  }
+
+  void _requestAuthorization(String action, String description, VoidCallback executeAction) {
+    showDialog(
+      context: context,
+      builder: (context) => AuthorizationModal(
+        action: action.toUpperCase(),
+        onAuthorized: (authorizerInfo) {
+          Get.snackbar(
+            '✅ Autorizado',
+            '$description autorizado por: $authorizerInfo',
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 2),
+          );
+          executeAction();
+        },
+        onCancelled: () {
+          // No hacer nada, el diálogo ya se cerró
+        },
+      ),
+    );
+  }
+
+  void _showPriceDialog(item, int index) {
+    final controller = TextEditingController(text: item.price.toString());
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Modificar Precio'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Producto: ${item.name}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Nuevo precio',
+                prefixText: '\$ ',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (value) {
+                final newPrice = double.tryParse(value) ?? item.price;
+                Navigator.of(context).pop();
+                _posController.updateItemPrice(index, newPrice);
+                Get.snackbar(
+                  '💰 Precio modificado',
+                  '${item.name}: \$${item.price.toStringAsFixed(0)} → \$${newPrice.toStringAsFixed(0)}',
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 2),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newPrice = double.tryParse(controller.text) ?? item.price;
+              Navigator.of(context).pop();
+              _posController.updateItemPrice(index, newPrice);
+              Get.snackbar(
+                '💰 Precio modificado',
+                '${item.name}: \$${item.price.toStringAsFixed(0)} → \$${newPrice.toStringAsFixed(0)}',
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 2),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Actualizar'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

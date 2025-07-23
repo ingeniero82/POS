@@ -48,6 +48,11 @@ enum Permission {
   
   // Código de usuario
   allowUserCode, // Puede tener/usar código de usuario
+  
+  // Acciones específicas del carrito
+  changeCartQuantity, // Cambiar cantidad de productos en carrito
+  removeCartItem, // Eliminar productos del carrito
+  modifyCartPrice, // Modificar precio de productos en carrito
 }
 
 // Configuración de permisos por rol
@@ -115,6 +120,9 @@ class RolePermissions {
       Permission.editClients,
       Permission.deleteClients,
       Permission.allowUserCode,
+      Permission.changeCartQuantity,
+      Permission.removeCartItem,
+      Permission.modifyCartPrice,
     },
     
     UserRole.supervisor: {
@@ -138,6 +146,9 @@ class RolePermissions {
       Permission.viewClients,
       Permission.createClients,
       Permission.allowUserCode,
+      Permission.changeCartQuantity,
+      Permission.removeCartItem,
+      Permission.modifyCartPrice,
     },
     
     UserRole.cashier: {
@@ -150,7 +161,8 @@ class RolePermissions {
       Permission.viewMovements,
       Permission.accessDashboard,
       Permission.viewClients,
-      // No tiene permiso de código de usuario
+      Permission.changeCartQuantity, // Puede cambiar cantidad con autorización
+      // NO tiene removeCartItem ni modifyCartPrice - requiere autorización
     },
   };
   
@@ -251,6 +263,12 @@ class RolePermissions {
         return 'Eliminar clientes';
       case Permission.allowUserCode:
         return 'Puede tener/usar código de usuario';
+      case Permission.changeCartQuantity:
+        return 'Cambiar cantidad en carrito';
+      case Permission.removeCartItem:
+        return 'Eliminar productos del carrito';
+      case Permission.modifyCartPrice:
+        return 'Modificar precio en carrito';
     }
   }
 } 

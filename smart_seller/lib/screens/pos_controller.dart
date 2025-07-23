@@ -12,7 +12,7 @@ import 'package:intl/intl.dart';
 
 class CartItem {
   final String name;
-  final double price;
+  double price; // Cambiado de final para permitir modificaciones temporales
   final String unit;
   int quantity;
   bool isWeighted;
@@ -274,6 +274,14 @@ class PosController extends GetxController {
   void updateQuantity(int index, int newQuantity) {
     if (index >= 0 && index < cartItems.length && newQuantity > 0) {
       cartItems[index].quantity = newQuantity;
+      cartItems.refresh();
+    }
+  }
+  
+  // Cambiar precio de un producto del carrito
+  void updateItemPrice(int index, double newPrice) {
+    if (index >= 0 && index < cartItems.length && newPrice > 0) {
+      cartItems[index].price = newPrice;
       cartItems.refresh();
     }
   }
