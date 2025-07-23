@@ -1268,7 +1268,19 @@ class _PosScreenState extends State<PosScreen> {
               title: const Text('Cambiar cantidad'),
               onTap: () {
                 Navigator.of(context).pop();
-                _showQuantityDialog(item, index);
+                _checkPermissionAndExecute('changeCartQuantity', () {
+                  _showQuantityDialog(item, index);
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.attach_money, color: Colors.orange),
+              title: const Text('Modificar precio'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _checkPermissionAndExecute('modifyCartPrice', () {
+                  _showPriceDialog(item, index);
+                });
               },
             ),
             ListTile(
@@ -1276,13 +1288,15 @@ class _PosScreenState extends State<PosScreen> {
               title: const Text('Eliminar'),
               onTap: () {
                 Navigator.of(context).pop();
-                _posController.removeFromCart(index);
-                Get.snackbar(
-                  'Producto eliminado',
-                  '${item.name} eliminado del carrito',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
+                _checkPermissionAndExecute('removeCartItem', () {
+                  _posController.removeFromCart(index);
+                  Get.snackbar(
+                    'Producto eliminado',
+                    '${item.name} eliminado del carrito',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                });
               },
             ),
           ],
