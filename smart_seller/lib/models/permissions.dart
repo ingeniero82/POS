@@ -117,6 +117,29 @@ class RolePermissions {
       Permission.allowUserCode,
     },
     
+    UserRole.supervisor: {
+      // Supervisor tiene permisos intermedios con capacidades de supervisión
+      Permission.viewUsers,
+      Permission.viewProducts,
+      Permission.createProducts,
+      Permission.editProducts,
+      Permission.accessPOS,
+      Permission.processSales,
+      Permission.cancelSales,
+      Permission.viewSalesHistory,
+      Permission.modifyPrice,
+      Permission.manualWeight,
+      Permission.viewInventory,
+      Permission.addInventory,
+      Permission.removeInventory,
+      Permission.viewMovements,
+      Permission.viewReports,
+      Permission.accessDashboard,
+      Permission.viewClients,
+      Permission.createClients,
+      Permission.allowUserCode,
+    },
+    
     UserRole.cashier: {
       // Cajero tiene permisos limitados
       Permission.viewProducts,

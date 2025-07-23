@@ -355,6 +355,7 @@ class _EditablePermissionsTable extends StatelessWidget {
         1: FlexColumnWidth(1),
         2: FlexColumnWidth(1),
         3: FlexColumnWidth(1),
+        4: FlexColumnWidth(1),
       },
       children: [
         // Header de la tabla
@@ -398,6 +399,17 @@ class _EditablePermissionsTable extends StatelessWidget {
             Padding(
               padding: EdgeInsets.all(12),
               child: Text(
+                'Supervisor',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF22315B),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
                 'Cajero',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -427,6 +439,10 @@ class _EditablePermissionsTable extends StatelessWidget {
             _EditablePermissionCell(
               hasPermission: controller.hasPermission(UserRole.manager, permission),
               onChanged: (value) => controller.togglePermission(UserRole.manager, permission),
+            ),
+            _EditablePermissionCell(
+              hasPermission: controller.hasPermission(UserRole.supervisor, permission),
+              onChanged: (value) => controller.togglePermission(UserRole.supervisor, permission),
             ),
             _EditablePermissionCell(
               hasPermission: controller.hasPermission(UserRole.cashier, permission),

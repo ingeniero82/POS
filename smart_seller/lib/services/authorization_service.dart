@@ -30,20 +30,24 @@ class AuthorizationService {
       switch (action) {
         case PRICE_CHANGE:
           return currentUser.role == UserRole.admin || 
-                 currentUser.role == UserRole.manager;
+                 currentUser.role == UserRole.manager ||
+                 currentUser.role == UserRole.supervisor;
         
         case WEIGHT_MANUAL:
           return currentUser.role == UserRole.admin || 
-                 currentUser.role == UserRole.manager;
+                 currentUser.role == UserRole.manager ||
+                 currentUser.role == UserRole.supervisor;
         
         case DISCOUNT_APPLY:
           return currentUser.role == UserRole.admin || 
-                 currentUser.role == UserRole.manager;
+                 currentUser.role == UserRole.manager ||
+                 currentUser.role == UserRole.supervisor;
         
         case CASH_DRAWER_OPEN:
-          // Solo supervisores y administradores pueden abrir el cajón manualmente
+          // Solo supervisores, gerentes y administradores pueden abrir el cajón manualmente
           return currentUser.role == UserRole.admin || 
-                 currentUser.role == UserRole.manager;
+                 currentUser.role == UserRole.manager ||
+                 currentUser.role == UserRole.supervisor;
         
         default:
           return false;
@@ -102,12 +106,16 @@ class AuthorizationService {
           return permissionsService.hasPermission(user.role, Permission.manualWeight);
         
         case DISCOUNT_APPLY:
-          // Para descuentos, permitir a gerentes y administradores
-          return user.role == UserRole.admin || user.role == UserRole.manager;
+          // Para descuentos, permitir a supervisores, gerentes y administradores
+          return user.role == UserRole.admin || 
+                 user.role == UserRole.manager ||
+                 user.role == UserRole.supervisor;
         
         case CASH_DRAWER_OPEN:
-          // Para cajón monedero, solo supervisores y administradores
-          return user.role == UserRole.admin || user.role == UserRole.manager;
+          // Para cajón monedero, solo supervisores, gerentes y administradores
+          return user.role == UserRole.admin || 
+                 user.role == UserRole.manager ||
+                 user.role == UserRole.supervisor;
         
         default:
           return false;

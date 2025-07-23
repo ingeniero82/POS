@@ -181,6 +181,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
         return 'Administrador';
       case UserRole.manager:
         return 'Gerente';
+      case UserRole.supervisor:
+        return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
     }
@@ -313,8 +315,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       if (value == null || value.trim().isEmpty) {
                         return 'La contraseña es obligatoria';
                       }
-                      if (value.trim().length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
+                                  if (value.trim().length < 4) {
+              return 'La contraseña debe tener al menos 4 caracteres';
                       }
                       return null;
                     },

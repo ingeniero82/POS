@@ -221,32 +221,51 @@ class SQLiteDatabaseService {
     }
   }
   
-  // Crear usuario admin por defecto
+  // Crear usuarios por defecto
   static Future<void> _createDefaultUser() async {
-    print('🔧 Verificando si existe usuario admin...');
+    print('🔧 Verificando si existen usuarios por defecto...');
     
+    // Crear usuario admin si no existe
     final adminExists = await _database!.query(
       'users',
       where: 'username = ?',
       whereArgs: ['admin'],
     );
     
-    if (adminExists.isNotEmpty) {
-      print('✅ Usuario admin ya existe, no se crea uno nuevo');
-      return;
+    if (adminExists.isEmpty) {
+      print('🔧 Creando usuario admin por defecto...');
+      await _database!.insert('users', {
+        'username': 'admin',
+        'password': '123456',
+        'fullName': 'Administrador',
+        'role': 'admin',
+        'createdAt': DateTime.now().toIso8601String(),
+        'isActive': 1,
+        'userCode': 'ADM-1001',
+      });
+      print('✅ Usuario admin creado: admin / 123456');
     }
     
-    print('🔧 Creando usuario admin por defecto...');
-    await _database!.insert('users', {
-      'username': 'admin',
-      'password': '123456',
-      'fullName': 'Administrador',
-      'role': 'admin',
-      'createdAt': DateTime.now().toIso8601String(),
-      'isActive': 1,
-    });
+    // Crear usuario supervisor si no existe
+    final supervisorExists = await _database!.query(
+      'users',
+      where: 'username = ?',
+      whereArgs: ['supervisor'],
+    );
     
-    print('✅ Usuario admin creado: admin / 123456');
+    if (supervisorExists.isEmpty) {
+      print('🔧 Creando usuario supervisor por defecto...');
+      await _database!.insert('users', {
+        'username': 'supervisor',
+        'password': '123456',
+        'fullName': 'Supervisor General',
+        'role': 'supervisor',
+        'createdAt': DateTime.now().toIso8601String(),
+        'isActive': 1,
+        'userCode': 'SUP-2001',
+      });
+      print('✅ Usuario supervisor creado: supervisor / 123456');
+    }
   }
   
   // ================== USUARIOS ==================

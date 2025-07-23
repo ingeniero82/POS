@@ -72,6 +72,8 @@ class AuthService extends GetxService {
         return 'Administrador';
       case UserRole.manager:
         return 'Gerente';
+      case UserRole.supervisor:
+        return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
     }
@@ -111,6 +113,11 @@ class AuthService extends GetxService {
     // El gerente tiene permisos de gerente y cajero
     if (_currentUser.value!.role == UserRole.manager) {
       return requiredRole == UserRole.manager || requiredRole == UserRole.cashier;
+    }
+    
+    // El supervisor tiene permisos de supervisor y cajero
+    if (_currentUser.value!.role == UserRole.supervisor) {
+      return requiredRole == UserRole.supervisor || requiredRole == UserRole.cashier;
     }
     
     // El cajero solo tiene permisos de cajero

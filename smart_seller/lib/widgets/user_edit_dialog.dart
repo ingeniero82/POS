@@ -205,6 +205,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
         return 'Administrador';
       case UserRole.manager:
         return 'Gerente';
+      case UserRole.supervisor:
+        return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
     }
@@ -360,8 +362,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
                         if (value == null || value.trim().isEmpty) {
                           return 'La nueva contraseña es obligatoria';
                         }
-                        if (value.trim().length < 6) {
-                          return 'La contraseña debe tener al menos 6 caracteres';
+                                    if (value.trim().length < 4) {
+              return 'La contraseña debe tener al menos 4 caracteres';
                         }
                         return null;
                       } : null,

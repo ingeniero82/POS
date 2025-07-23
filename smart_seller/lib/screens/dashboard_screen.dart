@@ -10,6 +10,7 @@ import '../models/user.dart';
 import 'package:intl/intl.dart';
 import 'customers_screen.dart';
 import 'reports_screen.dart';
+import 'permissions_screen.dart'; // ✅ AÑADIDO
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -118,6 +119,14 @@ class DashboardScreen extends StatelessWidget {
                           selected: controller.selectedMenu.value == DashboardMenu.usuarios,
                           onTap: () => controller.selectMenu(DashboardMenu.usuarios),
                         ),
+                      // Permisos - Solo si tiene permisos de configuración
+                      if (authService.hasPermission(Permission.modifySettings))
+                        _SidebarButton(
+                          icon: Icons.security,
+                          label: 'Permisos',
+                          selected: controller.selectedMenu.value == DashboardMenu.permisos,
+                          onTap: () => controller.selectMenu(DashboardMenu.permisos),
+                        ),
 
                     ],
                   ),
@@ -218,6 +227,8 @@ class DashboardScreen extends StatelessWidget {
                     return Center(child: Text('Configuración', style: TextStyle(fontSize: 28, color: Colors.grey[700])));
                   case DashboardMenu.usuarios:
                     return const UsersScreen();
+                  case DashboardMenu.permisos:
+                    return const PermissionsScreen(); // ✅ AÑADIDO
                 }
               }),
             ),

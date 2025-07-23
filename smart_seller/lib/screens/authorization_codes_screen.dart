@@ -386,6 +386,8 @@ class _AuthorizationCodesScreenState extends State<AuthorizationCodesScreen> {
         return Colors.red;
       case UserRole.manager:
         return Colors.orange;
+      case UserRole.supervisor:
+        return Colors.purple;
       case UserRole.cashier:
         return Colors.blue;
     }
@@ -397,6 +399,8 @@ class _AuthorizationCodesScreenState extends State<AuthorizationCodesScreen> {
         return Icons.admin_panel_settings;
       case UserRole.manager:
         return Icons.manage_accounts;
+      case UserRole.supervisor:
+        return Icons.supervisor_account;
       case UserRole.cashier:
         return Icons.point_of_sale;
     }
@@ -408,6 +412,8 @@ class _AuthorizationCodesScreenState extends State<AuthorizationCodesScreen> {
         return 'Administrador';
       case UserRole.manager:
         return 'Gerente';
+      case UserRole.supervisor:
+        return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
     }

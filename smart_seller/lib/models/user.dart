@@ -15,4 +15,5 @@ enum UserRole {
   admin,
   cashier,
   manager,
+  supervisor,
 } 

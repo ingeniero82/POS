@@ -353,6 +353,8 @@ class _UsersScreenState extends State<UsersScreen> {
         return 'Administrador';
       case UserRole.manager:
         return 'Gerente';
+      case UserRole.supervisor:
+        return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
     }
@@ -663,6 +665,8 @@ class _UserCard extends StatelessWidget {
         return 'Administrador';
       case UserRole.manager:
         return 'Gerente';
+      case UserRole.supervisor:
+        return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
     }
@@ -674,6 +678,8 @@ class _UserCard extends StatelessWidget {
         return Colors.red;
       case UserRole.manager:
         return Colors.orange;
+      case UserRole.supervisor:
+        return Colors.purple;
       case UserRole.cashier:
         return Colors.blue;
     }
