@@ -403,6 +403,7 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
         sale.total,
         isReprint: true, // Marcar como reimpresión
         reprintReason: 'Reimpresión solicitada por ${AuthService.to.currentUser?.fullName}',
+        paymentMethod: sale.paymentMethod,
       );
 
       Get.back(); // Cerrar diálogo de reimpresión

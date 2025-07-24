@@ -55,6 +55,58 @@ class PrintService {
   static const List<int> _openDrawer1 = [0x1B, 0x70, 0x00, 0x32, 0x96]; // ESC p 0 50 150 (cajón 1)
   static const List<int> _openDrawer2 = [0x1B, 0x70, 0x01, 0x32, 0x96]; // ESC p 1 50 150 (cajón 2)
   
+  // Configuración de métodos de pago que requieren duplicado
+  // TODOS los métodos diferentes a "Efectivo" requieren duplicado
+  static const Map<String, bool> _paymentMethodsRequiringDuplicate = {
+    // Efectivo - NO requiere duplicado
+    'efectivo': false,
+    'Efectivo': false,
+    'Efectivo (Cash)': false,
+    
+    // TODOS los demás métodos SÍ requieren duplicado
+    'tarjeta': true,
+    'Tarjeta': true,
+    'tarjeta crédito': true,
+    'Tarjeta Crédito': true,
+    'tarjeta débito': true,
+    'Tarjeta Débito': true,
+    'tarjeta debito': true,
+    'Tarjeta Debito': true,
+    'credito': true,
+    'Crédito': true,
+    'Credito': true,
+    'debito': true,
+    'Débito': true,
+    'Debito': true,
+    
+    'transferencia': true,
+    'Transferencia': true,
+    'pse': true,
+    'PSE': true,
+    'bancolombia': true,
+    'Bancolombia': true,
+    
+    'qr': true,
+    'QR': true,
+    'nequi': true,
+    'Nequi': true,
+    'daviplata': true,
+    'Daviplata': true,
+    
+    'cheque': true,
+    'Cheque': true,
+    'pago_movil': true,
+    'Pago Móvil': true,
+    'pago movil': true,
+    'Pago Movil': true,
+    'crypto': true,
+    'Crypto': true,
+    'bitcoin': true,
+    'Bitcoin': true,
+    'ethereum': true,
+    'Ethereum': true,
+  };
+
   // Inicializar servicio
   Future<void> initialize() async {
     try {
@@ -202,8 +254,81 @@ class PrintService {
     }
   }
   
-  // Imprimir recibo completo
-  Future<bool> printReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer, bool isReprint = false, String? reprintReason}) async {
+  // Imprimir recibo completo con lógica de doble impresión
+  Future<bool> printReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer, bool isReprint = false, String? reprintReason, String? paymentMethod}) async {
+    if (!_isConnected) {
+      print('❌ Impresora no conectada');
+      return false;
+    }
+    
+    try {
+      print('🖨️ Iniciando impresión de recibo...');
+      _isPrinting = true;
+
+      // Determinar si necesita duplicado basado en el método de pago
+      bool needsDuplicate = _paymentMethodsRequiringDuplicate[paymentMethod] ?? false;
+      
+      // ✅ MEJORADO: Si no está en la lista, verificar si NO es "Efectivo"
+      if (!_paymentMethodsRequiringDuplicate.containsKey(paymentMethod)) {
+        needsDuplicate = paymentMethod != null && 
+                        paymentMethod.toLowerCase() != 'efectivo' &&
+                        paymentMethod.toLowerCase() != 'cash';
+      }
+      
+      // Log para debugging
+      print('🔍 Método de pago detectado: "$paymentMethod"');
+      print('🔍 Necesita duplicado: $needsDuplicate');
+      print('🔍 Es diferente a efectivo: ${paymentMethod?.toLowerCase() != 'efectivo'}');
+      
+      if (needsDuplicate) {
+        print('📋 Método de pago requiere duplicado: $paymentMethod');
+        return await _printReceiptWithDuplicate(sale, items, subtotal, taxes, total, customer: customer, isReprint: isReprint, reprintReason: reprintReason);
+      } else {
+        print('📄 Método de pago requiere copia única: $paymentMethod');
+        return await _printSingleReceipt(sale, items, subtotal, taxes, total, customer: customer, isReprint: isReprint, reprintReason: reprintReason);
+      }
+    } catch (e) {
+      print('❌ Error en impresión: $e');
+      _isPrinting = false;
+      return false;
+    }
+  }
+
+  // Imprimir recibo con duplicado
+  Future<bool> _printReceiptWithDuplicate(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer, bool isReprint = false, String? reprintReason}) async {
+    try {
+      // Primera copia (CLIENTE)
+      print('🖨️ Imprimiendo copia CLIENTE...');
+      bool firstCopySuccess = await _printSingleReceipt(sale, items, subtotal, taxes, total, customer: customer, isReprint: isReprint, reprintReason: reprintReason, copyType: 'CLIENTE');
+      
+      if (!firstCopySuccess) {
+        print('❌ Error imprimiendo primera copia');
+        return false;
+      }
+      
+      // Pausa entre impresiones
+      await Future.delayed(Duration(milliseconds: 800));
+      
+      // Segunda copia (NEGOCIO)
+      print('🖨️ Imprimiendo copia NEGOCIO...');
+      bool secondCopySuccess = await _printSingleReceipt(sale, items, subtotal, taxes, total, customer: customer, isReprint: isReprint, reprintReason: reprintReason, copyType: 'NEGOCIO');
+      
+      if (!secondCopySuccess) {
+        print('⚠️ Error imprimiendo segunda copia, pero primera fue exitosa');
+        // Retornar true porque al menos una copia se imprimió
+        return true;
+      }
+      
+      print('✅ Doble impresión completada exitosamente');
+      return true;
+    } catch (e) {
+      print('❌ Error en doble impresión: $e');
+      return false;
+    }
+  }
+
+  // Imprimir recibo único
+  Future<bool> _printSingleReceipt(Sale sale, List<CartItem> items, double subtotal, double taxes, double total, {Customer? customer, bool isReprint = false, String? reprintReason, String? copyType}) async {
     if (!_isConnected) {
       print('❌ Impresora no conectada');
       return false;
@@ -270,6 +395,16 @@ class PrintService {
       commands.addAll(_newLine());
       commands.addAll(_formatText('No. ${_generateInvoiceNumber()}'));
       commands.addAll(_newLine());
+      
+      // Mostrar tipo de copia si es duplicado
+      if (copyType != null) {
+        commands.addAll(_alignCenter);
+        commands.addAll(_boldOn);
+        commands.addAll(_formatText('COPIA: $copyType'));
+        commands.addAll(_newLine());
+        commands.addAll(_boldOff);
+      }
+      
       commands.addAll(_boldOff);
       
       // Fecha y información de caja

@@ -757,7 +757,8 @@ class PosController extends GetxController {
         cartItems, 
         subtotal, 
         taxes, 
-        total
+        total,
+        paymentMethod: sale.paymentMethod
       );
       
       Get.back(); // Cerrar diálogo de imprimiendo
