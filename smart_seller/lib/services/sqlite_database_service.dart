@@ -10,6 +10,7 @@ import 'dart:convert'; // Added for jsonDecode
 import '../models/customer.dart'; // Added for Customer model
 import '../models/client.dart'; // Added for Client model
 import '../models/company_config.dart'; // Added for CompanyConfig model
+import '../models/group.dart'; // Added for Group model
 
 class SQLiteDatabaseService {
   static Database? _database;
@@ -47,6 +48,10 @@ class SQLiteDatabaseService {
     // Llama a la migración después de abrir la base de datos
     await migrateAddPricePerKg();
     await migrateAddWeightColumns();
+    
+    // Crear grupos por defecto si no existen
+    await migrateAddGroupsTable();
+    // await createDefaultGroups(); // Comentado para evitar recrear grupos automáticamente
   }
   
   // Crear las tablas
@@ -64,6 +69,20 @@ class SQLiteDatabaseService {
         createdAt TEXT NOT NULL,
         isActive INTEGER NOT NULL DEFAULT 1,
         userCode TEXT
+      )
+    ''');
+    
+    // Tabla de grupos
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        color TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isActive INTEGER NOT NULL DEFAULT 1
       )
     ''');
     
@@ -1031,5 +1050,189 @@ class SQLiteDatabaseService {
     
     final results = await _database!.query('clients', where: whereClause, whereArgs: whereArgs);
     return results.isNotEmpty;
+  }
+  
+  // ================== GRUPOS ==================
+  
+  // Crear grupo
+  static Future<void> createGroup(Group group) async {
+    await _database!.insert('groups', group.toMap());
+  }
+  
+  // Obtener todos los grupos
+  static Future<List<Group>> getAllGroups() async {
+    final results = await _database!.query(
+      'groups',
+      where: 'isActive = ?',
+      whereArgs: [1],
+      orderBy: 'name ASC',
+    );
+    
+    return results.map((groupData) => Group.fromMap(groupData)).toList();
+  }
+  
+  // Buscar grupo por ID
+  static Future<Group?> getGroupById(int id) async {
+    final results = await _database!.query(
+      'groups',
+      where: 'id = ? AND isActive = ?',
+      whereArgs: [id, 1],
+    );
+    
+    if (results.isNotEmpty) {
+      return Group.fromMap(results.first);
+    }
+    return null;
+  }
+  
+  // Actualizar grupo
+  static Future<void> updateGroup(Group group) async {
+    await _database!.update(
+      'groups',
+      group.toMap(),
+      where: 'id = ?',
+      whereArgs: [group.id],
+    );
+  }
+  
+  // Eliminar grupo (marcar como inactivo)
+  static Future<void> deleteGroup(int id) async {
+    await _database!.update(
+      'groups',
+      {'isActive': 0, 'updatedAt': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+  
+  // Verificar si existe un grupo con el nombre dado
+  static Future<bool> groupNameExists(String name, {int? excludeId}) async {
+    String whereClause = 'name = ? AND isActive = ?';
+    List<dynamic> whereArgs = [name.trim(), 1];
+    
+    if (excludeId != null) {
+      whereClause += ' AND id != ?';
+      whereArgs.add(excludeId);
+    }
+    
+    final results = await _database!.query('groups', where: whereClause, whereArgs: whereArgs);
+    return results.isNotEmpty;
+  }
+  
+  // Migración: agregar tabla de grupos si no existe
+  static Future<void> migrateAddGroupsTable() async {
+    print('🔄 Verificando tabla groups...');
+    final result = await _database!.rawQuery("PRAGMA table_info(groups)");
+    
+    if (result.isEmpty) {
+      print('🔧 Creando tabla groups...');
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS groups (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          description TEXT,
+          color TEXT NOT NULL,
+          icon TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          isActive INTEGER NOT NULL DEFAULT 1
+        )
+      ''');
+      print('✅ Tabla groups creada exitosamente');
+    } else {
+      print('ℹ️ La tabla groups ya existe');
+    }
+  }
+  
+  // Crear grupos por defecto
+  static Future<void> createDefaultGroups() async {
+    final defaultGroups = [
+      Group(
+        name: 'Frutas y Verduras',
+        description: 'Productos frescos del campo',
+        color: '#FF5722',
+        icon: 'apple',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Lácteos',
+        description: 'Productos derivados de la leche',
+        color: '#2196F3',
+        icon: 'local_drink',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Panadería',
+        description: 'Productos de panadería y pastelería',
+        color: '#FF9800',
+        icon: 'bakery_dining',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Carnes',
+        description: 'Productos cárnicos',
+        color: '#795548',
+        icon: 'set_meal',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Bebidas',
+        description: 'Bebidas y refrescos',
+        color: '#4CAF50',
+        icon: 'local_bar',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Abarrotes',
+        description: 'Productos de abarrotes',
+        color: '#9C27B0',
+        icon: 'inventory',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Limpieza',
+        description: 'Productos de limpieza',
+        color: '#009688',
+        icon: 'cleaning_services',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Cuidado Personal',
+        description: 'Productos de cuidado personal',
+        color: '#E91E63',
+        icon: 'person',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Servicios',
+        description: 'Servicios prestados',
+        color: '#3F51B5',
+        icon: 'miscellaneous_services',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Group(
+        name: 'Otros',
+        description: 'Otros productos',
+        color: '#9E9E9E',
+        icon: 'category',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    ];
+    
+    for (final group in defaultGroups) {
+      await createGroup(group);
+    }
+    
+    print('✅ Grupos por defecto creados');
   }
 } 

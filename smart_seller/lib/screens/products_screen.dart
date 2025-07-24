@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/product.dart';
+import '../models/group.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/import_service.dart';
 import 'package:intl/intl.dart';
@@ -19,7 +20,8 @@ class _ProductsScreenState extends State<ProductsScreen> with RouteAware {
   final TextEditingController _searchController = TextEditingController();
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
-  ProductCategory? _selectedCategory;
+  List<Group> _groups = [];
+  Group? _selectedGroup;
   bool _isLoading = true;
 
   final NumberFormat copFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0');
@@ -55,9 +57,11 @@ class _ProductsScreenState extends State<ProductsScreen> with RouteAware {
 
     try {
       final products = await SQLiteDatabaseService.getAllProducts();
+      final groups = await SQLiteDatabaseService.getAllGroups();
       setState(() {
         _products = products;
         _filteredProducts = products;
+        _groups = groups;
         _isLoading = false;
       });
     } catch (e) {
@@ -81,10 +85,10 @@ class _ProductsScreenState extends State<ProductsScreen> with RouteAware {
             .contains(_searchController.text.toLowerCase()) ||
             product.code.toLowerCase().contains(_searchController.text.toLowerCase());
         
-        final matchesCategory = _selectedCategory == null || 
-            product.category == _selectedCategory;
+        final matchesGroup = _selectedGroup == null || 
+            product.category.toString().split('.').last == _selectedGroup!.name;
         
-        return matchesSearch && matchesCategory;
+        return matchesSearch && matchesGroup;
       }).toList();
     });
   }
@@ -446,24 +450,24 @@ class _ProductsScreenState extends State<ProductsScreen> with RouteAware {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Filtro por categoría
+                // Filtro por grupo
                 Expanded(
                   flex: 1,
-                  child: DropdownButtonFormField<ProductCategory?>(
-                    value: _selectedCategory,
+                  child: DropdownButtonFormField<Group?>(
+                    value: _selectedGroup,
                     items: [
                       const DropdownMenuItem(
                         value: null,
-                        child: Text('Todas las categorías'),
+                        child: Text('Todos los grupos'),
                       ),
-                      ...ProductCategory.values.map((category) => DropdownMenuItem(
-                        value: category,
-                        child: Text(_getCategoryName(category)),
+                      ..._groups.map((group) => DropdownMenuItem(
+                        value: group,
+                        child: Text(group.name),
                       )),
                     ],
-                    onChanged: (category) {
+                    onChanged: (group) {
                       setState(() {
-                        _selectedCategory = category;
+                        _selectedGroup = group;
                       });
                       _filterProducts();
                     },
@@ -549,6 +553,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
   final _unitController = TextEditingController();
+  final _groupController = TextEditingController();
   
   // Controladores para productos pesados
   final _pricePerKgController = TextEditingController();
@@ -556,7 +561,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   final _minWeightController = TextEditingController();
   final _maxWeightController = TextEditingController();
   
-  ProductCategory _selectedCategory = ProductCategory.otros;
+  String _selectedGroup = 'Otros';
+  List<Group> _availableGroups = [];
   bool _isActive = true;
   bool _isWeighted = false;
   bool _isLoading = false;
@@ -564,6 +570,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   @override
   void initState() {
     super.initState();
+    _loadGroups();
     if (widget.product != null) {
       _codeController.text = widget.product!.code;
       _shortCodeController.text = widget.product!.shortCode;
@@ -574,7 +581,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       _stockController.text = widget.product!.stock.toString();
       _minStockController.text = widget.product!.minStock.toString();
       _unitController.text = widget.product!.unit;
-      _selectedCategory = widget.product!.category;
+      _selectedGroup = _getCategoryName(widget.product!.category);
+      _groupController.text = _selectedGroup;
       _isActive = widget.product!.isActive;
       
       // Campos para productos pesados
@@ -583,6 +591,47 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       _weightController.text = widget.product!.weight?.toString() ?? '';
       _minWeightController.text = widget.product!.minWeight?.toString() ?? '';
       _maxWeightController.text = widget.product!.maxWeight?.toString() ?? '';
+    }
+  }
+  
+  Future<void> _loadGroups() async {
+    try {
+      final groups = await SQLiteDatabaseService.getAllGroups();
+      setState(() {
+        _availableGroups = groups;
+      });
+    } catch (e) {
+      print('Error cargando grupos: $e');
+    }
+  }
+  
+  void _showGroupManager() {
+    Get.toNamed('/grupos')?.then((_) {
+      // Recargar grupos cuando regrese de la pantalla de gestión
+      _loadGroups();
+    });
+  }
+  
+  ProductCategory _getCategoryFromName(String name) {
+    switch (name.toLowerCase()) {
+      case 'frutas y verduras':
+        return ProductCategory.frutasVerduras;
+      case 'lácteos':
+        return ProductCategory.lacteos;
+      case 'panadería':
+        return ProductCategory.panaderia;
+      case 'carnes':
+        return ProductCategory.carnes;
+      case 'bebidas':
+        return ProductCategory.bebidas;
+      case 'abarrotes':
+        return ProductCategory.abarrotes;
+      case 'limpieza':
+        return ProductCategory.limpieza;
+      case 'cuidado personal':
+        return ProductCategory.cuidadoPersonal;
+      default:
+        return ProductCategory.otros;
     }
   }
 
@@ -640,7 +689,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         stock: int.parse(_stockController.text),
         minStock: int.parse(_minStockController.text),
         unit: _unitController.text.trim(),
-        category: _selectedCategory,
+        category: _getCategoryFromName(_selectedGroup),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: _isActive,
@@ -693,7 +742,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               _minWeightController.clear();
               _maxWeightController.clear();
               setState(() {
-                _selectedCategory = ProductCategory.otros;
+                _selectedGroup = 'Otros';
+                _groupController.text = 'Otros';
                 _isActive = true;
                 _isWeighted = false;
               });
@@ -795,7 +845,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
               Row(
                 children: [
                   Expanded(
-                    flex: 2,
+                    flex: 1,
                     child: TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -812,17 +862,71 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: DropdownButtonFormField<ProductCategory>(
-                      value: _selectedCategory,
-                      items: ProductCategory.values.map((category) => DropdownMenuItem(
-                        value: category,
-                        child: Text(_getCategoryName(category)),
-                      )).toList(),
-                      onChanged: (category) => setState(() => _selectedCategory = category!),
-                decoration: const InputDecoration(
-                        labelText: 'Categoría',
-                  border: OutlineInputBorder(),
-                ),
+                    flex: 1,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _availableGroups.isEmpty
+                              ? TextFormField(
+                                  controller: _groupController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Grupo',
+                                    border: OutlineInputBorder(),
+                                    hintText: 'Escribe el nombre del grupo',
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'El grupo es obligatorio';
+                                    }
+                                    return null;
+                                  },
+                                )
+                              : DropdownButtonFormField<String>(
+                                  value: _selectedGroup,
+                                  items: [
+                                    const DropdownMenuItem<String>(
+                                      value: 'Otros',
+                                      child: Text('Otros'),
+                                    ),
+                                    ..._availableGroups.map((group) => DropdownMenuItem<String>(
+                                      value: group.name,
+                                      child: Text(
+                                        group.name,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    )).toList(),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedGroup = value!;
+                                      _groupController.text = value;
+                                    });
+                                  },
+                                  decoration: const InputDecoration(
+                                    labelText: 'Grupo',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'El grupo es obligatorio';
+                                    }
+                                    return null;
+                                  },
+                                  isExpanded: true,
+                                ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: _showGroupManager,
+                          icon: const Icon(Icons.add_circle_outline),
+                          tooltip: 'Gestionar grupos',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
