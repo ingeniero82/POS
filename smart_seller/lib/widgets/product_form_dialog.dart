@@ -553,11 +553,350 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
   
   // Pestaña de Facturación Electrónica
   Widget _buildElectronicInvoicingTab() {
-    return const Center(
-      child: Text(
-        'Configuración de Facturación Electrónica\n\nPróximamente...',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16, color: Colors.grey),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Configuración DIAN',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          
+          // Primera fila - Clasificación Fiscal e IVA
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Clasificación Fiscal *',
+                    border: OutlineInputBorder(),
+                    helperText: 'Según normativa DIAN',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'GRAVADO', child: Text('Gravado')),
+                    DropdownMenuItem(value: 'EXENTO', child: Text('Exento')),
+                    DropdownMenuItem(value: 'EXCLUIDO', child: Text('Excluido')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'IVA *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: '19', child: Text('19%')),
+                    DropdownMenuItem(value: '5', child: Text('5%')),
+                    DropdownMenuItem(value: '0', child: Text('0% (Exento)')),
+                    DropdownMenuItem(value: 'EXCLUIDO', child: Text('Excluido')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Segunda fila - Indicador de Producto y Unidad de Medida DIAN
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Indicador de Producto *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'NORMAL', child: Text('Normal')),
+                    DropdownMenuItem(value: 'COMBO', child: Text('Combo')),
+                    DropdownMenuItem(value: 'SERVICIO', child: Text('Servicio')),
+                    DropdownMenuItem(value: 'PESADO', child: Text('Pesado (Báscula)')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Unidad de Medida DIAN *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'unidad', child: Text('Unidad')),
+                    DropdownMenuItem(value: 'kilogramo', child: Text('Kilogramo')),
+                    DropdownMenuItem(value: 'litro', child: Text('Litro')),
+                    DropdownMenuItem(value: 'paquete', child: Text('Paquete')),
+                    DropdownMenuItem(value: 'metro', child: Text('Metro')),
+                    DropdownMenuItem(value: 'gramo', child: Text('Gramo')),
+                    DropdownMenuItem(value: 'centimetro', child: Text('Centímetro')),
+                    DropdownMenuItem(value: 'mililitro', child: Text('Mililitro')),
+                    DropdownMenuItem(value: 'docena', child: Text('Docena')),
+                    DropdownMenuItem(value: 'caja', child: Text('Caja')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Tercera fila - Impuestos Adicionales y Marca
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Impuestos Adicionales',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'NINGUNO', child: Text('Sin impuestos adicionales')),
+                    DropdownMenuItem(value: 'IMPUESTO_BOLSA', child: Text('Impuesto Bolsa')),
+                    DropdownMenuItem(value: 'RETEFUENTE_2_5', child: Text('Retefuente 2.5%')),
+                    DropdownMenuItem(value: 'RETEIVA_15', child: Text('ReteIVA 15%')),
+                    DropdownMenuItem(value: 'IMPUESTO_CONSUMO', child: Text('Impuesto al Consumo')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Marca',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Coca-Cola',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Cuarta fila - Modelo y Código EAN/UPC
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Modelo',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: 2024',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Código EAN/UPC',
+                    border: OutlineInputBorder(),
+                    hintText: '1234567890123',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Quinta fila - Fabricante y País de origen
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Fabricante',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Coca-Cola Company',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'País de Origen',
+                    border: OutlineInputBorder(),
+                    hintText: 'CO',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Sexta fila - Código arancelario y Peso neto
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Código Arancelario',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: 2202.10.00.00',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Peso Neto (kg)',
+                    border: OutlineInputBorder(),
+                    hintText: '0.5',
+                    suffixText: 'kg',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Séptima fila - Peso bruto y Dimensiones
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Peso Bruto (kg)',
+                    border: OutlineInputBorder(),
+                    hintText: '0.6',
+                    suffixText: 'kg',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Dimensiones',
+                    border: OutlineInputBorder(),
+                    hintText: '10x5x2 cm',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Octava fila - Material y Garantía
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Material',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Plástico, Vidrio',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Garantía',
+                    border: OutlineInputBorder(),
+                    hintText: '1 año',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Novena fila - Fecha de vencimiento y SKU
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Fecha de Vencimiento',
+                    border: OutlineInputBorder(),
+                    hintText: 'DD/MM/YYYY',
+                    prefixIcon: Icon(Icons.calendar_today),
+                  ),
+                  readOnly: true,
+                  onTap: () {
+                    // TODO: Implementar selector de fecha
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'SKU',
+                    border: OutlineInputBorder(),
+                    hintText: 'Código interno del producto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Checkboxes
+          Row(
+            children: [
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Exento de impuestos'),
+              const SizedBox(width: 32),
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Es un servicio'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Información adicional
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Estos campos son requeridos para la facturación electrónica según normativa DIAN. Los campos marcados con * son obligatorios.',
+                    style: TextStyle(fontSize: 12, color: Colors.blue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
