@@ -903,11 +903,288 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
   
   // Pestaña de Inventario
   Widget _buildInventoryTab() {
-    return const Center(
-      child: Text(
-        'Configuración de Inventario\n\nPróximamente...',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16, color: Colors.grey),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Configuración de Inventario',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          
+          // Primera fila - Stock actual y Stock mínimo
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _stockController,
+                  decoration: const InputDecoration(
+                    labelText: 'Stock Actual *',
+                    border: OutlineInputBorder(),
+                    hintText: '0',
+                    suffixText: 'unidades',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El stock es obligatorio';
+                    }
+                    if (int.tryParse(value) == null) {
+                      return 'Stock inválido';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _minStockController,
+                  decoration: const InputDecoration(
+                    labelText: 'Stock Mínimo *',
+                    border: OutlineInputBorder(),
+                    hintText: '5',
+                    suffixText: 'unidades',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El stock mínimo es obligatorio';
+                    }
+                    if (int.tryParse(value) == null) {
+                      return 'Stock mínimo inválido';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Segunda fila - Precio mínimo y % de utilidad
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Precio Mínimo Permitido',
+                    border: OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: '0.00',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: '% de Utilidad',
+                    border: OutlineInputBorder(),
+                    suffixText: '%',
+                    hintText: '30',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Tercera fila - Precio sin IVA (calculado) y Costo total
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: InputDecoration(
+                    labelText: 'Precio sin IVA (Calculado)',
+                    border: const OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: '0.00',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                  ),
+                  readOnly: true,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: InputDecoration(
+                    labelText: 'Costo Total (Costo × Stock)',
+                    border: const OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: '0.00',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                  ),
+                  readOnly: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Cuarta fila - Manejo de decimales y Estado
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Manejo de Decimales',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'NO', child: Text('No (Productos enteros)')),
+                    DropdownMenuItem(value: 'SI', child: Text('Sí (Productos fraccionables)')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Estado del Producto',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'ACTIVO', child: Text('Activo')),
+                    DropdownMenuItem(value: 'INACTIVO', child: Text('Inactivo')),
+                    DropdownMenuItem(value: 'DESCONTINUADO', child: Text('Descontinuado')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Quinta fila - Proveedor principal y Código del proveedor
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Proveedor Principal',
+                    border: OutlineInputBorder(),
+                    hintText: 'Nombre del proveedor',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Código del Proveedor',
+                    border: OutlineInputBorder(),
+                    hintText: 'Código interno del proveedor',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Sexta fila - Cuenta contable y Ubicación
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Cuenta Contable',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: 1405 - Inventarios',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Ubicación en Almacén',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Estante A, Nivel 2',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Checkboxes
+          Row(
+            children: [
+              Checkbox(
+                value: _isWeighted,
+                onChanged: (value) {
+                  setState(() {
+                    _isWeighted = value ?? false;
+                  });
+                },
+              ),
+              const Text('Producto con peso (báscula)'),
+              const SizedBox(width: 32),
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Combustible'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          Row(
+            children: [
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Control de lotes'),
+              const SizedBox(width: 32),
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Control de vencimiento'),
+            ],
+          ),
+          const SizedBox(height: 24),
+          
+          // Información adicional
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.green),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Los campos marcados con * son obligatorios. Los precios calculados se actualizan automáticamente.',
+                    style: TextStyle(fontSize: 12, color: Colors.green),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
