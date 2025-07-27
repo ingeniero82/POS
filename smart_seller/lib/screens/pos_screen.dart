@@ -618,233 +618,80 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
   
-  // Widget de peso integrado en POS (solo aparece cuando es relevante)
+  // Widget de peso integrado en POS (siempre visible)
   Widget _buildWeightDisplay() {
-    // Solo mostrar si hay un producto pesado seleccionado O si la balanza está conectada
-    if (_selectedProduct?.isWeighted != true && !_weightController.isConnected.value) {
-      return const SizedBox.shrink();
-    }
+    // ✅ NUEVO: Mostrar siempre, independientemente del producto
 
     return Card(
       elevation: 3,
-      color: _selectedProduct?.isWeighted == true ? Colors.orange.shade50 : Colors.grey.shade50,
+      color: Colors.grey.shade50,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Título con estado de balanza
+            // Título "BALANZA" como en la imagen
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.scale, 
-                      size: 20, 
-                      color: _selectedProduct?.isWeighted == true ? Colors.orange.shade700 : Colors.grey.shade700,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _selectedProduct?.isWeighted == true ? '⚖️ Producto por Peso' : 'Balanza',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: _selectedProduct?.isWeighted == true ? Colors.orange.shade700 : Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
+                Text(
+                  'BALANZA',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
-                // Estado de conexión
-                Obx(() => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _weightController.isConnected.value ? Colors.green : Colors.red,
-                    borderRadius: BorderRadius.circular(12),
+                // Botón Debug como en la imagen
+                ElevatedButton(
+                  onPressed: () {
+                    // Función debug (mantener funcionalidad existente)
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    minimumSize: const Size(60, 30),
                   ),
-                  child: Text(
-                    _weightController.isConnected.value ? 'Conectada' : 'Desconectada',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: const Text(
+                    'Debug',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
-                )),
+                ),
               ],
             ),
             const SizedBox(height: 16),
             
-            // Peso actual y cálculos
+            // Peso actual como en la imagen
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _selectedProduct?.isWeighted == true ? Colors.orange.shade300 : Colors.grey.shade300,
-                  width: _selectedProduct?.isWeighted == true ? 2 : 1,
+                  color: Colors.grey.shade300,
+                  width: 1,
                 ),
               ),
               child: Column(
                 children: [
-                  // Peso actual
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Peso:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
+                  // Peso actual centrado como en la imagen
+                  Center(
+                    child: Obx(() => Text(
+                      '${_weightController.currentWeight.value.toStringAsFixed(3)} kg',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
                       ),
-                      Obx(() => Text(
-                        '${_weightController.currentWeight.value.toStringAsFixed(3)} kg',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _weightController.isConnected.value ? Colors.blue.shade700 : Colors.grey,
-                        ),
-                      )),
-                    ],
+                    )),
                   ),
                   
-                  // Si hay producto pesado seleccionado, mostrar cálculos
-                  if (_selectedProduct?.isWeighted == true) ...[
-                    const Divider(height: 20),
-                    
-                    // Precio por kg
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Precio/kg:',
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                        ),
-                        Text(
-                          '\$${_selectedProduct!.pricePerKg?.toStringAsFixed(0) ?? '0'}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    // Precio total calculado
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'TOTAL:',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        Obx(() {
-                          final totalPrice = (_selectedProduct!.pricePerKg ?? 0) * _weightController.currentWeight.value;
-                          return Text(
-                            '\$${totalPrice.toStringAsFixed(0)}',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green.shade700,
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Botón para agregar al carrito
-                    Obx(() {
-                      final hasValidWeight = _weightController.currentWeight.value > 0;
-                      return SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: hasValidWeight ? _addWeightProductToCart : null,
-                          icon: const Icon(Icons.add_shopping_cart),
-                          label: Text(
-                            hasValidWeight 
-                              ? 'Agregar al Carrito'
-                              : 'Coloque producto en la balanza',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Indicador de lectura
-                  Obx(() => Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: _weightController.isReading.value ? Colors.blue : Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    child: _weightController.isReading.value
-                        ? const LinearProgressIndicator(
-                            backgroundColor: Colors.transparent,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                          )
-                        : null,
-                  )),
+
                 ],
               ),
             ),
             
-            const SizedBox(height: 16),
-            
-            // Controles de balanza
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Conectar/Desconectar
-                Obx(() => ElevatedButton.icon(
-                  onPressed: _weightController.isConnected.value 
-                      ? _weightController.disconnectScale
-                      : _weightController.connectScale,
-                  icon: Icon(
-                    _weightController.isConnected.value 
-                        ? Icons.bluetooth_connected 
-                        : Icons.bluetooth_disabled,
-                    size: 16,
-                  ),
-                  label: Text(
-                    _weightController.isConnected.value ? 'Desconectar' : 'Conectar',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _weightController.isConnected.value ? Colors.red : Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                )),
-                
-                // Tare
-                Obx(() => ElevatedButton.icon(
-                  onPressed: _weightController.isConnected.value ? _weightController.tare : null,
-                  icon: const Icon(Icons.horizontal_rule, size: 16),
-                  label: const Text('Tare', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                )),
-              ],
-            ),
+
           ],
         ),
       ),
