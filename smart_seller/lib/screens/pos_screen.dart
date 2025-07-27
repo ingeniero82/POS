@@ -70,6 +70,8 @@ class _PosScreenState extends State<PosScreen> {
     
     // ✅ Auto-focus al barcode al iniciar
     _ensureBarcodeFocus();
+    
+
   }
   
   @override
@@ -91,6 +93,10 @@ class _PosScreenState extends State<PosScreen> {
       });
     });
   }
+  
+
+  
+
   
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
@@ -119,12 +125,23 @@ class _PosScreenState extends State<PosScreen> {
       .replaceAll(RegExp(r'[ÚÙÜÛ]'), 'U');
   }
   
-  @override
+    @override
   Widget build(BuildContext context) {
     return KeyboardListener(
       focusNode: FocusNode(),
-      autofocus: false, // ❌ Cambiado a false para no interferir
-      onKeyEvent: _handleKeyPress,
+      autofocus: false,
+      onKeyEvent: (KeyEvent event) {
+        // ✅ MEJORADO: Solo manejar teclas específicas, permitir que otras pasen
+        if (event is KeyDownEvent) {
+          final keyLabel = event.logicalKey.keyLabel;
+          if (keyLabel == 'F1' || keyLabel == 'F2' || keyLabel == 'F4' || 
+              keyLabel == 'F5' || keyLabel == 'F6' || keyLabel == 'Escape' || 
+              keyLabel == 'Enter') {
+            _handleKeyPress(event);
+          }
+          // Si no es una tecla de función, no hacer nada (permitir que pase)
+        }
+      },
       child: Scaffold(
         backgroundColor: Colors.grey[100],
         body: Column(
@@ -147,7 +164,10 @@ class _PosScreenState extends State<PosScreen> {
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   tooltip: 'Volver al Dashboard',
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: () {
+                    // ✅ SOLUCIÓN DIRECTA: Forzar navegación sin importar el estado
+                    Get.offAllNamed('/dashboard');
+                  },
                 ),
                 const Expanded(
                   child: Center(
@@ -1392,6 +1412,8 @@ class _PosScreenState extends State<PosScreen> {
     // Mostrar opciones de finalización
     _showPaymentOptionsDialog();
   }
+  
+
   
   void _showPaymentOptionsDialog() {
     Get.dialog(

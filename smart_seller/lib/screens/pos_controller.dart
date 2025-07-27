@@ -305,6 +305,8 @@ class PosController extends GetxController {
     );
   }
   
+
+  
   
   
   // Conectar balanza
@@ -355,6 +357,14 @@ class PosController extends GetxController {
   // Calcular total
   double get total {
     return subtotal + taxes;
+  }
+  
+  // ✅ NUEVA FUNCIÓN: Forzar limpieza de focus después de completar venta
+  void _forceFocusCleanup() {
+    // Forzar que se pierda el focus de cualquier widget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
   }
   
   // Procesar pago
@@ -526,6 +536,9 @@ class PosController extends GetxController {
           colorText: Colors.white,
           duration: const Duration(seconds: 2),
         );
+        
+        // ✅ NUEVO: Forzar limpieza de focus después de completar venta
+        _forceFocusCleanup();
       });
     }
     
@@ -559,6 +572,9 @@ class PosController extends GetxController {
           colorText: Colors.white,
           duration: const Duration(seconds: 2),
         );
+        
+        // ✅ NUEVO: Forzar limpieza de focus después de completar venta
+        _forceFocusCleanup();
       });
     }
     
