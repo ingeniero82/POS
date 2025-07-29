@@ -60,16 +60,25 @@ class PosController extends GetxController {
   }
   
   Future<void> _initializeScale() async {
-    _scaleService = ScaleService();
+    // ✅ NUEVO: Registrar ScaleService como singleton
+    if (!Get.isRegistered<ScaleService>()) {
+      _scaleService = ScaleService();
+      Get.put(_scaleService, permanent: true);
+    } else {
+      _scaleService = Get.find<ScaleService>();
+    }
+    
     await _scaleService.initialize();
     
     // Escuchar cambios de peso
     _scaleService.weightStream.listen((weight) {
+      print('📊 Peso recibido en PosController: $weight');
       scaleWeight.value = weight;
     });
     
     // Escuchar cambios de conexión
     _scaleService.connectionStream.listen((connected) {
+      print('🔌 Estado de conexión en PosController: $connected');
       isScaleConnected.value = connected;
     });
   }

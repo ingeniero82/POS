@@ -18,6 +18,12 @@ class WeightConfigScreen extends StatelessWidget {
         backgroundColor: Colors.orange.shade700,
         foregroundColor: Colors.white,
         actions: [
+          // ✅ NUEVO: Botón para configuración de balanza
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => Get.toNamed('/scale-config'),
+            tooltip: 'Configurar Balanza',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: controller.refresh,

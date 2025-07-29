@@ -5,7 +5,8 @@ import '../../../services/sqlite_database_service.dart';
 import 'dart:async';
 
 class WeightController extends GetxController {
-  final ScaleService _scaleService = ScaleService();
+  // ✅ NUEVO: Usar la misma instancia de ScaleService que el POS
+  late ScaleService _scaleService;
   
   // Estados reactivos
   var isConnected = false.obs;
@@ -24,7 +25,8 @@ class WeightController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initializeScaleService();
+    // ✅ NUEVO: Obtener la instancia existente de ScaleService
+    _scaleService = Get.find<ScaleService>();
     _loadWeightProducts();
     _setupStreams();
   }
@@ -33,22 +35,16 @@ class WeightController extends GetxController {
   void onClose() {
     _weightSubscription?.cancel();
     _connectionSubscription?.cancel();
-    _scaleService.dispose();
+    // ✅ NUEVO: No dispose aquí, el POS se encarga
     super.onClose();
   }
   
-  // Inicializar servicio de balanza
-  Future<void> _initializeScaleService() async {
-    try {
-      await _scaleService.initialize();
-    } catch (e) {
-      Get.snackbar('Error', 'Error inicializando balanza: $e');
-    }
-  }
-  
-  // Configurar streams de la balanza
+  // ✅ NUEVO: Configurar streams de la balanza
   void _setupStreams() {
+    print('🔧 Configurando streams de peso en WeightController...');
+    
     _weightSubscription = _scaleService.weightStream.listen((weight) {
+      print('📊 Peso recibido en WeightController: $weight');
       currentWeight.value = weight;
       // Si hay un producto seleccionado, actualizar su peso
       if (selectedProduct.value != null) {
@@ -57,8 +53,13 @@ class WeightController extends GetxController {
     });
     
     _connectionSubscription = _scaleService.connectionStream.listen((connected) {
+      print('🔌 Estado de conexión en WeightController: $connected');
       isConnected.value = connected;
     });
+    
+    // ✅ NUEVO: Actualizar estado inicial
+    currentWeight.value = _scaleService.currentWeight;
+    isConnected.value = _scaleService.isConnected;
   }
   
   // Cargar productos pesados

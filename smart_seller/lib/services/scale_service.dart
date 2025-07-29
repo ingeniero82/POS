@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:libserialport/libserialport.dart';
+import 'aclas_os2x_service.dart';
 
 class ScaleService {
   static const MethodChannel _channel = MethodChannel('scale_channel');
@@ -36,6 +37,9 @@ class ScaleService {
   SerialPortReader? _reader;
   Timer? _readTimer;
   
+  // ✅ NUEVO: Servicio específico para Aclas OS2X
+  final AclasOS2XService _aclasService = AclasOS2XService();
+  
   // Inicializar el servicio
   Future<void> initialize() async {
     try {
@@ -45,17 +49,54 @@ class ScaleService {
       _channel.setMethodCallHandler(_handleMethodCall);
       print('✅ Canal de método configurado');
       
-      // Conectar automáticamente a la balanza Aclas OS2X
-      await _connectToAclasOS2X();
+      // ✅ NUEVO: Usar servicio específico de Aclas OS2X
+      await _initializeAclasService();
       
-      // Si no se pudo conectar, usar simulación temporal
-      if (!_isConnected) {
-        print('⚠️ No se pudo conectar a balanza real, usando simulación temporal...');
-        await _simulateConnectionForTesting();
-      }
       print('✅ ScaleService inicializado');
     } catch (e) {
       print('❌ Error inicializando ScaleService: $e');
+    }
+  }
+  
+  // ✅ NUEVO: Inicializar servicio Aclas OS2X
+  Future<void> _initializeAclasService() async {
+    try {
+      print('🔌 Inicializando servicio Aclas OS2X...');
+      
+      // ✅ NUEVO: Intentar conectar a balanza real primero
+      print('🔍 Intentando conectar a balanza real...');
+      final connected = await _aclasService.connect();
+      
+      if (connected) {
+        _isConnected = true;
+        _connectionController.add(true);
+        print('✅ Servicio Aclas OS2X conectado exitosamente');
+        
+        // Configurar streams
+        _aclasService.weightStream.listen((weight) {
+          _currentWeight = weight;
+          _weightController.add(weight);
+          print('📊 Peso actualizado: ${weight.toStringAsFixed(3)} kg');
+        });
+        
+        _aclasService.connectionStream.listen((connected) {
+          _isConnected = connected;
+          _connectionController.add(connected);
+          print('🔌 Estado de conexión: $connected');
+        });
+        
+        // Iniciar lectura automáticamente
+        await startReading();
+      } else {
+        print('⚠️ No se pudo conectar a balanza real, usando simulación temporal...');
+        await _simulateConnectionForTesting();
+        _startSimulatedReading();
+      }
+    } catch (e) {
+      print('❌ Error inicializando servicio Aclas: $e');
+      // Fallback a simulación
+      await _simulateConnectionForTesting();
+      _startSimulatedReading();
     }
   }
   
@@ -184,6 +225,9 @@ class ScaleService {
       _isConnected = true;
       _connectionController.add(true);
       print('✅ Simulación temporal conectada');
+      
+      // ✅ NUEVO: Iniciar simulación de peso inmediatamente
+      _startSimulatedReading();
     } catch (e) {
       print('❌ Error en simulación temporal: $e');
     }
@@ -229,11 +273,29 @@ class ScaleService {
   // Obtener puertos disponibles
   Future<List<String>> _getAvailablePorts() async {
     try {
-      final List<dynamic> ports = await _channel.invokeMethod('getAvailablePorts');
-      return ports.cast<String>();
+      // ✅ NUEVO: Detección automática de puertos COM en Windows
+      final result = await Process.run('powershell', [
+        '-Command',
+        '[System.IO.Ports.SerialPort]::getportnames()'
+      ]);
+      
+      if (result.exitCode == 0) {
+        final ports = result.stdout.toString()
+            .trim()
+            .split('\n')
+            .where((port) => port.isNotEmpty)
+            .toList();
+        
+        print('📋 Puertos COM detectados: $ports');
+        return ports;
+      } else {
+        print('❌ Error detectando puertos: ${result.stderr}');
+        return [];
+      }
     } catch (e) {
-      print('Error obteniendo puertos: $e');
-      return [];
+      print('❌ Error obteniendo puertos: $e');
+      // Fallback a puertos comunes
+      return ['COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6'];
     }
   }
   
@@ -325,6 +387,9 @@ class ScaleService {
       _currentWeight = 0.0;
       _connectionController.add(false);
       
+      // ✅ NUEVO: Desconectar servicio Aclas
+      await _aclasService.disconnect();
+      
       print('✅ Balanza desconectada');
     } catch (e) {
       print('❌ Error desconectando: $e');
@@ -365,7 +430,9 @@ class ScaleService {
       _simulationTimer!.cancel();
     }
     
-    _simulationTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) {
+    print('🔄 Iniciando simulación de peso...');
+    
+    _simulationTimer = Timer.periodic(const Duration(milliseconds: 2000), (timer) {
       if (!_isReading || !_isConnected) {
         timer.cancel();
         return;
@@ -374,142 +441,107 @@ class ScaleService {
       // Simular peso que varía ligeramente
       final baseWeight = _getSimulatedWeight();
       final variation = (Random().nextDouble() - 0.5) * 0.01;
-      final newWeight = baseWeight + variation;
+      final newWeight = (baseWeight + variation).clamp(0.0, 10.0);
       
-      _currentWeight = double.parse(newWeight.toStringAsFixed(3));
-      _weightController.add(_currentWeight);
+      print('⚖️ Peso simulado: ${newWeight.toStringAsFixed(3)} kg');
+      _currentWeight = newWeight;
+      _weightController.add(newWeight);
     });
   }
   
-  // Simular diferentes pesos (backup)
+  // Obtener peso simulado
   double _getSimulatedWeight() {
+    // ✅ NUEVO: Simular peso más realista
     final now = DateTime.now();
     final seconds = now.second;
     
+    // Simular diferentes pesos según el tiempo
     if (seconds < 10) {
-      return 0.000;
+      return 0.000; // Balanza vacía
     } else if (seconds < 20) {
-      return 0.250;
+      return 0.250; // Peso ligero
     } else if (seconds < 30) {
-      return 0.500;
+      return 0.500; // Medio kilo
     } else if (seconds < 40) {
-      return 1.250;
+      return 1.250; // Un kilo y cuarto
     } else if (seconds < 50) {
-      return 2.100;
+      return 2.100; // Dos kilos y cien gramos
     } else {
-      return 0.750;
+      return 0.750; // Tres cuartos de kilo
     }
   }
   
-  // Iniciar lectura REAL de la balanza Aclas OS2X
+  // Iniciar lectura real
   void _startRealReading() {
     if (_readTimer != null) {
       _readTimer!.cancel();
     }
     
-    _readTimer = Timer.periodic(const Duration(milliseconds: 1000), (timer) {
-      if (!_isReading || !_isConnected || _serialPort == null) {
+    _readTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) async {
+      if (!_isReading || !_isConnected) {
         timer.cancel();
         return;
       }
       
-      _requestWeightFromAclas();
+      try {
+        if (_reader != null) {
+          // Leer datos del stream de forma asíncrona
+          _reader!.stream.timeout(
+            const Duration(milliseconds: 500),
+            onTimeout: (sink) => sink.close(),
+          ).listen((data) {
+            if (data.isNotEmpty) {
+              final response = String.fromCharCodes(data);
+              final weight = _parseWeight(response);
+              if (weight != null) {
+                _currentWeight = weight;
+                _weightController.add(weight);
+              }
+            }
+          });
+        }
+      } catch (e) {
+        print('Error leyendo peso: $e');
+      }
     });
   }
   
-  // Solicitar peso a la balanza Aclas OS2X
-  void _requestWeightFromAclas() async {
+  // Parsear peso de la respuesta
+  double? _parseWeight(String response) {
     try {
-      if (_serialPort == null) return;
+      // Patrones para Aclas OS2X
+      final patterns = [
+        RegExp(r'ST,GS,\s*([0-9]+\.[0-9]+)kg'),
+        RegExp(r'ST,NET,\s*([0-9]+\.[0-9]+)kg'),
+        RegExp(r'US,GS,\s*([0-9]+\.[0-9]+)kg'),
+        RegExp(r'([0-9]+\.[0-9]+)kg'),
+      ];
       
-      // Comando específico para Aclas OS2X
-      final command = 'W\r\n';
-      final commandBytes = Uint8List.fromList(command.codeUnits);
-      
-      // Enviar comando
-      _serialPort!.write(commandBytes);
-      
-      // Leer respuesta
-      if (_reader != null) {
-        _reader!.stream.timeout(
-          const Duration(milliseconds: 500),
-          onTimeout: (sink) => sink.close(),
-        ).listen((data) {
-          final response = String.fromCharCodes(data);
-          final weight = _parseAclasResponse(response);
-          
-          if (weight != null) {
-            _currentWeight = weight;
-            _weightController.add(_currentWeight);
-            print('📊 Peso leído: ${_currentWeight.toStringAsFixed(3)} kg');
-          }
-        });
-      }
-    } catch (e) {
-      print('❌ Error solicitando peso: $e');
-    }
-  }
-  
-  // Parsear respuesta de Aclas OS2X
-  double? _parseAclasResponse(String response) {
-    try {
-      print('📡 Respuesta raw: $response');
-      
-      // Limpiar respuesta
-      final cleanResponse = response.trim();
-      
-      // Patrones comunes de Aclas OS2X:
-      // "ST,GS,   1.234kg"
-      // "ST,NET,  0.500kg"
-      // "1.234kg"
-      
-      // Buscar patrón de peso con kg
-      final kgPattern = RegExp(r'([0-9]+\.?[0-9]*)\s*kg');
-      final kgMatch = kgPattern.firstMatch(cleanResponse);
-      
-      if (kgMatch != null) {
-        final weightStr = kgMatch.group(1)!;
-        return double.tryParse(weightStr);
-      }
-      
-      // Buscar patrón de peso con lb (convertir a kg)
-      final lbPattern = RegExp(r'([0-9]+\.?[0-9]*)\s*lb');
-      final lbMatch = lbPattern.firstMatch(cleanResponse);
-      
-      if (lbMatch != null) {
-        final weightStr = lbMatch.group(1)!;
-        final weightLb = double.tryParse(weightStr);
-        if (weightLb != null) {
-          return weightLb * 0.453592; // Convertir lb a kg
+      for (final pattern in patterns) {
+        final match = pattern.firstMatch(response);
+        if (match != null) {
+          final weightStr = match.group(1)!;
+          return double.tryParse(weightStr);
         }
       }
       
-      // Buscar solo números (asumir kg)
-      final numberPattern = RegExp(r'([0-9]+\.?[0-9]+)');
-      final numberMatch = numberPattern.firstMatch(cleanResponse);
-      
-      if (numberMatch != null) {
-        final weightStr = numberMatch.group(1)!;
-        return double.tryParse(weightStr);
-      }
-      
       return null;
     } catch (e) {
-      print('❌ Error parseando respuesta: $e');
+      print('Error parseando peso: $e');
       return null;
     }
   }
   
-  // Detener lectura de peso REAL
+  // Detener lectura
   Future<void> stopReading() async {
     try {
       print('⏹️ Deteniendo lectura de peso...');
       
+      _isReading = false;
       _readTimer?.cancel();
       _readTimer = null;
       _simulationTimer?.cancel();
       _simulationTimer = null;
-      _isReading = false;
       
       print('✅ Lectura de peso detenida');
     } catch (e) {
@@ -517,71 +549,65 @@ class ScaleService {
     }
   }
   
-  // Obtener peso actual
-  Future<double> getCurrentWeight() async {
+  // Tarar balanza
+  Future<bool> tare() async {
     try {
-      final double weight = await _channel.invokeMethod('getCurrentWeight');
-      _currentWeight = weight;
-      return weight;
-    } catch (e) {
-      print('Error obteniendo peso: $e');
-      return 0.0;
-    }
-  }
-  
-  // Tare (tarar la balanza) REAL
-  Future<void> tare() async {
-    try {
-      print('⚖️ Tarando balanza Aclas OS2X...');
+      print('⚖️ Tarando balanza...');
       
-      if (_serialPort != null) {
-        // Comando de tare específico para Aclas OS2X
-        final tareCommand = 'T\r\n';
-        final commandBytes = Uint8List.fromList(tareCommand.codeUnits);
-        
-        _serialPort!.write(commandBytes);
-        
-        // Esperar un momento para que la balanza procese
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        // Solicitar peso después del tare
-        _requestWeightFromAclas();
-      } else {
-        // Si no hay conexión, simular tare
-      _currentWeight = 0.0;
-      _weightController.add(0.0);
+      // ✅ NUEVO: Usar servicio Aclas para tare
+      if (_isConnected) {
+        final success = await _aclasService.tare();
+        if (success) {
+          _currentWeight = 0.0;
+          _weightController.add(0.0);
+          print('✅ Balanza tarada correctamente');
+          return true;
+        }
       }
       
-      print('✅ Balanza tarada');
+      // Fallback a simulación
+      _currentWeight = 0.0;
+      _weightController.add(0.0);
+      print('✅ Balanza tarada (simulación)');
+      return true;
     } catch (e) {
-      print('❌ Error tarando: $e');
+      print('❌ Error tarando balanza: $e');
+      return false;
     }
   }
   
-  // Calcular precio basado en peso y precio por kg
-  double calculatePrice(double weight, double pricePerKg) {
-    return weight * pricePerKg;
+  // Obtener peso actual
+  double getCurrentWeight() {
+    return _currentWeight;
   }
   
-  // Formatear peso para mostrar
+  // Verificar conexión
+  bool isScaleConnected() {
+    return _isConnected;
+  }
+  
+  // ✅ NUEVO: Formatear peso para mostrar
   String formatWeight(double weight) {
     if (weight == 0.0) return '0.000 kg';
     return '${weight.toStringAsFixed(3)} kg';
   }
   
-  // Formatear precio para mostrar
+  // ✅ NUEVO: Formatear precio para mostrar
   String formatPrice(double price) {
     return '\$ ${price.toStringAsFixed(0)}';
   }
   
-  // Limpiar recursos REAL
+  // ✅ NUEVO: Calcular precio basado en peso y precio por kg
+  double calculatePrice(double weight, double pricePerKg) {
+    return weight * pricePerKg;
+  }
+  
+  // Dispose del servicio
   void dispose() {
     _readTimer?.cancel();
-    _readTimer = null;
     _simulationTimer?.cancel();
-    _simulationTimer = null;
     _weightController.close();
     _connectionController.close();
-    disconnect();
+    _aclasService.dispose();
   }
 } 
