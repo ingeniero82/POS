@@ -207,7 +207,7 @@ class WeightController extends GetxController {
     required String name,
     required String code,
     required double pricePerKg,
-    required ProductCategory category,
+    required String groupName,
     double? minWeight,
     double? maxWeight,
     String? description,
@@ -222,7 +222,7 @@ class WeightController extends GetxController {
         cost: 0.0,
         stock: 999999, // Stock infinito para productos pesados
         minStock: 0,
-        category: category,
+        groupName: groupName,
         unit: 'kg',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),

@@ -176,7 +176,7 @@ class WeightConfigScreen extends StatelessWidget {
       text: product?.maxWeight?.toString() ?? '',
     );
     
-    ProductCategory selectedCategory = product?.category ?? ProductCategory.frutasVerduras;
+    String selectedCategory = product?.groupName ?? 'Frutas y Verduras';
 
     showDialog(
       context: context,
@@ -238,15 +238,25 @@ class WeightConfigScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 
-                DropdownButtonFormField<ProductCategory>(
+                DropdownButtonFormField<String>(
                   value: selectedCategory,
                   decoration: const InputDecoration(
-                    labelText: 'Categoría',
+                    labelText: 'Grupo',
                   ),
-                  items: ProductCategory.values.map((category) {
+                  items: [
+                    'Frutas y Verduras',
+                    'Carnes',
+                    'Lácteos',
+                    'Panadería',
+                    'Bebidas',
+                    'Abarrotes',
+                    'Limpieza',
+                    'Cuidado Personal',
+                    'Otros',
+                  ].map((groupName) {
                     return DropdownMenuItem(
-                      value: category,
-                      child: Text(_getCategoryName(category)),
+                      value: groupName,
+                      child: Text(groupName),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -338,7 +348,7 @@ class WeightConfigScreen extends StatelessWidget {
                     name: name,
                     code: code,
                     pricePerKg: price,
-                    category: selectedCategory,
+                    groupName: selectedCategory,
                     description: description,
                     minWeight: minWeight,
                     maxWeight: maxWeight,
@@ -350,7 +360,7 @@ class WeightConfigScreen extends StatelessWidget {
                     name: name,
                     code: code,
                     pricePerKg: price,
-                    category: selectedCategory,
+                    groupName: selectedCategory,
                     description: description,
                     minWeight: minWeight,
                     maxWeight: maxWeight,
@@ -394,26 +404,5 @@ class WeightConfigScreen extends StatelessWidget {
     );
   }
 
-  String _getCategoryName(ProductCategory category) {
-    switch (category) {
-      case ProductCategory.frutasVerduras:
-        return 'Frutas y Verduras';
-      case ProductCategory.carnes:
-        return 'Carnes';
-      case ProductCategory.lacteos:
-        return 'Lácteos';
-      case ProductCategory.panaderia:
-        return 'Panadería';
-      case ProductCategory.bebidas:
-        return 'Bebidas';
-      case ProductCategory.abarrotes:
-        return 'Abarrotes';
-      case ProductCategory.limpieza:
-        return 'Limpieza';
-      case ProductCategory.cuidadoPersonal:
-        return 'Cuidado Personal';
-      default:
-        return 'Otros';
-    }
-  }
+
 } 

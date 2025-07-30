@@ -75,8 +75,12 @@ class ScaleService {
         // Configurar streams
         _aclasService.weightStream.listen((weight) {
           _currentWeight = weight;
-          _weightController.add(weight);
-          print('📊 Peso actualizado: ${weight.toStringAsFixed(3)} kg');
+          try {
+            _weightController.add(weight);
+            print('📊 Peso actualizado: ${weight.toStringAsFixed(3)} kg');
+          } catch (e) {
+            print('⚠️ Error enviando peso de Aclas al stream: $e');
+          }
         });
         
         _aclasService.connectionStream.listen((connected) {
@@ -239,7 +243,11 @@ class ScaleService {
       case 'onWeightChanged':
         _currentWeight = call.arguments['weight'] ?? 0.0;
         _unit = call.arguments['unit'] ?? 'kg';
-        _weightController.add(_currentWeight);
+        try {
+          _weightController.add(_currentWeight);
+        } catch (e) {
+          print('⚠️ Error enviando peso del método nativo al stream: $e');
+        }
         break;
       case 'onConnectionChanged':
         _isConnected = call.arguments['connected'] ?? false;
@@ -445,7 +453,11 @@ class ScaleService {
       
       print('⚖️ Peso simulado: ${newWeight.toStringAsFixed(3)} kg');
       _currentWeight = newWeight;
-      _weightController.add(newWeight);
+      try {
+        _weightController.add(newWeight);
+      } catch (e) {
+        print('⚠️ Error enviando peso simulado al stream: $e');
+      }
     });
   }
   
@@ -495,7 +507,11 @@ class ScaleService {
               final weight = _parseWeight(response);
               if (weight != null) {
                 _currentWeight = weight;
-                _weightController.add(weight);
+                try {
+                  _weightController.add(weight);
+                } catch (e) {
+                  print('⚠️ Error enviando peso real al stream: $e');
+                }
               }
             }
           });
@@ -559,16 +575,24 @@ class ScaleService {
         final success = await _aclasService.tare();
         if (success) {
           _currentWeight = 0.0;
-          _weightController.add(0.0);
-          print('✅ Balanza tarada correctamente');
+          try {
+            _weightController.add(0.0);
+            print('✅ Balanza tarada correctamente');
+          } catch (e) {
+            print('⚠️ Error enviando tare al stream: $e');
+          }
           return true;
         }
       }
       
       // Fallback a simulación
       _currentWeight = 0.0;
-      _weightController.add(0.0);
-      print('✅ Balanza tarada (simulación)');
+      try {
+        _weightController.add(0.0);
+        print('✅ Balanza tarada (simulación)');
+      } catch (e) {
+        print('⚠️ Error enviando tare simulado al stream: $e');
+      }
       return true;
     } catch (e) {
       print('❌ Error tarando balanza: $e');

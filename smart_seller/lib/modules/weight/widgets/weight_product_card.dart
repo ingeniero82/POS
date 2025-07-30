@@ -280,22 +280,22 @@ class WeightProductCard extends StatelessWidget {
   }
 
   Color _getCategoryColor() {
-    switch (product.category) {
-      case ProductCategory.frutasVerduras:
+    switch (product.groupName) {
+      case 'Frutas y Verduras':
         return Colors.green;
-      case ProductCategory.carnes:
+      case 'Carnes':
         return Colors.red;
-      case ProductCategory.lacteos:
+      case 'Lácteos':
         return Colors.blue;
-      case ProductCategory.panaderia:
+      case 'Panadería':
         return Colors.orange;
-      case ProductCategory.bebidas:
+      case 'Bebidas':
         return Colors.cyan;
-      case ProductCategory.abarrotes:
+      case 'Abarrotes':
         return Colors.brown;
-      case ProductCategory.limpieza:
+      case 'Limpieza':
         return Colors.purple;
-      case ProductCategory.cuidadoPersonal:
+      case 'Cuidado Personal':
         return Colors.pink;
       default:
         return Colors.grey;
@@ -303,25 +303,6 @@ class WeightProductCard extends StatelessWidget {
   }
 
   String _getCategoryName() {
-    switch (product.category) {
-      case ProductCategory.frutasVerduras:
-        return 'Frutas y Verduras';
-      case ProductCategory.carnes:
-        return 'Carnes';
-      case ProductCategory.lacteos:
-        return 'Lácteos';
-      case ProductCategory.panaderia:
-        return 'Panadería';
-      case ProductCategory.bebidas:
-        return 'Bebidas';
-      case ProductCategory.abarrotes:
-        return 'Abarrotes';
-      case ProductCategory.limpieza:
-        return 'Limpieza';
-      case ProductCategory.cuidadoPersonal:
-        return 'Cuidado Personal';
-      default:
-        return 'Otros';
-    }
+    return product.groupName;
   }
 } 

@@ -302,9 +302,19 @@ class WeightProductsScreen extends StatelessWidget {
             // Aquí puedes agregar filtros por categoría
             Wrap(
               spacing: 8,
-              children: ProductCategory.values.map((category) {
+              children: [
+                'Frutas y Verduras',
+                'Carnes',
+                'Lácteos',
+                'Panadería',
+                'Bebidas',
+                'Abarrotes',
+                'Limpieza',
+                'Cuidado Personal',
+                'Otros',
+              ].map((groupName) {
                 return FilterChip(
-                  label: Text(_getCategoryName(category)),
+                  label: Text(groupName),
                   selected: false, // Implementar lógica de selección
                   onSelected: (selected) {
                     // Implementar filtrado por categoría
@@ -324,26 +334,5 @@ class WeightProductsScreen extends StatelessWidget {
     );
   }
 
-  String _getCategoryName(ProductCategory category) {
-    switch (category) {
-      case ProductCategory.frutasVerduras:
-        return 'Frutas y Verduras';
-      case ProductCategory.carnes:
-        return 'Carnes';
-      case ProductCategory.lacteos:
-        return 'Lácteos';
-      case ProductCategory.panaderia:
-        return 'Panadería';
-      case ProductCategory.bebidas:
-        return 'Bebidas';
-      case ProductCategory.abarrotes:
-        return 'Abarrotes';
-      case ProductCategory.limpieza:
-        return 'Limpieza';
-      case ProductCategory.cuidadoPersonal:
-        return 'Cuidado Personal';
-      default:
-        return 'Otros';
-    }
-  }
+
 } 

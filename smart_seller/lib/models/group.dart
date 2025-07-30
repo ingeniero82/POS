@@ -10,7 +10,6 @@ class Group {
   late DateTime updatedAt;
   bool isActive = true;
 
-  // Constructor
   Group({
     this.id,
     required this.name,
@@ -25,24 +24,12 @@ class Group {
   // Constructor desde Map (para base de datos)
   Group.fromMap(Map<String, dynamic> map) {
     id = map['id'];
-    name = map['name'] ?? '';
-    description = map['description'] ?? '';
-    color = map['color'] ?? '#9E9E9E';
-    icon = map['icon'] ?? 'category';
-    
-    // Parsear fechas de forma segura
-    try {
-      createdAt = DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String());
-    } catch (e) {
-      createdAt = DateTime.now();
-    }
-    
-    try {
-      updatedAt = DateTime.parse(map['updatedAt'] ?? DateTime.now().toIso8601String());
-    } catch (e) {
-      updatedAt = DateTime.now();
-    }
-    
+    name = map['name'];
+    description = map['description'];
+    color = map['color'];
+    icon = map['icon'];
+    createdAt = DateTime.parse(map['createdAt']);
+    updatedAt = DateTime.parse(map['updatedAt']);
     isActive = map['isActive'] == 1;
   }
 
@@ -75,17 +62,17 @@ class Group {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      color: color ?? this.color,
-      icon: icon ?? this.icon,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
+              color: color ?? this.color,
+        icon: icon ?? this.icon,
     );
   }
 
   @override
   String toString() {
-    return 'Group(id: $id, name: $name, description: $description, color: $color, icon: $icon, isActive: $isActive)';
+    return 'Group(id: $id, name: $name, description: $description)';
   }
 
   @override

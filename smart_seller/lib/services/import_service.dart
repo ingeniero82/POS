@@ -113,7 +113,7 @@ class ImportService {
       cost: _parseDouble(get('costo') ?? get('cost')) ?? 0.0,
       stock: _parseInt(stockStr) ?? 0,
       minStock: _parseInt(get('stock mínimo') ?? get('stock_minimo') ?? get('min_stock')) ?? 5,
-      category: _parseCategory(get('categoría') ?? get('categoria') ?? get('category')),
+      groupName: _parseGroup(get('categoría') ?? get('categoria') ?? get('category') ?? get('grupo') ?? get('group')),
       unit: get('unidad') ?? get('unit') ?? 'unidad',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -163,7 +163,7 @@ class ImportService {
       cost: _parseDouble(getCellValue('costo') ?? getCellValue('cost')) ?? 0.0,
       stock: _parseInt(stockStr) ?? 0,
       minStock: _parseInt(getCellValue('stock mínimo') ?? getCellValue('stock_minimo') ?? getCellValue('min_stock')) ?? 5,
-      category: _parseCategory(getCellValue('categoría') ?? getCellValue('categoria') ?? getCellValue('category')),
+      groupName: _parseGroup(getCellValue('categoría') ?? getCellValue('categoria') ?? getCellValue('category') ?? getCellValue('grupo') ?? getCellValue('group')),
       unit: getCellValue('unidad') ?? getCellValue('unit') ?? 'unidad',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -201,41 +201,41 @@ class ImportService {
     return lowerValue == 'true' || lowerValue == '1' || lowerValue == 'yes' || lowerValue == 'si';
   }
   
-  static ProductCategory _parseCategory(String? category) {
-    if (category == null) return ProductCategory.otros;
+  static String _parseGroup(String? group) {
+    if (group == null) return 'Otros';
     
-    String cat = category.toLowerCase().trim();
+    String grp = group.toLowerCase().trim();
     
-    switch (cat) {
+    switch (grp) {
       case 'frutas':
       case 'verduras':
       case 'frutas y verduras':
-        return ProductCategory.frutasVerduras;
+        return 'Frutas y Verduras';
       case 'lácteos':
       case 'lacteos':
       case 'leche':
-        return ProductCategory.lacteos;
+        return 'Lácteos';
       case 'panadería':
       case 'panaderia':
       case 'pan':
-        return ProductCategory.panaderia;
+        return 'Panadería';
       case 'carnes':
       case 'carne':
-        return ProductCategory.carnes;
+        return 'Carnes';
       case 'bebidas':
       case 'bebida':
-        return ProductCategory.bebidas;
+        return 'Bebidas';
       case 'abarrotes':
       case 'abarrote':
-        return ProductCategory.abarrotes;
+        return 'Abarrotes';
       case 'limpieza':
       case 'productos de limpieza':
-        return ProductCategory.limpieza;
+        return 'Limpieza';
       case 'cuidado personal':
       case 'higiene':
-        return ProductCategory.cuidadoPersonal;
+        return 'Cuidado Personal';
       default:
-        return ProductCategory.otros;
+        return 'Otros';
     }
   }
   
@@ -296,7 +296,7 @@ PROD010	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1
         p.cost,
         p.stock,
         p.minStock,
-        _categoryToString(p.category),
+        p.groupName,
         p.unit,
         p.isWeighted,
         p.pricePerKg ?? 0.0,
@@ -309,26 +309,5 @@ PROD010	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1
     await file.writeAsString(csv, encoding: utf8);
   }
 
-  static String _categoryToString(ProductCategory category) {
-    switch (category) {
-      case ProductCategory.frutasVerduras:
-        return 'Frutas y Verduras';
-      case ProductCategory.lacteos:
-        return 'Lácteos';
-      case ProductCategory.panaderia:
-        return 'Panadería';
-      case ProductCategory.carnes:
-        return 'Carnes';
-      case ProductCategory.bebidas:
-        return 'Bebidas';
-      case ProductCategory.abarrotes:
-        return 'Abarrotes';
-      case ProductCategory.limpieza:
-        return 'Limpieza';
-      case ProductCategory.cuidadoPersonal:
-        return 'Cuidado Personal';
-      default:
-        return 'Otros';
-    }
-  }
+
 } 

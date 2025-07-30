@@ -66,26 +66,37 @@ class _ProductsScreenState extends State<ProductsScreen> {
             .contains(_searchController.text.toLowerCase()) ||
             product.code.toLowerCase().contains(_searchController.text.toLowerCase());
         
+        // Comparación de grupos dinámicos
         final matchesGroup = _selectedGroup == null || 
-            product.category.toString().split('.').last == _selectedGroup!.name;
+            product.groupName == _selectedGroup!.name;
         
         return matchesSearch && matchesGroup;
       }).toList();
     });
   }
+  
+
 
   void _showAddProductDialog() {
     showDialog(
       context: context,
       builder: (context) => const ProductFormDialog(),
-    ).then((_) => _loadProducts());
+    ).then((_) async {
+      // Recargar productos y aplicar filtro actual
+      await _loadProducts();
+      _filterProducts(); // Aplicar filtro actual después de recargar
+    });
   }
 
   void _showEditProductDialog(Product product) {
     showDialog(
       context: context,
       builder: (context) => ProductFormDialog(product: product),
-    ).then((_) => _loadProducts());
+    ).then((_) async {
+      // Recargar productos y aplicar filtro actual
+      await _loadProducts();
+      _filterProducts(); // Aplicar filtro actual después de recargar
+    });
   }
 
   Future<void> _deleteProduct(Product product) async {
@@ -408,9 +419,9 @@ class _ProductCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: _getCategoryColor(product.category),
+                          backgroundColor: _getGroupColor(product.groupName),
           child: Icon(
-            _getCategoryIcon(product.category),
+                  _getGroupIcon(product.groupName),
             color: Colors.white,
           ),
         ),
@@ -475,48 +486,46 @@ class _ProductCard extends StatelessWidget {
     );
   }
 
-  Color _getCategoryColor(ProductCategory category) {
-    switch (category) {
-      case ProductCategory.frutasVerduras:
-        return Colors.red;
-      case ProductCategory.lacteos:
-        return Colors.blue;
-      case ProductCategory.panaderia:
-        return Colors.orange;
-      case ProductCategory.carnes:
-        return Colors.brown;
-      case ProductCategory.bebidas:
-        return Colors.green;
-      case ProductCategory.abarrotes:
-        return Colors.purple;
-      case ProductCategory.limpieza:
-        return Colors.teal;
-      case ProductCategory.cuidadoPersonal:
-        return Colors.pink;
-      case ProductCategory.otros:
-        return Colors.grey;
-    }
+  Color _getGroupColor(String groupName) {
+    // Generar color basado en el nombre del grupo
+    final colors = [
+      Colors.green,
+      Colors.blue,
+      Colors.orange,
+      Colors.red,
+      Colors.purple,
+      Colors.indigo,
+      Colors.teal,
+      Colors.pink,
+      Colors.amber,
+      Colors.cyan,
+    ];
+    
+    final index = groupName.hashCode % colors.length;
+    return colors[index];
   }
 
-  IconData _getCategoryIcon(ProductCategory category) {
-    switch (category) {
-      case ProductCategory.frutasVerduras:
+  IconData _getGroupIcon(String groupName) {
+    // Iconos basados en el nombre del grupo
+    final lowerName = groupName.toLowerCase();
+    
+    if (lowerName.contains('fruta') || lowerName.contains('verdura')) {
         return Icons.apple;
-      case ProductCategory.lacteos:
+    } else if (lowerName.contains('lácteo') || lowerName.contains('lacteo')) {
         return Icons.local_drink;
-      case ProductCategory.panaderia:
+    } else if (lowerName.contains('pan') || lowerName.contains('panadería')) {
         return Icons.bakery_dining;
-      case ProductCategory.carnes:
+    } else if (lowerName.contains('carne')) {
         return Icons.set_meal;
-      case ProductCategory.bebidas:
+    } else if (lowerName.contains('bebida')) {
         return Icons.local_bar;
-      case ProductCategory.abarrotes:
+    } else if (lowerName.contains('abarrote')) {
         return Icons.inventory;
-      case ProductCategory.limpieza:
+    } else if (lowerName.contains('limpieza')) {
         return Icons.cleaning_services;
-      case ProductCategory.cuidadoPersonal:
+    } else if (lowerName.contains('cuidado')) {
         return Icons.person;
-      case ProductCategory.otros:
+    } else {
         return Icons.category;
     }
   }

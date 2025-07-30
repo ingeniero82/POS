@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/group.dart';
+import '../models/product.dart';
 import '../services/sqlite_database_service.dart';
 
 class GroupsScreen extends StatefulWidget {
@@ -50,6 +51,11 @@ class _GroupsScreenState extends State<GroupsScreen> {
     final descriptionController = TextEditingController(text: group?.description ?? '');
     String selectedColor = group?.color ?? '#2196F3';
     String selectedIcon = group?.icon ?? 'category';
+    
+    // ✅ NUEVO: Variables para gestión de productos
+    List<Product> groupProducts = [];
+    bool isLoadingProducts = false;
+    String? selectedNewGroup;
 
     final List<String> colors = [
       '#2196F3', // Azul
@@ -88,202 +94,336 @@ class _GroupsScreenState extends State<GroupsScreen> {
     ];
 
     Get.dialog(
-      AlertDialog(
-        title: Text(isEditing ? 'Editar Grupo' : 'Nuevo Grupo'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del Grupo *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'El nombre es obligatorio';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              Row(
+      StatefulBuilder(
+        builder: (context, setState) {
+          // ✅ NUEVO: Cargar productos del grupo si estamos editando
+          if (isEditing && groupProducts.isEmpty && !isLoadingProducts) {
+            isLoadingProducts = true;
+            SQLiteDatabaseService.getProductsByGroup(group!.name).then((products) {
+              setState(() {
+                groupProducts = products;
+                isLoadingProducts = false;
+              });
+            });
+          }
+          
+          return AlertDialog(
+            title: Text(isEditing ? 'Editar Grupo' : 'Nuevo Grupo'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Color del grupo:'),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          children: colors.map((color) {
-                            return GestureDetector(
-                              onTap: () {
-                                selectedColor = color;
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre del Grupo *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'El nombre es obligatorio';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Color del grupo:'),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: colors.map((color) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    selectedColor = color;
+                                    setState(() {});
+                                  },
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: Color(int.parse(color.replaceAll('#', '0xFF'))),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: selectedColor == color ? Colors.black : Colors.grey,
+                                        width: selectedColor == color ? 3 : 1,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Ícono del grupo:'),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              value: selectedIcon,
+                              items: icons.map((iconData) => DropdownMenuItem<String>(
+                                value: iconData['name'] as String,
+                                child: Row(
+                                  children: [
+                                    Icon(iconData['icon'] as IconData),
+                                    const SizedBox(width: 8),
+                                    Text(iconData['name'] as String),
+                                  ],
+                                ),
+                              )).toList(),
+                              onChanged: (value) {
+                                selectedIcon = value!;
                                 setState(() {});
                               },
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: Color(int.parse(color.replaceAll('#', '0xFF'))),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: selectedColor == color ? Colors.black : Colors.grey,
-                                    width: selectedColor == color ? 3 : 1,
-                                  ),
+                              decoration: const InputDecoration(
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  // ✅ NUEVO: Sección de productos del grupo (solo en edición)
+                  if (isEditing) ...[
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.inventory, color: Colors.blue.shade700),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Productos en este grupo (${groupProducts.length})',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade700,
                                 ),
                               ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Ícono del grupo:'),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          value: selectedIcon,
-                          items: icons.map((iconData) => DropdownMenuItem<String>(
-                            value: iconData['name'] as String,
-                            child: Row(
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (isLoadingProducts)
+                            const Center(child: CircularProgressIndicator())
+                          else if (groupProducts.isEmpty)
+                            const Text(
+                              'No hay productos en este grupo',
+                              style: TextStyle(color: Colors.grey),
+                            )
+                          else ...[
+                            // Lista de productos
+                            Container(
+                              height: 150,
+                              child: ListView.builder(
+                                itemCount: groupProducts.length,
+                                itemBuilder: (context, index) {
+                                  final product = groupProducts[index];
+                                  return ListTile(
+                                    dense: true,
+                                    leading: Icon(Icons.inventory_2, size: 20),
+                                    title: Text(
+                                      product.name,
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      'Código: ${product.code}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            // Opción para mover productos a otro grupo
+                            Row(
                               children: [
-                                Icon(iconData['icon'] as IconData),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: selectedNewGroup,
+                                    hint: const Text('Mover a otro grupo...'),
+                                    items: _groups
+                                        .where((g) => g.name != group!.name)
+                                        .map((g) => DropdownMenuItem(
+                                              value: g.name,
+                                              child: Text(g.name),
+                                            ))
+                                        .toList(),
+                                    onChanged: (value) {
+                                      selectedNewGroup = value;
+                                      setState(() {});
+                                    },
+                                    decoration: const InputDecoration(
+                                      border: OutlineInputBorder(),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
-                                Text(iconData['name'] as String),
+                                ElevatedButton.icon(
+                                  onPressed: selectedNewGroup != null
+                                      ? () async {
+                                          // Mover productos al grupo seleccionado
+                                          await SQLiteDatabaseService.updateProductsGroup(
+                                            group!.name,
+                                            selectedNewGroup!,
+                                          );
+                                          // Recargar productos
+                                          final updatedProducts = await SQLiteDatabaseService.getProductsByGroup(group!.name);
+                                          setState(() {
+                                            groupProducts = updatedProducts;
+                                            selectedNewGroup = null;
+                                          });
+                                          Get.snackbar(
+                                            '✅ Productos movidos',
+                                            'Los productos han sido movidos al grupo "$selectedNewGroup"',
+                                            backgroundColor: Colors.green,
+                                            colorText: Colors.white,
+                                          );
+                                        }
+                                      : null,
+                                  icon: const Icon(Icons.move_to_inbox, size: 16),
+                                  label: const Text('Mover'),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  ),
+                                ),
                               ],
                             ),
-                          )).toList(),
-                          onChanged: (value) {
-                            selectedIcon = value!;
-                            setState(() {});
-                          },
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ],
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.trim().isEmpty) {
-                Get.snackbar(
-                  'Error',
-                  'El nombre del grupo es obligatorio',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-                return;
-              }
-
-              try {
-                final newGroup = Group(
-                  id: group?.id,
-                  name: nameController.text.trim(),
-                  description: descriptionController.text.trim(),
-                  color: selectedColor,
-                  icon: selectedIcon,
-                  createdAt: group?.createdAt ?? DateTime.now(),
-                  updatedAt: DateTime.now(),
-                  isActive: true,
-                );
-
-                if (isEditing) {
-                  await SQLiteDatabaseService.updateGroup(newGroup);
-                  Get.snackbar(
-                    'Éxito',
-                    'Grupo actualizado correctamente',
-                    backgroundColor: Colors.green,
-                    colorText: Colors.white,
-                  );
-                } else {
-                  // Verificar si ya existe un grupo con ese nombre
-                  final exists = await SQLiteDatabaseService.groupNameExists(newGroup.name);
-                  if (exists) {
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (nameController.text.trim().isEmpty) {
                     Get.snackbar(
                       'Error',
-                      'Ya existe un grupo con ese nombre',
+                      'El nombre del grupo es obligatorio',
                       backgroundColor: Colors.red,
                       colorText: Colors.white,
                     );
                     return;
                   }
-                  
-                  await SQLiteDatabaseService.createGroup(newGroup);
-                  Get.snackbar(
-                    'Éxito',
-                    'Grupo creado correctamente',
-                    backgroundColor: Colors.green,
-                    colorText: Colors.white,
-                  );
-                  
-                  // Preguntar si desea crear otro grupo
-                  Future.delayed(const Duration(milliseconds: 300), () {
-                    Get.defaultDialog(
-                      title: '¿Crear otro grupo?',
-                      middleText: '¿Deseas crear otro grupo nuevo?',
-                      textCancel: 'No',
-                      textConfirm: 'Sí',
-                      onCancel: () {
-                        Get.back(); // Cierra el diálogo de confirmación
-                        Get.back(); // Cierra el modal de creación
-                      },
-                      onConfirm: () {
-                        Get.back(); // Cierra el diálogo de confirmación
-                        // Limpiar el formulario para crear otro grupo
-                        nameController.clear();
-                        descriptionController.clear();
-                        selectedColor = '#2196F3';
-                        selectedIcon = 'category';
-                        setState(() {});
-                      },
-                      barrierDismissible: false,
-                    );
-                  });
-                }
 
-                // Cerrar el modal y recargar grupos (para edición)
-                Get.back();
-                await _loadGroups();
-              } catch (e) {
-                Get.snackbar(
-                  'Error',
-                  'Error al guardar grupo: $e',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-              }
-            },
-            child: Text(isEditing ? 'Actualizar' : 'Crear'),
-          ),
-        ],
+                  try {
+                    final newGroup = Group(
+                      id: group?.id,
+                      name: nameController.text.trim(),
+                      description: descriptionController.text.trim(),
+                      color: selectedColor,
+                      icon: selectedIcon,
+                      createdAt: group?.createdAt ?? DateTime.now(),
+                      updatedAt: DateTime.now(),
+                      isActive: true,
+                    );
+
+                    if (isEditing) {
+                      await SQLiteDatabaseService.updateGroup(newGroup);
+                      Get.snackbar(
+                        'Éxito',
+                        'Grupo actualizado correctamente',
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                      );
+                    } else {
+                      // Verificar si ya existe un grupo con ese nombre
+                      final exists = await SQLiteDatabaseService.groupNameExists(newGroup.name);
+                      if (exists) {
+                        Get.snackbar(
+                          'Error',
+                          'Ya existe un grupo con ese nombre',
+                          backgroundColor: Colors.red,
+                          colorText: Colors.white,
+                        );
+                        return;
+                      }
+                      
+                      await SQLiteDatabaseService.createGroup(newGroup);
+                      Get.snackbar(
+                        'Éxito',
+                        'Grupo creado correctamente',
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                      );
+                      
+                      // Preguntar si desea crear otro grupo
+                      Future.delayed(const Duration(milliseconds: 300), () {
+                        Get.defaultDialog(
+                          title: '¿Crear otro grupo?',
+                          middleText: '¿Deseas crear otro grupo nuevo?',
+                          textCancel: 'No',
+                          textConfirm: 'Sí',
+                          onCancel: () {
+                            Get.back(); // Cierra el diálogo de confirmación
+                            Get.back(); // Cierra el modal de creación
+                          },
+                          onConfirm: () {
+                            Get.back(); // Cierra el diálogo de confirmación
+                            // Limpiar el formulario para crear otro grupo
+                            nameController.clear();
+                            descriptionController.clear();
+                            selectedColor = '#2196F3';
+                            selectedIcon = 'category';
+                            setState(() {});
+                          },
+                          barrierDismissible: false,
+                        );
+                      });
+                    }
+
+                    // Cerrar el modal y recargar grupos (para edición)
+                    Get.back();
+                    await _loadGroups();
+                  } catch (e) {
+                    Get.snackbar(
+                      'Error',
+                      'Error al guardar grupo: $e',
+                      backgroundColor: Colors.red,
+                      colorText: Colors.white,
+                    );
+                  }
+                },
+                child: Text(isEditing ? 'Actualizar' : 'Crear'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

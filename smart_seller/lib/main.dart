@@ -20,7 +20,7 @@ import 'services/auth_service.dart';
 import 'services/permissions_service.dart';
 import 'services/print_service.dart';
 import 'services/company_config_service.dart';
-import 'utils/sample_weight_products.dart';
+
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
@@ -35,30 +35,14 @@ void main() async {
   await PermissionsService.to.restoreDefaultPermissions();
   // Inicializar servicio de impresión
   await PrintService.instance.initialize();
-  // Insertar productos pesados de ejemplo si no existen
-  await _insertSampleWeightProductsIfNeeded();
+
   // Inicializar configuración de empresa
   await CompanyConfigService.initializeCompanyConfig();
   
   runApp(const MyApp());
 }
 
-Future<void> _insertSampleWeightProductsIfNeeded() async {
-  try {
-    //   Verificar si ya hay productos pesados
-    final allProducts = await SQLiteDatabaseService.getAllProducts();
-    final weightedProducts = allProducts.where((p) => p.isWeighted).toList();
-    
-    if (weightedProducts.isEmpty) {
-      print('📦 No hay productos pesados, insertando productos de ejemplo...');
-      await SampleWeightProducts.insertSampleProducts();
-    } else {
-      print('✅ Ya hay ${weightedProducts.length} productos pesados configurados');
-    }
-  } catch (e) {
-    print('❌ Error verificando productos pesados: $e');
-  }
-}
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -95,6 +79,8 @@ class MyApp extends StatelessWidget {
           ),
           filled: true,
           fillColor: Colors.grey.shade50,
+          floatingLabelBehavior: FloatingLabelBehavior.always,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         appBarTheme: const AppBarTheme(
           elevation: 0,

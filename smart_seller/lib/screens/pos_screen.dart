@@ -15,7 +15,7 @@ import '../services/auth_service.dart';
 import '../modules/weight/controllers/weight_controller.dart';
 import '../modules/weight/widgets/scale_widget.dart';
 import '../modules/electronic_invoicing/controllers/electronic_invoice_controller.dart';
-import '../utils/sample_weight_products.dart';
+
 import 'package:intl/intl.dart';
 
 class PosScreen extends StatefulWidget {

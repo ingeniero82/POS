@@ -56,7 +56,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       _stockController.text = widget.product!.stock.toString();
       _minStockController.text = widget.product!.minStock.toString();
       _unitController.text = widget.product!.unit;
-      _selectedGroup = _getCategoryName(widget.product!.category);
+              _selectedGroup = widget.product!.groupName;
       _groupController.text = _selectedGroup ?? '';
       _isActive = widget.product!.isActive;
       
@@ -80,6 +80,24 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       final groups = await SQLiteDatabaseService.getAllGroups();
       setState(() {
         _availableGroups = groups;
+        
+        // Si estamos editando un producto y su grupo no existe en la lista actual,
+        // lo agregamos temporalmente para evitar errores
+        if (widget.product != null && _selectedGroup != null) {
+          final groupExists = groups.any((group) => group.name == _selectedGroup);
+          if (!groupExists) {
+            // Crear un grupo temporal para el producto existente
+            final tempGroup = Group(
+              name: _selectedGroup!,
+              description: 'Grupo temporal para producto existente',
+              color: '#9E9E9E',
+              icon: 'category',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            _availableGroups.add(tempGroup);
+          }
+        }
       });
     } catch (e) {
       print('Error cargando grupos: $e');
@@ -93,28 +111,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
     });
   }
   
-  ProductCategory _getCategoryFromName(String name) {
-    switch (name.toLowerCase()) {
-      case 'frutas y verduras':
-        return ProductCategory.frutasVerduras;
-      case 'lácteos':
-        return ProductCategory.lacteos;
-      case 'panadería':
-        return ProductCategory.panaderia;
-      case 'carnes':
-        return ProductCategory.carnes;
-      case 'bebidas':
-        return ProductCategory.bebidas;
-      case 'abarrotes':
-        return ProductCategory.abarrotes;
-      case 'limpieza':
-        return ProductCategory.limpieza;
-      case 'cuidado personal':
-        return ProductCategory.cuidadoPersonal;
-      default:
-        return ProductCategory.otros;
-    }
-  }
+
 
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
@@ -170,7 +167,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         stock: int.parse(_stockController.text),
         minStock: int.parse(_minStockController.text),
         unit: _unitController.text.trim(),
-        category: _getCategoryFromName(_selectedGroup ?? 'Otros'),
+        groupName: _selectedGroup ?? 'Sin grupo',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: _isActive,
@@ -189,11 +186,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           _isLoading = false;
         });
         Get.snackbar(
-          'Éxito',
-          'Producto creado correctamente',
+          '✅ Producto Creado',
+          'El producto "${product.name}" ha sido creado correctamente',
           backgroundColor: Colors.green,
           colorText: Colors.white,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 2),
+          snackPosition: SnackPosition.TOP,
         );
         // Preguntar si desea ingresar otro producto
         Future.delayed(const Duration(milliseconds: 300), () {
@@ -240,14 +238,21 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         setState(() {
           _isLoading = false;
         });
+        
+        // Cerrar el modal inmediatamente y mostrar confirmación
+        Get.back(); // Cierra el modal primero
+        
+        // Mostrar confirmación después de cerrar el modal
+        Future.delayed(const Duration(milliseconds: 100), () {
         Get.snackbar(
-          'Éxito',
-          'Producto actualizado correctamente',
+            '✅ Producto Actualizado',
+            'El producto "${product.name}" ha sido actualizado correctamente',
           backgroundColor: Colors.green,
           colorText: Colors.white,
-          duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
+            snackPosition: SnackPosition.TOP,
         );
-        Get.back();
+        });
       }
     } catch (e) {
       setState(() {
@@ -350,6 +355,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 16),
           // Primera fila - Código de Barras y Código Corto
           Row(
             children: [
@@ -423,7 +429,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
                         ),
                       )
                     : DropdownButtonFormField<String>(
-                        value: _selectedGroup,
+                        value: _selectedGroup != null && _availableGroups.any((group) => group.name == _selectedGroup) 
+                            ? _selectedGroup 
+                            : null,
                         decoration: const InputDecoration(
                           labelText: 'Grupo',
                           border: OutlineInputBorder(),
@@ -440,11 +448,27 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
                               child: Text(group.name),
                             );
                           }),
+                          // ✅ NUEVO: Opción para crear nuevo grupo
+                          const DropdownMenuItem(
+                            value: 'CREATE_NEW_GROUP',
+                            child: Row(
+                              children: [
+                                Icon(Icons.add, color: Colors.blue),
+                                SizedBox(width: 8),
+                                Text('Nuevo grupo', style: TextStyle(color: Colors.blue)),
+                              ],
+                            ),
+                          ),
                         ],
                         onChanged: (value) {
-                          setState(() {
-                            _selectedGroup = value;
-                          });
+                          if (value == 'CREATE_NEW_GROUP') {
+                            // ✅ NUEVO: Mostrar modal para crear nuevo grupo
+                            _showCreateGroupDialog();
+                          } else {
+                            setState(() {
+                              _selectedGroup = value;
+                            });
+                          }
                         },
                       ),
               ),
@@ -1189,26 +1213,136 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
     );
   }
 
-  String _getCategoryName(ProductCategory category) {
-    switch (category) {
-      case ProductCategory.frutasVerduras:
-        return 'Frutas y Verduras';
-      case ProductCategory.lacteos:
-        return 'Lácteos';
-      case ProductCategory.panaderia:
-        return 'Panadería';
-      case ProductCategory.carnes:
-        return 'Carnes';
-      case ProductCategory.bebidas:
-        return 'Bebidas';
-      case ProductCategory.abarrotes:
-        return 'Abarrotes';
-      case ProductCategory.limpieza:
-        return 'Limpieza';
-      case ProductCategory.cuidadoPersonal:
-        return 'Cuidado Personal';
-      case ProductCategory.otros:
-        return 'Otros';
-    }
+  // ✅ NUEVO: Mostrar modal para crear nuevo grupo
+  void _showCreateGroupDialog() {
+    final nameController = TextEditingController();
+    String selectedColor = '#FF5722'; // Color por defecto
+    
+    final List<Map<String, String>> availableColors = [
+      {'name': 'Rojo', 'value': '#FF5722'},
+      {'name': 'Verde', 'value': '#4CAF50'},
+      {'name': 'Azul', 'value': '#2196F3'},
+      {'name': 'Naranja', 'value': '#FF9800'},
+      {'name': 'Morado', 'value': '#9C27B0'},
+      {'name': 'Marrón', 'value': '#795548'},
+      {'name': 'Gris', 'value': '#9E9E9E'},
+      {'name': 'Amarillo', 'value': '#FFEB3B'},
+    ];
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Crear Nuevo Grupo'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del Grupo *',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Frutas y Verduras',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El nombre es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('Color del grupo:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: availableColors.map((color) {
+                    final isSelected = selectedColor == color['value'];
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedColor = color['value']!;
+                        });
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Color(int.parse(color['value']!.replaceAll('#', '0xFF'))),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? Colors.black : Colors.grey,
+                            width: isSelected ? 3 : 1,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.trim().isNotEmpty) {
+                try {
+                  // Crear el nuevo grupo
+                  final newGroup = Group(
+                    name: nameController.text.trim(),
+                    description: 'Grupo creado por el usuario',
+                    color: selectedColor,
+                    icon: 'category', // Icono por defecto
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  );
+                  
+                  await SQLiteDatabaseService.createGroup(newGroup);
+                  
+                  // Recargar grupos y seleccionar el nuevo
+                  await _loadGroups();
+                  setState(() {
+                    _selectedGroup = newGroup.name;
+                  });
+                  
+                  Get.back(); // Cerrar modal
+                  Get.snackbar(
+                    '✅ Grupo Creado',
+                    'El grupo "${newGroup.name}" ha sido creado exitosamente',
+                    backgroundColor: Colors.green,
+                    colorText: Colors.white,
+                    duration: const Duration(seconds: 2),
+                  );
+                } catch (e) {
+                  Get.snackbar(
+                    '❌ Error',
+                    'Error creando grupo: $e',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              } else {
+                Get.snackbar(
+                  '⚠️ Campo requerido',
+                  'El nombre del grupo es obligatorio',
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Crear'),
+          ),
+        ],
+      ),
+    );
   }
+
 } 

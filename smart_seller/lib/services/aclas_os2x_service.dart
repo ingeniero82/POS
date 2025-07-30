@@ -143,8 +143,12 @@ try {
         final weight = await _readWeightWithPowerShell();
         if (weight != null) {
           _currentWeight = weight;
-          _weightController.add(weight);
-          print('⚖️ Peso leído: ${weight.toStringAsFixed(3)} kg');
+          try {
+            _weightController.add(weight);
+            print('⚖️ Peso leído: ${weight.toStringAsFixed(3)} kg');
+          } catch (e) {
+            print('⚠️ Error enviando peso al stream: $e');
+          }
         } else {
           print('❌ No se pudo leer peso de la balanza');
         }
@@ -287,8 +291,12 @@ try {
       
       if (result.exitCode == 0 && result.stdout.toString().contains('TARE_SUCCESS')) {
         _currentWeight = 0.0;
-        _weightController.add(0.0);
-        print('✅ Balanza tarada correctamente');
+        try {
+          _weightController.add(0.0);
+          print('✅ Balanza tarada correctamente');
+        } catch (e) {
+          print('⚠️ Error enviando tare al stream: $e');
+        }
         return true;
       } else {
         print('❌ Error tarando balanza: ${result.stderr}');

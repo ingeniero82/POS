@@ -10,7 +10,7 @@ class Product {
   late double cost;
   late int stock;
   late int minStock;
-  late ProductCategory category;
+  late String groupName; // Nombre del grupo (dinámico)
   late String unit;
   late DateTime createdAt;
   late DateTime updatedAt;
@@ -48,7 +48,7 @@ class Product {
     required this.cost,
     required this.stock,
     required this.minStock,
-    required this.category,
+    required this.groupName,
     required this.unit,
     required this.createdAt,
     required this.updatedAt,
@@ -72,10 +72,7 @@ class Product {
     cost = map['cost'];
     stock = map['stock'];
     minStock = map['minStock'];
-    category = ProductCategory.values.firstWhere(
-      (e) => e.toString() == 'ProductCategory.${map['category']}',
-      orElse: () => ProductCategory.otros,
-    );
+    groupName = map['groupName'] ?? 'Sin grupo';
     unit = map['unit'];
     createdAt = DateTime.parse(map['createdAt']);
     updatedAt = DateTime.parse(map['updatedAt']);
@@ -100,7 +97,7 @@ class Product {
       'cost': cost,
       'stock': stock,
       'minStock': minStock,
-      'category': category.toString().split('.').last,
+      'groupName': groupName,
       'unit': unit,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -125,7 +122,7 @@ class Product {
     double? cost,
     int? stock,
     int? minStock,
-    ProductCategory? category,
+    String? groupName,
     String? unit,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -147,7 +144,7 @@ class Product {
       cost: cost ?? this.cost,
       stock: stock ?? this.stock,
       minStock: minStock ?? this.minStock,
-      category: category ?? this.category,
+      groupName: groupName ?? this.groupName,
       unit: unit ?? this.unit,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -162,14 +159,4 @@ class Product {
   }
 }
 
-enum ProductCategory {
-  frutasVerduras,
-  lacteos,
-  panaderia,
-  carnes,
-  bebidas,
-  abarrotes,
-  limpieza,
-  cuidadoPersonal,
-  otros,
-} 
+// Enum eliminado - ahora usamos grupos dinámicos 

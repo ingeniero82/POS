@@ -52,6 +52,12 @@ class SQLiteDatabaseService {
     // Crear grupos por defecto si no existen
     await migrateAddGroupsTable();
     // await createDefaultGroups(); // Comentado para evitar recrear grupos automáticamente
+    
+    // ✅ NUEVO: Migración para agregar columna groupName
+    await migrateAddGroupNameColumn();
+    
+    // ✅ FORZAR MIGRACIÓN: Asegurar que groupName existe
+    await forceAddGroupNameColumn();
   }
   
   // Crear las tablas
@@ -548,6 +554,32 @@ class SQLiteDatabaseService {
       final product = Product.fromMap(productData);
       return product;
     }).toList();
+  }
+  
+  // ✅ NUEVO: Obtener productos por grupo
+  static Future<List<Product>> getProductsByGroup(String groupName) async {
+    final results = await _database!.query(
+      'products', 
+      where: 'groupName = ? AND isActive = ?', 
+      whereArgs: [groupName, 1]
+    );
+    return results.map((productData) {
+      final product = Product.fromMap(productData);
+      return product;
+    }).toList();
+  }
+  
+  // ✅ NUEVO: Actualizar grupo de productos
+  static Future<void> updateProductsGroup(String oldGroupName, String newGroupName) async {
+    await _database!.update(
+      'products',
+      {
+        'groupName': newGroupName,
+        'updatedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'groupName = ? AND isActive = ?',
+      whereArgs: [oldGroupName, 1],
+    );
   }
   
   // Crear producto
@@ -1105,6 +1137,8 @@ class SQLiteDatabaseService {
     );
   }
   
+
+  
   // Verificar si existe un grupo con el nombre dado
   static Future<bool> groupNameExists(String name, {int? excludeId}) async {
     String whereClause = 'name = ? AND isActive = ?';
@@ -1234,5 +1268,72 @@ class SQLiteDatabaseService {
     }
     
     print('✅ Grupos por defecto creados');
+  }
+  
+  // ✅ NUEVO: Migración para agregar columna groupName
+  static Future<void> migrateAddGroupNameColumn() async {
+    try {
+      print('🔧 Migrando: Agregando columna groupName a tabla products...');
+      
+      // Verificar si la columna groupName ya existe usando pragma
+      final result = await _database!.rawQuery('PRAGMA table_info(products)');
+      final hasGroupName = result.any((column) => column['name'] == 'groupName');
+      
+      if (hasGroupName) {
+        print('ℹ️ La columna groupName ya existe');
+        return;
+      }
+      
+      // Agregar columna groupName
+      await _database!.execute('''
+        ALTER TABLE products 
+        ADD COLUMN groupName TEXT DEFAULT 'Sin grupo'
+      ''');
+      
+      // Migrar datos existentes de category a groupName
+      await _database!.execute('''
+        UPDATE products 
+        SET groupName = category 
+        WHERE groupName IS NULL OR groupName = 'Sin grupo'
+      ''');
+      
+      print('✅ Columna groupName agregada exitosamente');
+    } catch (e) {
+      print('❌ Error en migración groupName: $e');
+      // Si falla, intentar agregar la columna de forma más directa
+      try {
+        await _database!.execute('''
+          ALTER TABLE products 
+          ADD COLUMN groupName TEXT DEFAULT 'Sin grupo'
+        ''');
+        print('✅ Columna groupName agregada en segundo intento');
+      } catch (e2) {
+        print('❌ Error crítico en migración groupName: $e2');
+      }
+    }
+  }
+  
+  // ✅ FORZAR MIGRACIÓN: Asegurar que groupName existe
+  static Future<void> forceAddGroupNameColumn() async {
+    try {
+      print('🔧 Forzando migración: Verificando columna groupName...');
+      
+      // Intentar agregar la columna sin verificar (SQLite ignorará si ya existe)
+      await _database!.execute('''
+        ALTER TABLE products 
+        ADD COLUMN groupName TEXT DEFAULT 'Sin grupo'
+      ''');
+      
+      // Actualizar productos existentes que no tengan groupName
+      await _database!.execute('''
+        UPDATE products 
+        SET groupName = 'Sin grupo' 
+        WHERE groupName IS NULL
+      ''');
+      
+      print('✅ Migración forzada completada');
+    } catch (e) {
+      print('❌ Error en migración forzada: $e');
+    }
   }
 } 
