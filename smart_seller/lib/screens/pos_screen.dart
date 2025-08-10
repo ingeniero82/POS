@@ -12,8 +12,7 @@ import '../models/permissions.dart';
 import '../widgets/reprint_menu_widget.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
-import '../modules/weight/controllers/weight_controller.dart';
-import '../modules/weight/widgets/scale_widget.dart';
+
 import '../modules/electronic_invoicing/controllers/electronic_invoice_controller.dart';
 
 import 'package:intl/intl.dart';
@@ -40,8 +39,7 @@ class _PosScreenState extends State<PosScreen> {
   // Controlador del POS
   late PosController _posController;
   
-  // Controlador de peso
-  late WeightController _weightController;
+
   
   // Variables para autorización
   bool _isAuthorized = false;
@@ -65,7 +63,7 @@ class _PosScreenState extends State<PosScreen> {
   void initState() {
     super.initState();
     _posController = Get.put(PosController());
-    _weightController = Get.put(WeightController());
+
     _loadProducts();
     
     // ✅ Auto-focus al barcode al iniciar
@@ -275,9 +273,7 @@ class _PosScreenState extends State<PosScreen> {
           children: [
             Text(
               _currentMode == 'barcode' 
-                ? (_selectedProduct?.isWeighted == true 
-                    ? '⚖️ Producto por peso seleccionado' 
-                    : '📱 Escanear código de barras')
+                ? '📱 Escanear código de barras'
                 : '⌨️ Ingresar cantidad',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
@@ -289,9 +285,7 @@ class _PosScreenState extends State<PosScreen> {
               keyboardType: _currentMode == 'quantity' ? TextInputType.number : TextInputType.text,
               decoration: InputDecoration(
                 hintText: _currentMode == 'barcode' 
-                    ? (_selectedProduct?.isWeighted == true 
-                        ? 'Use la balanza integrada para pesar...'
-                        : 'Escanear código o escribir código PLU...')
+                    ? 'Escanear código o escribir código PLU...'
                     : 'Cantidad (Enter = 1)',
                 border: const OutlineInputBorder(),
                 suffixIcon: Icon(
@@ -334,7 +328,7 @@ class _PosScreenState extends State<PosScreen> {
   
   Widget _buildSelectedProduct() {
     return Card(
-      color: _selectedProduct!.isWeighted ? Colors.orange[50] : Colors.blue[50],
+      color: Colors.blue[50],
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -348,38 +342,11 @@ class _PosScreenState extends State<PosScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: _selectedProduct!.isWeighted ? Colors.orange[700] : Colors.blue[700],
+                      color: Colors.blue[700],
                     ),
                   ),
                 ),
-                if (_selectedProduct!.isWeighted)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.shade300),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.scale,
-                          size: 16,
-                          color: Colors.orange.shade700,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Por Peso',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+
               ],
             ),
             const SizedBox(height: 8),
@@ -388,67 +355,27 @@ class _PosScreenState extends State<PosScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text('Código: ${_selectedProduct!.code}'),
-            if (_selectedProduct!.isWeighted) 
-              Text('Precio/kg: \$${_selectedProduct!.pricePerKg?.toStringAsFixed(0) ?? '0'}')
-            else
-              Text('Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
+            Text('Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
             Text('Stock: ${_selectedProduct!.stock}'),
             const SizedBox(height: 16),
             
-            // Campo de cantidad SOLO para productos NO pesados
-            if (!_selectedProduct!.isWeighted) ...[
-              TextField(
-                controller: _quantityController,
-                focusNode: _quantityFocus,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Cantidad',
-                  hintText: 'Ingrese cantidad (Enter = 1)',
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.keyboard),
-                ),
-                onSubmitted: (value) => _addToCart(int.tryParse(value) ?? 1),
+            // Campo de cantidad
+            TextField(
+              controller: _quantityController,
+              focusNode: _quantityFocus,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Cantidad',
+                hintText: 'Ingrese cantidad (Enter = 1)',
+                border: OutlineInputBorder(),
+                suffixIcon: Icon(Icons.keyboard),
               ),
-              const SizedBox(height: 16),
-            ],
+              onSubmitted: (value) => _addToCart(int.tryParse(value) ?? 1),
+            ),
+            const SizedBox(height: 16),
             
-            // Para productos pesados, mostrar mensaje informativo
-            if (_selectedProduct!.isWeighted) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade300),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info,
-                          size: 16,
-                          color: Colors.orange.shade700,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Producto por peso: Use la balanza integrada en el panel derecho',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
+
             
             // Botones de acción
             Row(
@@ -465,18 +392,17 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (!_selectedProduct!.isWeighted)
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _addToCart(int.tryParse(_quantityController.text) ?? 1),
-                      icon: const Icon(Icons.add_shopping_cart),
-                      label: const Text('Agregar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _addToCart(int.tryParse(_quantityController.text) ?? 1),
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: const Text('Agregar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
                     ),
                   ),
+                ),
               ],
             ),
           ],
@@ -554,9 +480,6 @@ class _PosScreenState extends State<PosScreen> {
           _buildTotals(),
           const SizedBox(height: 16),
           
-          // Widget de Peso (integrado en POS) - Solo aparece si hay producto pesado o balanza conectada
-          _buildWeightDisplay(),
-          
           // Carrito
           Expanded(
             child: _buildCart(),
@@ -576,6 +499,7 @@ class _PosScreenState extends State<PosScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // Subtotal
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -584,12 +508,28 @@ class _PosScreenState extends State<PosScreen> {
                   style: TextStyle(fontSize: 16),
                 ),
                 Obx(() => Text(
-                  '\$${_posController.total.toStringAsFixed(0)}',
+                  '\$${_posController.subtotal.toStringAsFixed(0)}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                )),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // IVA
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'IVA (19%):',
+                  style: TextStyle(fontSize: 16),
+                ),
+                Obx(() => Text(
+                  '\$${_posController.taxes.toStringAsFixed(0)}',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 )),
               ],
             ),
             const Divider(),
+            // Total
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -618,85 +558,7 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
   
-  // Widget de peso integrado en POS (siempre visible)
-  Widget _buildWeightDisplay() {
-    // ✅ NUEVO: Mostrar siempre, independientemente del producto
 
-    return Card(
-      elevation: 3,
-      color: Colors.grey.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Título "BALANZA" como en la imagen
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'BALANZA',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                // Botón Debug como en la imagen
-                ElevatedButton(
-                  onPressed: () {
-                    // Función debug (mantener funcionalidad existente)
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    minimumSize: const Size(60, 30),
-                  ),
-                  child: const Text(
-                    'Debug',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // Peso actual como en la imagen
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Colors.grey.shade300,
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  // Peso actual centrado como en la imagen
-                  Center(
-                    child: Obx(() => Text(
-                      '${_weightController.currentWeight.value.toStringAsFixed(3)} kg',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    )),
-                  ),
-                  
-
-                ],
-              ),
-            ),
-            
-
-          ],
-        ),
-      ),
-    );
-  }
   
   Widget _buildCart() {
     return Card(
@@ -835,7 +697,7 @@ class _PosScreenState extends State<PosScreen> {
           break;
         case 'Enter':
           // Solo si hay producto seleccionado
-          if (_selectedProduct != null && !_selectedProduct!.isWeighted) {
+          if (_selectedProduct != null) {
             _addToCart(int.tryParse(_quantityController.text) ?? 1);
           }
           break;
@@ -861,16 +723,7 @@ class _PosScreenState extends State<PosScreen> {
   
   void _switchMode(String mode) {
     // Si hay un producto pesado seleccionado, no permitir cambiar a modo cantidad
-    if (mode == 'quantity' && _selectedProduct?.isWeighted == true) {
-      Get.snackbar(
-        'Modo no disponible',
-        'Para productos por peso use la balanza integrada',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-        duration: const Duration(seconds: 2),
-      );
-      return;
-    }
+
     
     setState(() {
       _currentMode = mode;
@@ -925,31 +778,22 @@ class _PosScreenState extends State<PosScreen> {
   void _selectProduct(Product product) {
     setState(() {
       _selectedProduct = product;
-      // SOLO cambiar a modo cantidad si el producto NO es pesado
-      if (!product.isWeighted) {
-        _currentMode = 'quantity';
-      }
-      // Para productos pesados, mantener el modo 'barcode' 
+      _currentMode = 'quantity'; 
     });
     
-    // Para productos pesados, actualizar el controlador de peso
-    if (product.isWeighted) {
-      _weightController.selectProduct(product);
-    }
+
     
-    // Configurar el campo de cantidad solo para productos normales
-    if (!product.isWeighted) {
-      _quantityController.text = '1';
-      _quantityController.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _quantityController.text.length,
-      );
-      
-      // Enfocar el campo de cantidad después de un breve delay
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _quantityFocus.requestFocus();
-      });
-    }
+    // Configurar el campo de cantidad
+    _quantityController.text = '1';
+    _quantityController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _quantityController.text.length,
+    );
+    
+    // Enfocar el campo de cantidad después de un breve delay
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _quantityFocus.requestFocus();
+    });
     
     _barcodeController.clear();
     
@@ -963,10 +807,7 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
     
-    if (_selectedProduct!.isWeighted) {
-      Get.snackbar('Error', 'Use la balanza integrada para productos por peso');
-      return;
-    }
+
     
     _posController.addToCart(
       _selectedProduct!.name,
@@ -987,55 +828,7 @@ class _PosScreenState extends State<PosScreen> {
     _cancelSelection();
   }
   
-  // Método para agregar productos por peso al carrito
-  void _addWeightProductToCart() {
-    if (_selectedProduct == null || !_selectedProduct!.isWeighted) {
-      Get.snackbar('Error', 'No hay producto pesado seleccionado');
-      return;
-    }
-    
-    final currentWeight = _weightController.currentWeight.value;
-    if (currentWeight <= 0) {
-      Get.snackbar('Error', 'Peso inválido');
-      return;
-    }
-    
-    // Validar límites de peso si existen
-    if (_selectedProduct!.minWeight != null && currentWeight < _selectedProduct!.minWeight!) {
-      Get.snackbar('Error', 'Peso mínimo: ${_selectedProduct!.minWeight!.toStringAsFixed(3)} kg');
-      return;
-    }
-    
-    if (_selectedProduct!.maxWeight != null && currentWeight > _selectedProduct!.maxWeight!) {
-      Get.snackbar('Error', 'Peso máximo: ${_selectedProduct!.maxWeight!.toStringAsFixed(3)} kg');
-      return;
-    }
-    
-    // Calcular precio total
-    final pricePerKg = _selectedProduct!.pricePerKg ?? 0;
-    final totalPrice = pricePerKg * currentWeight;
-    
-    // Agregar al carrito con información de peso
-    _posController.addToCart(
-      '${_selectedProduct!.name} (${currentWeight.toStringAsFixed(3)} kg)',
-      totalPrice,
-      'kg',
-      quantity: 1, // Siempre 1 para productos pesados
-      availableStock: _selectedProduct!.stock,
-    );
-    
-    // Mensaje de confirmación optimizado
-    Get.snackbar(
-      '⚖️ Pesado agregado',
-      '${_selectedProduct!.name} - ${currentWeight.toStringAsFixed(3)} kg - \$${totalPrice.toStringAsFixed(0)}',
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      duration: const Duration(seconds: 1, milliseconds: 500), // ⚡ MÁS RÁPIDO
-    );
-    
-    // Limpiar selección y volver al modo de escaneo
-    _cancelSelection();
-  }
+
   
   void _cancelSelection() {
     setState(() {
@@ -1045,7 +838,7 @@ class _PosScreenState extends State<PosScreen> {
     
     _barcodeController.clear();
     _quantityController.text = '1';
-    _weightController.selectedProduct.value = null;
+
     
     // ✅ Asegurar focus en búsqueda
     _ensureBarcodeFocus();
@@ -1066,10 +859,10 @@ class _PosScreenState extends State<PosScreen> {
               final product = products[index];
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: product.isWeighted ? Colors.orange[100] : Colors.blue[100],
+                  backgroundColor: Colors.blue[100],
                   child: Icon(
-                    product.isWeighted ? Icons.scale : Icons.inventory,
-                    color: product.isWeighted ? Colors.orange[700] : Colors.blue[700],
+                    Icons.inventory,
+                    color: Colors.blue[700],
                   ),
                 ),
                 title: Text(
@@ -1081,29 +874,11 @@ class _PosScreenState extends State<PosScreen> {
                   children: [
                     Text('Código: ${product.code}'),
                     Text(
-                      product.isWeighted 
-                        ? 'Precio: \$${product.pricePerKg?.toStringAsFixed(0) ?? '0'}/kg'
-                        : 'Precio: \$${NumberFormat('#,###').format(product.price)}',
+                      'Precio: \$${NumberFormat('#,0').format(product.price)}',
                     ),
                   ],
                 ),
-                trailing: product.isWeighted
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'PESO',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange[700],
-                        ),
-                      ),
-                    )
-                  : null,
+
                 onTap: () {
                   Navigator.of(context).pop();
                   _selectProduct(product);
@@ -1383,10 +1158,7 @@ class _PosScreenState extends State<PosScreen> {
             Text('• Usa los botones táctiles'),
             Text('• Selección rápida y fácil'),
             SizedBox(height: 8),
-            Text('⚖️ PRODUCTOS POR PESO:'),
-            Text('• Selecciona producto pesado'),
-            Text('• Usa balanza integrada en panel derecho'),
-            Text('• Precio se calcula automáticamente'),
+
           ],
         ),
         actions: [
@@ -1622,10 +1394,9 @@ class _ProductButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWeighted = product.isWeighted;
-    final primaryColor = isWeighted ? Colors.orange : Colors.blue;
-    final backgroundColor = isWeighted ? Colors.orange[50] : Colors.blue[50];
-    final iconColor = isWeighted ? Colors.orange[700] : Colors.blue[700];
+    final primaryColor = Colors.blue;
+    final backgroundColor = Colors.blue[50];
+    final iconColor = Colors.blue[700];
     
     return Material(
       color: backgroundColor,
@@ -1647,16 +1418,11 @@ class _ProductButton extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Fila superior: Solo icono de peso si es necesario
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (isWeighted)
-                    Icon(
-                      Icons.scale,
-                      size: 16,
-                      color: iconColor,
-                    ),
+
                 ],
               ),
               
@@ -1669,7 +1435,7 @@ class _ProductButton extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  isWeighted ? Icons.scale : Icons.inventory_2,
+                  Icons.inventory_2,
                   color: iconColor,
                   size: 24,
                 ),
@@ -1697,9 +1463,7 @@ class _ProductButton extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      isWeighted 
-                        ? '\$${product.pricePerKg?.toStringAsFixed(0) ?? '0'}/kg'
-                        : '\$${NumberFormat('#,###').format(product.price)}',
+                      '\$${NumberFormat('#,###').format(product.price)}',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,

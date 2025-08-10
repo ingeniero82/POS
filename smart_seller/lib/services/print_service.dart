@@ -447,7 +447,7 @@ class PrintService {
         // Formato: AVENA        4.000 KG 3.00      12.000
         String productName = item.name.toUpperCase().padRight(12);
         String unitPrice = '${currencyFormat.format(item.price)}'.padLeft(7);
-        String measure = item.isWeighted ? 'KG ' : 'UND'; // Mostrar medida real: KG o UNIDAD  
+        String measure = item.unit; // Usar la unidad real del producto  
         String medUnit = '$measure ${item.quantity.toStringAsFixed(2)}'.padRight(9);
         String subtotalItem = currencyFormat.format(item.total).padLeft(10);
         
@@ -705,7 +705,7 @@ class PrintService {
     for (CartItem item in items) {
       String productName = item.name.toUpperCase().padRight(12);
       String unitPrice = '${currencyFormat.format(item.price)}'.padLeft(7);
-      String measure = item.isWeighted ? 'KG ' : 'UND'; // Mostrar medida real: KG o UNIDAD  
+      String measure = item.unit; // Usar la unidad real del producto  
       String medUnit = '$measure ${item.quantity.toStringAsFixed(2)}'.padRight(9);
       String subtotalItem = currencyFormat.format(item.total).padLeft(10);
     

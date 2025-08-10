@@ -26,16 +26,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
   final _unitController = TextEditingController();
   final _groupController = TextEditingController();
   
-  // Controladores para productos pesados
-  final _pricePerKgController = TextEditingController();
-  final _weightController = TextEditingController();
-  final _minWeightController = TextEditingController();
-  final _maxWeightController = TextEditingController();
+
   
   String? _selectedGroup;
   List<Group> _availableGroups = [];
   bool _isActive = true;
-  bool _isWeighted = false;
+
   bool _isLoading = false;
   
   // Controlador para las pestañas
@@ -60,12 +56,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       _groupController.text = _selectedGroup ?? '';
       _isActive = widget.product!.isActive;
       
-      // Campos para productos pesados
-      _isWeighted = widget.product!.isWeighted;
-      _pricePerKgController.text = widget.product!.pricePerKg?.toString() ?? '';
-      _weightController.text = widget.product!.weight?.toString() ?? '';
-      _minWeightController.text = widget.product!.minWeight?.toString() ?? '';
-      _maxWeightController.text = widget.product!.maxWeight?.toString() ?? '';
+
     }
   }
   
@@ -171,11 +162,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: _isActive,
-        isWeighted: _isWeighted,
-        pricePerKg: _pricePerKgController.text.isNotEmpty ? double.tryParse(_pricePerKgController.text) : null,
-        weight: _weightController.text.isNotEmpty ? double.tryParse(_weightController.text) : null,
-        minWeight: _minWeightController.text.isNotEmpty ? double.tryParse(_minWeightController.text) : null,
-        maxWeight: _maxWeightController.text.isNotEmpty ? double.tryParse(_maxWeightController.text) : null,
+
       );
 
       if (widget.product == null) {
@@ -216,15 +203,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
               _stockController.clear();
               _minStockController.clear();
               _unitController.clear();
-              _pricePerKgController.clear();
-              _weightController.clear();
-              _minWeightController.clear();
-              _maxWeightController.clear();
+              
               setState(() {
                 _selectedGroup = null;
                 _groupController.text = '';
                 _isActive = true;
-                _isWeighted = false;
+        
               });
             },
             barrierDismissible: false,
@@ -558,16 +542,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
                 },
               ),
               const Text('Producto activo'),
-              const SizedBox(width: 32),
-              Checkbox(
-                value: _isWeighted,
-                onChanged: (value) {
-                  setState(() {
-                    _isWeighted = value ?? false;
-                  });
-                },
-              ),
-              const Text('Producto pesado (se vende por peso)'),
+
             ],
           ),
         ],
@@ -1145,15 +1120,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           // Checkboxes
           Row(
             children: [
-              Checkbox(
-                value: _isWeighted,
-                onChanged: (value) {
-                  setState(() {
-                    _isWeighted = value ?? false;
-                  });
-                },
-              ),
-              const Text('Producto con peso (báscula)'),
+
               const SizedBox(width: 32),
               Checkbox(
                 value: false, // TODO: Implementar estado

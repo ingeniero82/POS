@@ -6,7 +6,7 @@ import '../models/product.dart';
 import '../models/customer.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/auth_service.dart';
-import '../services/scale_service.dart';
+
 import '../services/print_service.dart';
 import 'package:intl/intl.dart';
 
@@ -15,81 +15,33 @@ class CartItem {
   double price; // Cambiado de final para permitir modificaciones temporales
   final String unit;
   int quantity;
-  bool isWeighted;
-  double? weight;
-  double? pricePerKg;
+
 
   CartItem({
     required this.name,
     required this.price,
     required this.unit,
     this.quantity = 1,
-    this.isWeighted = false,
-    this.weight,
-    this.pricePerKg,
   });
 
-  double get total {
-    if (isWeighted && weight != null && pricePerKg != null) {
-      return pricePerKg! * weight! * quantity;
-    }
-    return price * quantity;
-  }
+  double get total => price * quantity;
   
-  String get displayInfo {
-    if (isWeighted && weight != null) {
-      return '${weight!.toStringAsFixed(3)} kg';
-    }
-    return '$quantity ${unit}';
-  }
+  String get displayInfo => '$quantity ${unit}';
 }
 
 class PosController extends GetxController {
   var cartItems = <CartItem>[].obs;
-  var scaleWeight = 0.0.obs;
-  var isScaleConnected = false.obs;
-  var isScaleReading = false.obs;
 
-  
-  late ScaleService _scaleService;
   
   @override
   void onInit() {
     super.onInit();
-    _initializeScale(); // Desactivado temporalmente para pruebas sin balanza
-  }
-  
-  Future<void> _initializeScale() async {
-    // ✅ NUEVO: Registrar ScaleService como singleton
-    if (!Get.isRegistered<ScaleService>()) {
-      _scaleService = ScaleService();
-      Get.put(_scaleService, permanent: true);
-    } else {
-      _scaleService = Get.find<ScaleService>();
-    }
-    
-    await _scaleService.initialize();
-    
-    // Escuchar cambios de peso
-    _scaleService.weightStream.listen((weight) {
-      print('📊 Peso recibido en PosController: $weight');
-      scaleWeight.value = weight;
-    });
-    
-    // Escuchar cambios de conexión
-    _scaleService.connectionStream.listen((connected) {
-      print('🔌 Estado de conexión en PosController: $connected');
-      isScaleConnected.value = connected;
-    });
   }
   
   // Agregar producto al carrito
   void addToCart(String name, double price, String unit, {
     int quantity = 1,
     int? availableStock,
-    bool isWeighted = false,
-    double? weight,
-    double? pricePerKg,
   }) {
     // Buscar si el producto ya existe en el carrito
     final existingIndex = cartItems.indexWhere((item) => item.name == name);
@@ -126,9 +78,7 @@ class PosController extends GetxController {
         price: price,
         unit: unit,
         quantity: quantity,
-        isWeighted: isWeighted,
-        weight: weight,
-        pricePerKg: pricePerKg,
+
       ));
     }
   }
@@ -143,9 +93,7 @@ class PosController extends GetxController {
         price: newPrice,
         unit: item.unit,
         quantity: item.quantity,
-        isWeighted: item.isWeighted,
-        weight: item.weight,
-        pricePerKg: item.pricePerKg,
+
       );
       cartItems[index] = updatedItem;
       cartItems.refresh();
@@ -160,117 +108,9 @@ class PosController extends GetxController {
     }
   }
 
-  // Cambiar peso temporal de un item del carrito
-  void changeItemWeight(int index, double newWeight) {
-    if (index >= 0 && index < cartItems.length) {
-      final item = cartItems[index];
-      if (item.isWeighted && item.pricePerKg != null) {
-        // Crear nuevo item con peso actualizado
-        final updatedItem = CartItem(
-          name: item.name,
-          price: item.price,
-          unit: item.unit,
-          quantity: item.quantity,
-          isWeighted: item.isWeighted,
-          weight: newWeight,
-          pricePerKg: item.pricePerKg,
-        );
-        cartItems[index] = updatedItem;
-        cartItems.refresh();
-        
-        final newTotal = item.pricePerKg! * newWeight;
-        Get.snackbar(
-          'Peso actualizado',
-          'Peso cambiado a ${newWeight.toStringAsFixed(3)} kg - Total: \$${newTotal.toStringAsFixed(0)}',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
-        );
-      }
-    }
-  }
 
-  // Agregar producto pesado usando balanza
-  void addWeightedProduct(Product product) {
-    if (!isScaleConnected.value) {
-      Get.snackbar(
-        'Balanza no conectada',
-        'Conecta la balanza para agregar productos pesados',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    
-    if (product.pricePerKg == null) {
-      Get.snackbar(
-        'Producto sin precio por kg',
-        'Configura el precio por kg para este producto',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    
-    final currentWeight = scaleWeight.value;
-    if (currentWeight <= 0) {
-      Get.snackbar(
-        'Peso inválido',
-        'Coloca el producto en la balanza',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    
-    // Verificar peso mínimo y máximo
-    if (product.minWeight != null && currentWeight < product.minWeight!) {
-      Get.snackbar(
-        'Peso mínimo no alcanzado',
-        'El peso mínimo es ${product.minWeight!.toStringAsFixed(3)} kg',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    
-    if (product.maxWeight != null && currentWeight > product.maxWeight!) {
-      Get.snackbar(
-        'Peso máximo excedido',
-        'El peso máximo es ${product.maxWeight!.toStringAsFixed(3)} kg',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    
-    // Agregar al carrito
-    addToCart(
-      product.name,
-      product.price,
-      product.unit,
-      availableStock: product.stock,
-      isWeighted: true,
-      weight: currentWeight,
-      pricePerKg: product.pricePerKg,
-    );
-    
-    // Mostrar confirmación
-    final calculatedPrice = product.pricePerKg! * currentWeight;
-    Get.snackbar(
-      'Producto agregado',
-      '${product.name}: ${currentWeight.toStringAsFixed(3)} kg - \$${calculatedPrice.toStringAsFixed(0)}',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      duration: Duration(seconds: 2),
-    );
-  }
+
+  
   
   // Remover producto del carrito
   void removeFromCart(int index) {
@@ -295,13 +135,7 @@ class PosController extends GetxController {
     }
   }
   
-  // Actualizar peso de un producto pesado
-  void updateWeightedProductWeight(int index, double newWeight) {
-    if (index >= 0 && index < cartItems.length && cartItems[index].isWeighted) {
-      cartItems[index].weight = newWeight;
-      cartItems.refresh();
-    }
-  }
+
   
   // Limpiar carrito
   void clearCart() {
@@ -318,40 +152,9 @@ class PosController extends GetxController {
   
   
   
-  // Conectar balanza
-  Future<void> connectScale() async {
-    await _scaleService.connect();
-  }
+
   
-  // Desconectar balanza
-  Future<void> disconnectScale() async {
-    await _scaleService.disconnect();
-  }
-  
-  // Iniciar lectura de balanza
-  Future<void> startScaleReading() async {
-    await _scaleService.startReading();
-    isScaleReading.value = true;
-  }
-  
-  // Detener lectura de balanza
-  Future<void> stopScaleReading() async {
-    await _scaleService.stopReading();
-    isScaleReading.value = false;
-  }
-  
-  // Tarar balanza
-  Future<void> tareScale() async {
-    await _scaleService.tare();
-  }
-  
-  // Obtener peso actual de la balanza
-  double get currentScaleWeight => scaleWeight.value;
-  
-  // Formatear peso para mostrar
-  String formatWeight(double weight) {
-    return _scaleService.formatWeight(weight);
-  }
+
   
   // Calcular subtotal
   double get subtotal {
@@ -845,7 +648,6 @@ class PosController extends GetxController {
 
   @override
   void onClose() {
-    _scaleService.dispose();
     super.onClose();
   }
 }

@@ -11,7 +11,7 @@ import 'screens/customers_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/company_config_screen.dart';
 import 'screens/groups_screen.dart';
-import 'screens/scale_config_screen.dart';
+
 
 import 'modules/electronic_invoicing/screens/electronic_invoice_screen.dart';
 import 'services/sqlite_database_service.dart';
@@ -158,12 +158,7 @@ class MyApp extends StatelessWidget {
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         
-        // ✅ NUEVO: Ruta para configuración de balanza
-        GetPage(
-          name: '/scale-config', 
-          page: () => const ScaleConfigScreen(),
-          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
-        ),
+
       ],
     );
   }
