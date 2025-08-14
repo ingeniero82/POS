@@ -10,7 +10,7 @@ class Product {
   late double cost;
   late int stock;
   late int minStock;
-  late String groupName; // Nombre del grupo (dinámico)
+  late String category; // Nombre de la categoría (dinámico)
   late String unit;
   late DateTime createdAt;
   late DateTime updatedAt;
@@ -48,7 +48,7 @@ class Product {
     required this.cost,
     required this.stock,
     required this.minStock,
-    required this.groupName,
+    required this.category,
     required this.unit,
     required this.createdAt,
     required this.updatedAt,
@@ -72,7 +72,7 @@ class Product {
     cost = map['cost'];
     stock = map['stock'];
     minStock = map['minStock'];
-    groupName = map['groupName'] ?? 'Sin grupo';
+    category = map['category'] ?? 'Sin categoría';
     unit = map['unit'];
     createdAt = DateTime.parse(map['createdAt']);
     updatedAt = DateTime.parse(map['updatedAt']);
@@ -97,7 +97,7 @@ class Product {
       'cost': cost,
       'stock': stock,
       'minStock': minStock,
-      'groupName': groupName,
+      'category': category,
       'unit': unit,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -122,7 +122,7 @@ class Product {
     double? cost,
     int? stock,
     int? minStock,
-    String? groupName,
+    String? category,
     String? unit,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -144,7 +144,7 @@ class Product {
       cost: cost ?? this.cost,
       stock: stock ?? this.stock,
       minStock: minStock ?? this.minStock,
-      groupName: groupName ?? this.groupName,
+      category: category ?? this.category,
       unit: unit ?? this.unit,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

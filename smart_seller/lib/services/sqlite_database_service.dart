@@ -53,11 +53,14 @@ class SQLiteDatabaseService {
     await migrateAddGroupsTable();
     // await createDefaultGroups(); // Comentado para evitar recrear grupos automáticamente
     
-    // ✅ NUEVO: Migración para agregar columna groupName
-    await migrateAddGroupNameColumn();
+    // ✅ NUEVO: Migración para agregar columna category
+    await migrateAddCategoryColumn();
     
-    // ✅ FORZAR MIGRACIÓN: Asegurar que groupName existe
-    await forceAddGroupNameColumn();
+    // ✅ FORZAR MIGRACIÓN: Asegurar que category existe
+    await forceAddCategoryColumn();
+    
+    // ✅ NUEVO: Asegurar que la tabla customers existe (SOLO CLIENTES)
+    await ensureCustomersTableExists();
   }
   
   // Crear las tablas
@@ -1270,70 +1273,113 @@ class SQLiteDatabaseService {
     print('✅ Grupos por defecto creados');
   }
   
-  // ✅ NUEVO: Migración para agregar columna groupName
-  static Future<void> migrateAddGroupNameColumn() async {
+  // ✅ NUEVO: Migración para agregar columna category
+  static Future<void> migrateAddCategoryColumn() async {
     try {
-      print('🔧 Migrando: Agregando columna groupName a tabla products...');
+      print('🔧 Migrando: Agregando columna category a tabla products...');
       
-      // Verificar si la columna groupName ya existe usando pragma
+      // Verificar si la columna category ya existe usando pragma
       final result = await _database!.rawQuery('PRAGMA table_info(products)');
-      final hasGroupName = result.any((column) => column['name'] == 'groupName');
+      final hasCategory = result.any((column) => column['name'] == 'category');
       
-      if (hasGroupName) {
-        print('ℹ️ La columna groupName ya existe');
+      if (hasCategory) {
+        print('ℹ️ La columna category ya existe');
         return;
       }
       
-      // Agregar columna groupName
+      // Agregar columna category
       await _database!.execute('''
         ALTER TABLE products 
-        ADD COLUMN groupName TEXT DEFAULT 'Sin grupo'
+        ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
       ''');
       
-      // Migrar datos existentes de category a groupName
+      // Migrar datos existentes de groupName a category
       await _database!.execute('''
         UPDATE products 
-        SET groupName = category 
-        WHERE groupName IS NULL OR groupName = 'Sin grupo'
+        SET category = groupName 
+        WHERE category IS NULL OR category = 'Sin Categoría'
       ''');
       
-      print('✅ Columna groupName agregada exitosamente');
+      print('✅ Columna category agregada exitosamente');
     } catch (e) {
-      print('❌ Error en migración groupName: $e');
+      print('❌ Error en migración category: $e');
       // Si falla, intentar agregar la columna de forma más directa
       try {
         await _database!.execute('''
           ALTER TABLE products 
-          ADD COLUMN groupName TEXT DEFAULT 'Sin grupo'
+          ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
         ''');
-        print('✅ Columna groupName agregada en segundo intento');
+        print('✅ Columna category agregada en segundo intento');
       } catch (e2) {
-        print('❌ Error crítico en migración groupName: $e2');
+        print('❌ Error crítico en migración category: $e2');
       }
     }
   }
   
-  // ✅ FORZAR MIGRACIÓN: Asegurar que groupName existe
-  static Future<void> forceAddGroupNameColumn() async {
+  // ✅ FORZAR MIGRACIÓN: Asegurar que category existe
+  static Future<void> forceAddCategoryColumn() async {
     try {
-      print('🔧 Forzando migración: Verificando columna groupName...');
+      print('🔧 Forzando migración: Verificando columna category...');
       
       // Intentar agregar la columna sin verificar (SQLite ignorará si ya existe)
       await _database!.execute('''
         ALTER TABLE products 
-        ADD COLUMN groupName TEXT DEFAULT 'Sin grupo'
+        ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
       ''');
       
-      // Actualizar productos existentes que no tengan groupName
+      // Actualizar productos existentes que no tengan category
       await _database!.execute('''
         UPDATE products 
-        SET groupName = 'Sin grupo' 
-        WHERE groupName IS NULL
+        SET category = 'Sin Categoría' 
+        WHERE category IS NULL
       ''');
       
       print('✅ Migración forzada completada');
     } catch (e) {
       print('❌ Error en migración forzada: $e');
+    }
+  }
+  
+  // ✅ NUEVO: Crear tabla customers si no existe (SOLO CLIENTES)
+  static Future<void> ensureCustomersTableExists() async {
+    try {
+      print('🔧 Verificando tabla customers...');
+      
+      // Verificar si la tabla customers ya existe
+      final result = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'"
+      );
+      
+      if (result.isNotEmpty) {
+        print('✅ Tabla customers ya existe');
+        return;
+      }
+      
+      print('🔧 Creando tabla customers...');
+      
+      // Crear SOLO la tabla customers sin tocar nada más
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          address TEXT,
+          documentNumber TEXT,
+          documentType TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          isActive INTEGER NOT NULL DEFAULT 1,
+          points INTEGER NOT NULL DEFAULT 0,
+          membershipLevel TEXT,
+          lastPurchase TEXT,
+          totalPurchases REAL NOT NULL DEFAULT 0.0
+        )
+      ''');
+      
+      print('✅ Tabla customers creada exitosamente');
+    } catch (e) {
+      print('❌ Error creando tabla customers: $e');
     }
   }
 } 

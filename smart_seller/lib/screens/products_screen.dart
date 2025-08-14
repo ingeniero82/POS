@@ -68,7 +68,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         
         // Comparación de grupos dinámicos
         final matchesGroup = _selectedGroup == null || 
-            product.groupName == _selectedGroup!.name;
+            product.category == _selectedGroup!.name;
         
         return matchesSearch && matchesGroup;
       }).toList();
@@ -194,8 +194,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       // Seleccionar ubicación para guardar
       String? outputFile = await FilePicker.platform.saveFile(
         dialogTitle: 'Guardar inventario como Excel',
-        fileName: 'inventario_${DateTime.now().millisecondsSinceEpoch}.csv',
-        allowedExtensions: ['csv'],
+        fileName: 'inventario_${DateTime.now().millisecondsSinceEpoch}.xlsx',
+        allowedExtensions: ['xlsx'],
         type: FileType.custom,
       );
 
@@ -209,12 +209,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
         return;
       }
 
-      // Exportar productos
-      await ImportService.exportProductsToCsv(_products, outputFile);
+      // Exportar productos con formato Excel real (.xlsx)
+      await ImportService.exportProductsToExcel(_products, outputFile);
       
       Get.snackbar(
         'Éxito',
-        'Inventario exportado correctamente',
+        'Inventario exportado correctamente como archivo Excel (.xlsx)',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -419,9 +419,9 @@ class _ProductCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-                          backgroundColor: _getGroupColor(product.groupName),
+                          backgroundColor: _getGroupColor(product.category),
           child: Icon(
-                  _getGroupIcon(product.groupName),
+                  _getGroupIcon(product.category),
             color: Colors.white,
           ),
         ),
@@ -486,28 +486,29 @@ class _ProductCard extends StatelessWidget {
     );
   }
 
-  Color _getGroupColor(String groupName) {
-    // Generar color basado en el nombre del grupo
+  Color _getGroupColor(String category) {
+    // Colores predefinidos para grupos
     final colors = [
-      Colors.green,
       Colors.blue,
+      Colors.green,
       Colors.orange,
-      Colors.red,
       Colors.purple,
-      Colors.indigo,
+      Colors.red,
       Colors.teal,
+      Colors.indigo,
       Colors.pink,
       Colors.amber,
       Colors.cyan,
     ];
     
-    final index = groupName.hashCode % colors.length;
+    // Usar el hash de la categoría para asignar un color consistente
+    final index = category.hashCode % colors.length;
     return colors[index];
   }
-
-  IconData _getGroupIcon(String groupName) {
-    // Iconos basados en el nombre del grupo
-    final lowerName = groupName.toLowerCase();
+  
+  IconData _getGroupIcon(String category) {
+    // Iconos predefinidos para grupos
+    final lowerName = category.toLowerCase();
     
     if (lowerName.contains('fruta') || lowerName.contains('verdura')) {
         return Icons.apple;

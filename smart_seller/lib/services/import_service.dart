@@ -104,6 +104,12 @@ class ImportService {
     double? minWeight = _parseDouble(get('peso_min') ?? get('pesomin') ?? get('minweight'));
     double? maxWeight = _parseDouble(get('peso_max') ?? get('pesomax') ?? get('maxweight'));
     
+    // Asegurar que la categoría siempre tenga un valor válido
+    String category = _parseGroup(get('categoría') ?? get('categoria') ?? get('category') ?? get('grupo') ?? get('group'));
+    if (category.isEmpty || category.trim().isEmpty) {
+      category = 'Otros';
+    }
+    
     Product product = Product(
       code: code,
       shortCode: code.length > 8 ? code.substring(0, 8) : code,
@@ -113,7 +119,7 @@ class ImportService {
       cost: _parseDouble(get('costo') ?? get('cost')) ?? 0.0,
       stock: _parseInt(stockStr) ?? 0,
       minStock: _parseInt(get('stock mínimo') ?? get('stock_minimo') ?? get('min_stock')) ?? 5,
-      groupName: _parseGroup(get('categoría') ?? get('categoria') ?? get('category') ?? get('grupo') ?? get('group')),
+      category: category,
       unit: get('unidad') ?? get('unit') ?? 'unidad',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -153,6 +159,12 @@ class ImportService {
     double? minWeight = _parseDouble(getCellValue('peso_min') ?? getCellValue('pesomin') ?? getCellValue('minweight'));
     double? maxWeight = _parseDouble(getCellValue('peso_max') ?? getCellValue('pesomax') ?? getCellValue('maxweight'));
     
+    // Asegurar que la categoría siempre tenga un valor válido
+    String category = _parseGroup(getCellValue('categoría') ?? getCellValue('categoria') ?? getCellValue('category') ?? getCellValue('grupo') ?? getCellValue('group'));
+    if (category.isEmpty || category.trim().isEmpty) {
+      category = 'Otros';
+    }
+    
     // Crear producto
     Product product = Product(
       code: code,
@@ -163,7 +175,7 @@ class ImportService {
       cost: _parseDouble(getCellValue('costo') ?? getCellValue('cost')) ?? 0.0,
       stock: _parseInt(stockStr) ?? 0,
       minStock: _parseInt(getCellValue('stock mínimo') ?? getCellValue('stock_minimo') ?? getCellValue('min_stock')) ?? 5,
-      groupName: _parseGroup(getCellValue('categoría') ?? getCellValue('categoria') ?? getCellValue('category') ?? getCellValue('grupo') ?? getCellValue('group')),
+      category: category,
       unit: getCellValue('unidad') ?? getCellValue('unit') ?? 'unidad',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -284,29 +296,113 @@ PROD010	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1
 
   static Future<void> exportProductsToCsv(List<Product> products, String filePath) async {
     List<List<dynamic>> rows = [];
+    
+    // Encabezados mejorados para Excel
     rows.add([
       'CÓDIGO', 'NOMBRE', 'DESCRIPCIÓN', 'PRECIO', 'COSTO', 'STOCK', 'STOCK MÍNIMO', 'CATEGORÍA', 'UNIDAD', 'ES_PESADO', 'PRECIO_POR_KG', 'PESO_MIN', 'PESO_MAX'
     ]);
+    
     for (final p in products) {
       rows.add([
         p.code,
         p.name,
         p.description,
-        p.price,
-        p.cost,
+        // Formatear precios para Excel (sin decimales si son enteros)
+        p.price == p.price.toInt() ? p.price.toInt() : p.price,
+        p.cost == p.cost.toInt() ? p.cost.toInt() : p.cost,
         p.stock,
         p.minStock,
-        p.groupName,
+        p.category,
         p.unit,
-        p.isWeighted,
-        p.pricePerKg ?? 0.0,
-        p.minWeight ?? 0.0,
-        p.maxWeight ?? 0.0,
+        // Convertir boolean a texto más amigable
+        p.isWeighted ? 'SÍ' : 'NO',
+        // Formatear precios por kg
+        p.pricePerKg != null && p.pricePerKg! > 0 
+            ? (p.pricePerKg == p.pricePerKg!.toInt() ? p.pricePerKg!.toInt() : p.pricePerKg!)
+            : '',
+        // Formatear pesos (mostrar solo si son productos pesados)
+        p.isWeighted && p.minWeight != null && p.minWeight! > 0 ? p.minWeight : '',
+        p.isWeighted && p.maxWeight != null && p.maxWeight! > 0 ? p.maxWeight : '',
       ]);
     }
+    
+    // Crear CSV con mejor formato para Excel
     String csv = const ListToCsvConverter().convert(rows);
+    
+    // Agregar BOM (Byte Order Mark) para mejor compatibilidad con Excel
+    final bom = utf8.encode('\uFEFF');
     final file = File(filePath);
-    await file.writeAsString(csv, encoding: utf8);
+    await file.writeAsBytes([...bom, ...utf8.encode(csv)]);
+  }
+
+  // Nueva función para exportar en formato Excel (.xlsx) con mejor formato
+  static Future<void> exportProductsToExcel(List<Product> products, String filePath) async {
+    try {
+      // Crear un archivo Excel real con formato visual
+      var excel = Excel.createExcel();
+      var sheet = excel['Productos'];
+      
+      // Configurar encabezados con formato
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'CÓDIGO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'NOMBRE';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'DESCRIPCIÓN';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0)).value = 'PRECIO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0)).value = 'COSTO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'STOCK';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'STOCK MÍNIMO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value = 'CATEGORÍA';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value = 'UNIDAD';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value = 'ES_PESADO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: 0)).value = 'PRECIO_POR_KG';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: 0)).value = 'PESO_MIN';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: 0)).value = 'PESO_MAX';
+      
+      // Llenar datos de productos
+      for (int i = 0; i < products.length; i++) {
+        final p = products[i];
+        final row = i + 1;
+        
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = p.code;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = p.name;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = p.description;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = p.price;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = p.cost;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = p.stock;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = p.minStock;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = p.category;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = p.unit;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = p.isWeighted ? 'SÍ' : 'NO';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row)).value = p.pricePerKg ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = p.minWeight ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = p.maxWeight ?? '';
+      }
+      
+      // Ajustar ancho de columnas automáticamente
+      for (int i = 0; i < 13; i++) {
+        // Nota: setColumnWidth no está disponible en esta versión
+        // Las columnas se ajustarán automáticamente en Excel
+      }
+      
+      // Guardar archivo Excel
+      final bytes = excel.encode();
+      if (bytes != null) {
+        final file = File(filePath.replaceAll('.csv', '.xlsx'));
+        await file.writeAsBytes(bytes);
+      } else {
+        throw Exception('Error al generar archivo Excel');
+      }
+      
+    } catch (e) {
+      throw Exception('Error al exportar a Excel: $e');
+    }
+  }
+
+  // Función auxiliar para formatear precios
+  static String _formatPrice(double price) {
+    if (price == price.toInt()) {
+      return price.toInt().toString();
+    }
+    return price.toStringAsFixed(2);
   }
 
 

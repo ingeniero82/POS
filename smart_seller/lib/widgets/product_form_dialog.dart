@@ -52,7 +52,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       _stockController.text = widget.product!.stock.toString();
       _minStockController.text = widget.product!.minStock.toString();
       _unitController.text = widget.product!.unit;
-              _selectedGroup = widget.product!.groupName;
+              _selectedGroup = widget.product!.category;
       _groupController.text = _selectedGroup ?? '';
       _isActive = widget.product!.isActive;
       
@@ -158,7 +158,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         stock: int.parse(_stockController.text),
         minStock: int.parse(_minStockController.text),
         unit: _unitController.text.trim(),
-        groupName: _selectedGroup ?? 'Sin grupo',
+        category: _selectedGroup ?? 'Sin grupo',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: _isActive,
