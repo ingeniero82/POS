@@ -31,13 +31,205 @@ class CartItem {
 
 class PosController extends GetxController {
   var cartItems = <CartItem>[].obs;
-
   
+  // ✅ NUEVO: Variables para gestión de clientes
+  var selectedCustomer = Rxn<Customer>();
+  var isSearchingCustomer = false.obs;
+  var customerSearchResults = <Customer>[].obs;
+  var customerSearchQuery = ''.obs;
+
   @override
   void onInit() {
     super.onInit();
   }
   
+  // ✅ NUEVO: Método para buscar clientes
+  Future<void> searchCustomers(String query) async {
+    if (query.trim().isEmpty) {
+      customerSearchResults.clear();
+      return;
+    }
+    
+    try {
+      isSearchingCustomer.value = true;
+      final allCustomers = await SQLiteDatabaseService.getAllCustomers();
+      
+      // Filtrar por nombre, email, cédula o teléfono
+      final filtered = allCustomers.where((customer) {
+        final searchLower = query.toLowerCase();
+        return customer.name.toLowerCase().contains(searchLower) ||
+               customer.email.toLowerCase().contains(searchLower) ||
+               (customer.documentNumber?.toLowerCase().contains(searchLower) ?? false) ||
+               customer.phone.contains(query);
+      }).toList();
+      
+      customerSearchResults.value = filtered;
+    } catch (e) {
+      print('Error buscando clientes: $e');
+      customerSearchResults.clear();
+    } finally {
+      isSearchingCustomer.value = false;
+    }
+  }
+  
+  // ✅ NUEVO: Método para seleccionar cliente
+  void selectCustomer(Customer customer) {
+    selectedCustomer.value = customer;
+    Get.back(); // Cerrar modal de búsqueda
+    Get.snackbar(
+      'Cliente seleccionado',
+      '${customer.name} - Tasa: ${customer.pointsRate} pts/\$1000 - Acumulados: ${customer.accumulatedPoints}',
+      duration: const Duration(seconds: 2),
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+    );
+  }
+  
+  // ✅ NUEVO: Método para limpiar cliente seleccionado
+  void clearSelectedCustomer() {
+    selectedCustomer.value = null;
+    Get.snackbar(
+      'Cliente removido',
+      'No hay cliente seleccionado',
+      duration: const Duration(seconds: 1),
+    );
+  }
+  
+  // ✅ NUEVO: Método para mostrar modal de selección de cliente
+  void showCustomerSelectionModal() {
+    Get.dialog(
+      Dialog(
+        child: Container(
+          width: 600,
+          height: 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Seleccionar Cliente',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    onPressed: () => Get.back(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Campo de búsqueda
+              TextField(
+                onChanged: (value) {
+                  customerSearchQuery.value = value;
+                  searchCustomers(value);
+                },
+                decoration: InputDecoration(
+                  hintText: 'Buscar por nombre, email, cédula o teléfono...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Lista de resultados
+              Expanded(
+                child: Obx(() {
+                  if (isSearchingCustomer.value) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (customerSearchResults.isEmpty && customerSearchQuery.value.isNotEmpty) {
+                    return const Center(
+                      child: Text('No se encontraron clientes'),
+                    );
+                  }
+                  
+                  if (customerSearchResults.isEmpty) {
+                    return const Center(
+                      child: Text('Busca un cliente para comenzar'),
+                    );
+                  }
+                  
+                  return ListView.builder(
+                    itemCount: customerSearchResults.length,
+                    itemBuilder: (context, index) {
+                      final customer = customerSearchResults[index];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue,
+                          child: Text(
+                            customer.name.substring(0, 1).toUpperCase(),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        title: Text(customer.name),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(customer.email),
+                            Text('${customer.pointsRate} pts/\$1000 - Acumulados: ${customer.accumulatedPoints}'),
+                          ],
+                        ),
+                        trailing: ElevatedButton(
+                          onPressed: () => selectCustomer(customer),
+                          child: const Text('Seleccionar'),
+                        ),
+                      );
+                    },
+                  );
+                }),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // ✅ NUEVO: Método para actualizar puntos del cliente después de la venta
+  Future<void> updateCustomerAfterSale() async {
+    if (selectedCustomer.value == null) return;
+    
+    try {
+      final customer = selectedCustomer.value!;
+      // 🎯 AQUÍ ESTÁ LA LÓGICA: Usar la tasa del cliente
+      final pointsEarned = customer.calculatePointsEarned(total);
+      final newAccumulatedPoints = customer.accumulatedPoints + pointsEarned;
+      final newTotalPurchases = customer.totalPurchases + total;
+      
+      // Actualizar puntos acumulados y total de compras
+      await SQLiteDatabaseService.updateCustomer(
+        customer.copyWith(
+          accumulatedPoints: newAccumulatedPoints,
+          totalPurchases: newTotalPurchases,
+          lastPurchase: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+      
+      // Actualizar el cliente en memoria
+      selectedCustomer.value = customer.copyWith(
+        accumulatedPoints: newAccumulatedPoints,
+        totalPurchases: newTotalPurchases,
+        lastPurchase: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      
+      print('✅ Cliente actualizado: ${customer.name} - Puntos ganados: $pointsEarned - Acumulados: $newAccumulatedPoints - Total: \$${newTotalPurchases}');
+      
+      // Limpiar cliente seleccionado
+      selectedCustomer.value = null;
+    } catch (e) {
+      print('❌ Error actualizando cliente: $e');
+    }
+  }
+
   // Agregar producto al carrito
   void addToCart(String name, double price, String unit, {
     int quantity = 1,
@@ -288,6 +480,9 @@ class PosController extends GetxController {
       
       // Guardar la venta
       await SQLiteDatabaseService.saveSale(sale);
+      
+      // ✅ NUEVO: Actualizar puntos del cliente si hay uno seleccionado
+      await updateCustomerAfterSale();
       
       // El stock se actualiza automáticamente en saveSale
       

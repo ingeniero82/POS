@@ -161,9 +161,9 @@ class SQLiteDatabaseService {
         documentType TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
-        isActive INTEGER NOT NULL DEFAULT 1,
-        points INTEGER NOT NULL DEFAULT 0,
-        membershipLevel TEXT,
+        isActive INTEGER NOT NULL,
+        pointsRate REAL NOT NULL DEFAULT 1.0,
+        accumulatedPoints INTEGER NOT NULL DEFAULT 0,
         lastPurchase TEXT,
         totalPurchases REAL NOT NULL DEFAULT 0.0
       )
@@ -927,21 +927,11 @@ class SQLiteDatabaseService {
   }
   
   // Actualizar puntos del cliente
-  static Future<void> updateCustomerPoints(int customerId, int points) async {
-    final tempCustomer = Customer(
-      name: '', // Campo temporal
-      email: '', // Campo temporal
-      phone: '', // Campo temporal
-      createdAt: DateTime.now(), // Campo temporal
-      updatedAt: DateTime.now(), // Campo temporal
-      points: points,
-    );
-    
+  static Future<void> updateCustomerPoints(int customerId, int accumulatedPoints) async {
     await _database!.update(
       'customers',
       {
-        'points': points,
-        'membershipLevel': tempCustomer.calculateMembershipLevel(),
+        'accumulatedPoints': accumulatedPoints,
         'updatedAt': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -1370,8 +1360,8 @@ class SQLiteDatabaseService {
           createdAt TEXT NOT NULL,
           updatedAt TEXT NOT NULL,
           isActive INTEGER NOT NULL DEFAULT 1,
-          points INTEGER NOT NULL DEFAULT 0,
-          membershipLevel TEXT,
+          pointsRate REAL NOT NULL DEFAULT 1.0,
+          accumulatedPoints INTEGER NOT NULL DEFAULT 0,
           lastPurchase TEXT,
           totalPurchases REAL NOT NULL DEFAULT 0.0
         )
@@ -1380,6 +1370,125 @@ class SQLiteDatabaseService {
       print('✅ Tabla customers creada exitosamente');
     } catch (e) {
       print('❌ Error creando tabla customers: $e');
+      // Si falla, intentar recrear la tabla
+      await forceRecreateCustomersTable();
+    }
+  }
+  
+  // ✅ NUEVO: Forzar recreación de tabla customers si hay problemas
+  static Future<void> forceRecreateCustomersTable() async {
+    try {
+      print('🔧 Forzando recreación de tabla customers...');
+      
+      // Eliminar tabla si existe
+      await _database!.execute('DROP TABLE IF EXISTS customers');
+      
+      // Crear tabla nueva
+      await _database!.execute('''
+        CREATE TABLE customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          address TEXT,
+          documentNumber TEXT,
+          documentType TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          isActive INTEGER NOT NULL DEFAULT 1,
+          pointsRate REAL NOT NULL DEFAULT 1.0,
+          accumulatedPoints INTEGER NOT NULL DEFAULT 0,
+          lastPurchase TEXT,
+          totalPurchases REAL NOT NULL DEFAULT 0.0
+        )
+      ''');
+      
+      print('✅ Tabla customers recreada exitosamente');
+    } catch (e) {
+      print('❌ Error crítico recreando tabla customers: $e');
+    }
+  }
+  
+  // ✅ NUEVO: Método público para verificar estado de la tabla customers
+  static Future<Map<String, dynamic>> getCustomersTableStatus() async {
+    try {
+      final result = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'"
+      );
+      
+      final exists = result.isNotEmpty;
+      
+      if (exists) {
+        // Verificar estructura de la tabla
+        final columns = await _database!.rawQuery('PRAGMA table_info(customers)');
+        final hasPointsRate = columns.any((col) => col['name'] == 'pointsRate');
+        final hasAccumulatedPoints = columns.any((col) => col['name'] == 'accumulatedPoints');
+        
+        return {
+          'exists': true,
+          'hasPointsRate': hasPointsRate,
+          'hasAccumulatedPoints': hasAccumulatedPoints,
+          'columns': columns.length,
+        };
+      }
+      
+      return {
+        'exists': false,
+        'hasPointsRate': false,
+        'hasAccumulatedPoints': false,
+        'columns': 0,
+      };
+    } catch (e) {
+      return {
+        'exists': false,
+        'error': e.toString(),
+        'hasPointsRate': false,
+        'hasAccumulatedPoints': false,
+        'columns': 0,
+      };
+    }
+  }
+
+  // ✅ FORZAR: Verificar que la tabla customers realmente existe
+  static Future<void> _forceVerifyCustomersTable() async {
+    try {
+      print('🔧 Forzando verificación de tabla customers...');
+      
+      // Verificar si la tabla customers ya existe
+      final result = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'"
+      );
+      
+      if (result.isNotEmpty) {
+        print('✅ Tabla customers ya existe');
+        return;
+      }
+      
+      print('🔧 Creando tabla customers...');
+      
+      // Crear SOLO la tabla customers sin tocar nada más
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS customers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          address TEXT,
+          documentNumber TEXT,
+          documentType TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          isActive INTEGER NOT NULL DEFAULT 1,
+          pointsRate REAL NOT NULL DEFAULT 1.0,
+          accumulatedPoints INTEGER NOT NULL DEFAULT 0,
+          lastPurchase TEXT,
+          totalPurchases REAL NOT NULL DEFAULT 0.0
+        )
+      ''');
+      
+      print('✅ Tabla customers creada exitosamente');
+    } catch (e) {
+      print('❌ Error forzando verificación de tabla customers: $e');
     }
   }
 } 

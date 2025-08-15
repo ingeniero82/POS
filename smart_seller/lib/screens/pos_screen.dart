@@ -476,6 +476,10 @@ class _PosScreenState extends State<PosScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
+          // ✅ NUEVO: Selección de cliente
+          _buildCustomerSelection(),
+          const SizedBox(height: 16),
+          
           // Totales
           _buildTotals(),
           const SizedBox(height: 16),
@@ -492,6 +496,104 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
   
+  // ✅ NUEVO: Widget para selección de cliente
+  Widget _buildCustomerSelection() {
+    return Card(
+      color: Colors.blue[50],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Cliente',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Obx(() {
+                  if (_posController.selectedCustomer.value != null) {
+                    return Row(
+                      children: [
+                        Text(
+                          '${_posController.selectedCustomer.value!.pointsRate} pts/\$1000',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: _posController.clearSelectedCustomer,
+                          icon: const Icon(Icons.close, size: 20),
+                          tooltip: 'Remover cliente',
+                        ),
+                      ],
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Obx(() {
+              if (_posController.selectedCustomer.value != null) {
+                final customer = _posController.selectedCustomer.value!;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    Text(
+                      customer.email,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    if (customer.documentNumber != null)
+                      Text(
+                        'Doc: ${customer.documentNumber}',
+                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                  ],
+                );
+              } else {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sin cliente seleccionado',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _posController.showCustomerSelectionModal,
+                        icon: const Icon(Icons.person_add),
+                        label: const Text('Seleccionar Cliente'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTotals() {
     return Card(
       color: Colors.orange[50],

@@ -11,8 +11,8 @@ class Customer {
   bool isActive = true;
   
   // Campos para fidelización
-  int points = 0;
-  String? membershipLevel; // bronze, silver, gold, platinum
+  double pointsRate = 1.0; // ✅ NUEVO: Tasa de puntos por cada $1000 (ej: 1.0 = 1 punto por $1000)
+  int accumulatedPoints = 0; // ✅ NUEVO: Puntos acumulados del cliente
   DateTime? lastPurchase;
   double totalPurchases = 0.0;
   
@@ -28,8 +28,8 @@ class Customer {
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
-    this.points = 0,
-    this.membershipLevel,
+    this.pointsRate = 1.0, // ✅ NUEVO: Tasa por defecto 1.0
+    this.accumulatedPoints = 0, // ✅ NUEVO: Puntos acumulados por defecto 0
     this.lastPurchase,
     this.totalPurchases = 0.0,
   });
@@ -46,8 +46,8 @@ class Customer {
     createdAt = DateTime.parse(map['createdAt']);
     updatedAt = DateTime.parse(map['updatedAt']);
     isActive = map['isActive'] == 1;
-    points = map['points'] ?? 0;
-    membershipLevel = map['membershipLevel'];
+    pointsRate = (map['pointsRate'] ?? 1.0).toDouble(); // ✅ NUEVO: Tasa de puntos
+    accumulatedPoints = map['accumulatedPoints'] ?? 0; // ✅ NUEVO: Puntos acumulados
     lastPurchase = map['lastPurchase'] != null 
         ? DateTime.parse(map['lastPurchase']) 
         : null;
@@ -67,8 +67,8 @@ class Customer {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive ? 1 : 0,
-      'points': points,
-      'membershipLevel': membershipLevel,
+      'pointsRate': pointsRate, // ✅ NUEVO: Tasa de puntos
+      'accumulatedPoints': accumulatedPoints, // ✅ NUEVO: Puntos acumulados
       'lastPurchase': lastPurchase?.toIso8601String(),
       'totalPurchases': totalPurchases,
     };
@@ -86,8 +86,8 @@ class Customer {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
-    int? points,
-    String? membershipLevel,
+    double? pointsRate, // ✅ NUEVO: Tasa de puntos
+    int? accumulatedPoints, // ✅ NUEVO: Puntos acumulados
     DateTime? lastPurchase,
     double? totalPurchases,
   }) {
@@ -102,28 +102,25 @@ class Customer {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
-      points: points ?? this.points,
-      membershipLevel: membershipLevel ?? this.membershipLevel,
+      pointsRate: pointsRate ?? this.pointsRate, // ✅ NUEVO: Tasa de puntos
+      accumulatedPoints: accumulatedPoints ?? this.accumulatedPoints, // ✅ NUEVO: Puntos acumulados
       lastPurchase: lastPurchase ?? this.lastPurchase,
       totalPurchases: totalPurchases ?? this.totalPurchases,
     );
   }
   
-  // Calcular nivel de membresía basado en puntos
-  String calculateMembershipLevel() {
-    if (points >= 1000) return 'platinum';
-    if (points >= 500) return 'gold';
-    if (points >= 200) return 'silver';
-    return 'bronze';
+  // ✅ NUEVO: Método para calcular puntos ganados en una venta
+  int calculatePointsEarned(double saleTotal) {
+    return ((saleTotal / 1000) * pointsRate).floor();
   }
   
-  // Agregar puntos por compra
-  void addPoints(double purchaseAmount) {
-    int pointsEarned = (purchaseAmount / 1000).round(); // 1 punto por cada $1000
-    points += pointsEarned;
-    membershipLevel = calculateMembershipLevel();
-    totalPurchases += purchaseAmount;
+  // ✅ NUEVO: Método para agregar puntos de una venta
+  void addPointsFromSale(double saleTotal) {
+    final pointsEarned = calculatePointsEarned(saleTotal);
+    accumulatedPoints += pointsEarned;
+    totalPurchases += saleTotal;
     lastPurchase = DateTime.now();
+    updatedAt = DateTime.now();
   }
 }
 

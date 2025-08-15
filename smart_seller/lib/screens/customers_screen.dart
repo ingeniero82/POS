@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../models/customer.dart';
 import '../services/sqlite_database_service.dart';
@@ -57,11 +58,58 @@ class _CustomersScreenState extends State<CustomersScreen> {
           IconButton(
             onPressed: _loadCustomers,
             icon: const Icon(Icons.refresh),
+            tooltip: 'Recargar clientes',
+          ),
+          IconButton(
+            onPressed: _debugRecreateTable,
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Debug: Estado de tabla',
           ),
         ],
       ),
       body: Column(
         children: [
+          // ✅ NUEVO: Indicador de estado de la tabla
+          FutureBuilder<Map<String, dynamic>>(
+            future: SQLiteDatabaseService.getCustomersTableStatus(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final status = snapshot.data!;
+                final hasError = !status['exists'] || !status['hasPointsRate'] || !status['hasAccumulatedPoints'];
+                
+                if (hasError) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning, color: Colors.orange.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Problema detectado con la tabla customers. Usa el botón de debug para solucionarlo.',
+                            style: TextStyle(color: Colors.orange.shade700),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _debugRecreateTable,
+                          child: const Text('SOLUCIONAR'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          
           // Barra de búsqueda
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -142,7 +190,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
-          backgroundColor: _getMembershipColor(customer.membershipLevel ?? 'bronze'),
+          backgroundColor: Colors.blue,
           child: Text(
             customer.name.substring(0, 1).toUpperCase(),
             style: const TextStyle(
@@ -179,21 +227,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
               children: [
                 Icon(Icons.star, size: 16, color: Colors.amber),
                 const SizedBox(width: 4),
-                Text('${customer.points} puntos'),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: _getMembershipColor(customer.membershipLevel ?? 'bronze'),
-                    borderRadius: BorderRadius.circular(12),
+                Text(
+                  '${customer.pointsRate == 1 ? '1 punto' : '${customer.pointsRate} puntos'} por \$1000',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.amber,
                   ),
-                  child: Text(
-                    customer.membershipLevel ?? 'bronze',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Icon(Icons.attach_money, size: 16, color: Colors.green.shade600),
+                const SizedBox(width: 4),
+                Text(
+                  'Total: \$${NumberFormat('#,###').format(customer.totalPurchases)}',
+                  style: TextStyle(
+                    color: Colors.green.shade700,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -251,18 +303,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
   
-  Color _getMembershipColor(String level) {
-    switch (level.toLowerCase()) {
-      case 'platinum':
-        return Colors.purple;
-      case 'gold':
-        return Colors.amber;
-      case 'silver':
-        return Colors.grey;
-      default:
-        return Colors.orange;
-    }
-  }
+
   
   void _showCustomerDialog({Customer? customer}) {
     final isEditing = customer != null;
@@ -271,6 +312,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final phoneController = TextEditingController(text: customer?.phone ?? '');
     final addressController = TextEditingController(text: customer?.address ?? '');
     final documentController = TextEditingController(text: customer?.documentNumber ?? '');
+    // ✅ NUEVO: Controlador para tasa de puntos
+    final pointsController = TextEditingController(text: customer?.pointsRate.toString() ?? '1.0');
     
     Get.dialog(
       AlertDialog(
@@ -321,6 +364,21 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   prefixIcon: Icon(Icons.badge),
                 ),
               ),
+              const SizedBox(height: 16),
+              // ✅ NUEVO: Campo para editar tasa de puntos
+              TextField(
+                controller: pointsController,
+                decoration: const InputDecoration(
+                  labelText: 'Tasa de Puntos',
+                  prefixIcon: Icon(Icons.star, color: Colors.amber),
+                  hintText: 'Puntos por cada \$1000 (ej: 1, 2, 0.5)',
+                  helperText: '1 = 1 punto por \$1000, 2 = 2 puntos por \$1000, 0.5 = 1 punto por \$2000',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^[0-9]*\.?[0-9]*$')),
+                ],
+              ),
             ],
           ),
         ),
@@ -339,6 +397,29 @@ class _CustomersScreenState extends State<CustomersScreen> {
               }
               
               try {
+                // ✅ NUEVO: Validar y convertir tasa de puntos
+                final pointsText = pointsController.text.trim();
+                if (pointsText.isEmpty) {
+                  Get.snackbar('Error', 'La tasa de puntos es obligatoria');
+                  return;
+                }
+                
+                final pointsRate = double.tryParse(pointsText);
+                if (pointsRate == null) {
+                  Get.snackbar('Error', 'La tasa de puntos debe ser un número válido (ej: 1, 0.5, 2)');
+                  return;
+                }
+                
+                if (pointsRate < 0) {
+                  Get.snackbar('Error', 'La tasa de puntos no puede ser negativa');
+                  return;
+                }
+                
+                if (pointsRate == 0) {
+                  Get.snackbar('Error', 'La tasa de puntos no puede ser 0');
+                  return;
+                }
+                
                 if (isEditing) {
                   await SQLiteDatabaseService.updateCustomer(
                     customer!.copyWith(
@@ -347,6 +428,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       phone: phoneController.text,
                       address: addressController.text.isEmpty ? null : addressController.text,
                       documentNumber: documentController.text.isEmpty ? null : documentController.text,
+                      pointsRate: pointsRate, // ✅ NUEVO: Incluir tasa de puntos
                       updatedAt: DateTime.now(),
                     ),
                   );
@@ -358,6 +440,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       phone: phoneController.text,
                       address: addressController.text.isEmpty ? null : addressController.text,
                       documentNumber: documentController.text.isEmpty ? null : documentController.text,
+                      pointsRate: pointsRate, // ✅ NUEVO: Incluir tasa de puntos
                       createdAt: DateTime.now(),
                       updatedAt: DateTime.now(),
                     ),
@@ -397,12 +480,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 _buildDetailRow('Dirección', customer.address!),
               if (customer.documentNumber != null)
                 _buildDetailRow('Documento', customer.documentNumber!),
-              _buildDetailRow('Puntos', '${customer.points}'),
-              _buildDetailRow('Nivel', customer.membershipLevel ?? 'bronze'),
+              _buildDetailRow('Tasa de Puntos', '${customer.pointsRate == 1 ? '1 punto' : '${customer.pointsRate} puntos'} por cada \$1000'),
+              _buildDetailRow('Puntos Acumulados', '${customer.accumulatedPoints}'),
               _buildDetailRow('Total compras', '\$${NumberFormat('#,###').format(customer.totalPurchases)}'),
               if (customer.lastPurchase != null)
-                _buildDetailRow('Última compra', DateFormat('dd/MM/yyyy').format(customer.lastPurchase!)),
-              _buildDetailRow('Fecha registro', DateFormat('dd/MM/yyyy').format(customer.createdAt)),
+                _buildDetailRow('Última compra', DateFormat('dd/MM/yyyy HH:mm').format(customer.lastPurchase!)),
+              _buildDetailRow('Fecha registro', DateFormat('dd/MM/yyyy HH:mm').format(customer.createdAt)),
+              _buildDetailRow('Última actualización', DateFormat('dd/MM/yyyy HH:mm').format(customer.updatedAt)),
             ],
           ),
         ),
@@ -462,5 +546,70 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ],
       ),
     );
+  }
+  
+  // ✅ NUEVO: Función de debug para recrear tabla customers
+  Future<void> _debugRecreateTable() async {
+    try {
+      // Primero verificar el estado actual de la tabla
+      final status = await SQLiteDatabaseService.getCustomersTableStatus();
+      
+      String message = 'Estado actual de la tabla customers:\n\n';
+      message += '• Existe: ${status['exists'] ? 'SÍ' : 'NO'}\n';
+      message += '• Columnas: ${status['columns']}\n';
+      message += '• Tiene pointsRate: ${status['hasPointsRate'] ? 'SÍ' : 'NO'}\n';
+      message += '• Tiene accumulatedPoints: ${status['hasAccumulatedPoints'] ? 'SÍ' : 'NO'}\n';
+      
+      if (status['error'] != null) {
+        message += '• Error: ${status['error']}\n';
+      }
+      
+      message += '\n¿Qué acción deseas realizar?';
+      
+      Get.dialog(
+        AlertDialog(
+          title: const Text('Debug: Estado de Tabla Customers'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('Cancelar'),
+            ),
+            if (!status['exists'] || !status['hasPointsRate'] || !status['hasAccumulatedPoints'])
+              ElevatedButton(
+                onPressed: () async {
+                  Get.back();
+                  try {
+                    await SQLiteDatabaseService.forceRecreateCustomersTable();
+                    Get.snackbar('Éxito', 'Tabla customers recreada correctamente');
+                    _loadCustomers();
+                  } catch (e) {
+                    Get.snackbar('Error', 'Error recreando tabla: $e');
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text('Recrear Tabla'),
+              ),
+            if (status['exists'])
+              ElevatedButton(
+                onPressed: () async {
+                  Get.back();
+                  try {
+                    await SQLiteDatabaseService.ensureCustomersTableExists();
+                    Get.snackbar('Éxito', 'Tabla customers verificada');
+                    _loadCustomers();
+                  } catch (e) {
+                    Get.snackbar('Error', 'Error verificando tabla: $e');
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                child: const Text('Verificar Tabla'),
+              ),
+          ],
+        ),
+      );
+    } catch (e) {
+      Get.snackbar('Error', 'Error en debug: $e');
+    }
   }
 } 
