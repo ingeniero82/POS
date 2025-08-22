@@ -185,6 +185,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
         return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
+      case UserRole.maintenance:
+        return 'Mantenimiento';
     }
   }
 

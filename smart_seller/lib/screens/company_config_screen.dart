@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../models/company_config.dart';
 import '../services/company_config_service.dart';
+import '../services/permissions_service.dart';
+import '../services/auth_service.dart';
+import '../models/permissions.dart';
+import '../models/user.dart';
 
 class CompanyConfigScreen extends StatefulWidget {
   const CompanyConfigScreen({super.key});
@@ -118,12 +122,67 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ VERIFICAR PERMISOS DE ACCESO
+    final permissionsService = Get.find<PermissionsService>();
+    final currentUser = Get.find<AuthService>().currentUser;
+    if (currentUser == null || !permissionsService.hasPermission(currentUser.role, Permission.accessCompanyConfig)) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Acceso Denegado'),
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock, size: 64, color: Colors.red),
+              SizedBox(height: 16),
+              Text(
+                'Acceso Denegado',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'No tienes permisos para acceder a la configuración de empresa.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Solo usuarios con rol de mantenimiento pueden modificar estos datos.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Configuración de Empresa'),
         backgroundColor: const Color(0xFF2196F3),
         foregroundColor: Colors.white,
         actions: [
+          // ✅ INDICADOR DE ROL DE MANTENIMIENTO
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Text(
+              'MANTENIMIENTO',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           IconButton(
             onPressed: _saveConfig,
             icon: const Icon(Icons.save),

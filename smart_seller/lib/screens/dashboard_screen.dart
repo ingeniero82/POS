@@ -127,6 +127,8 @@ class DashboardScreen extends StatelessWidget {
                           selected: controller.selectedMenu.value == DashboardMenu.permisos,
                           onTap: () => controller.selectMenu(DashboardMenu.permisos),
                         ),
+                      
+
 
                     ],
                   ),

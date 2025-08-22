@@ -14,6 +14,9 @@ import 'screens/groups_screen.dart';
 
 
 import 'modules/electronic_invoicing/screens/electronic_invoice_screen.dart';
+import 'modules/electronic_invoicing/screens/system_configuration_screen.dart';
+import 'modules/electronic_invoicing/screens/invoice_status_screen.dart';
+import 'modules/electronic_invoicing/screens/pending_invoice_queue_screen.dart';
 import 'services/sqlite_database_service.dart';
 import 'middleware/auth_middleware.dart';
 import 'services/auth_service.dart';
@@ -158,6 +161,22 @@ class MyApp extends StatelessWidget {
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         
+        // Rutas del módulo de facturación electrónica
+        GetPage(
+          name: '/electronic-invoicing/system-config', 
+          page: () => const SystemConfigurationScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/electronic-invoicing/status', 
+          page: () => const InvoiceStatusScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/electronic-invoicing/queue', 
+          page: () => const PendingInvoiceQueueScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
 
       ],
     );

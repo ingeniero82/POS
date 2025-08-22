@@ -390,6 +390,8 @@ class _AuthorizationCodesScreenState extends State<AuthorizationCodesScreen> {
         return Colors.purple;
       case UserRole.cashier:
         return Colors.blue;
+      case UserRole.maintenance:
+        return Colors.orange; // Color naranja para mantenimiento
     }
   }
 
@@ -403,6 +405,8 @@ class _AuthorizationCodesScreenState extends State<AuthorizationCodesScreen> {
         return Icons.supervisor_account;
       case UserRole.cashier:
         return Icons.point_of_sale;
+      case UserRole.maintenance:
+        return Icons.build; // Icono de herramientas para mantenimiento
     }
   }
 
@@ -416,6 +420,8 @@ class _AuthorizationCodesScreenState extends State<AuthorizationCodesScreen> {
         return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
+      case UserRole.maintenance:
+        return 'Mantenimiento';
     }
   }
 

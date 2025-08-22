@@ -209,6 +209,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
         return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
+      case UserRole.maintenance:
+        return 'Mantenimiento';
     }
   }
 

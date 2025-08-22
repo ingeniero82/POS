@@ -76,6 +76,8 @@ class AuthService extends GetxService {
         return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
+      case UserRole.maintenance:
+        return 'Mantenimiento';
     }
   }
   

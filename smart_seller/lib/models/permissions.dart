@@ -37,6 +37,12 @@ enum Permission {
   accessSettings,
   modifySettings,
   
+  // Mantenimiento del sistema
+  accessCompanyConfig, // Acceder a configuración de empresa
+  modifyCompanyConfig, // Modificar configuración de empresa
+  accessSystemConfig, // Acceder a configuración del sistema
+  modifySystemConfig, // Modificar configuración del sistema
+  
   // Dashboard
   accessDashboard,
   
@@ -168,6 +174,15 @@ class RolePermissions {
       Permission.changeCartQuantity, // Puede cambiar cantidad con autorización
       // NO tiene removeCartItem, modifyCartPrice ni reprintInvoices - requiere autorización
     },
+    
+    UserRole.maintenance: {
+      // Rol de mantenimiento - Solo acceso a configuración del sistema
+      Permission.accessCompanyConfig,
+      Permission.modifyCompanyConfig,
+      Permission.accessSystemConfig,
+      Permission.modifySystemConfig,
+      Permission.accessDashboard, // Para ver el estado del sistema
+    },
   };
   
   // Verificar si un rol tiene un permiso específico
@@ -201,6 +216,10 @@ class RolePermissions {
         return hasPermission(role, Permission.viewMovements);
       case 'ventas':
         return hasPermission(role, Permission.viewSalesHistory);
+      case 'configuracion-empresa':
+        return hasPermission(role, Permission.accessCompanyConfig);
+      case 'configuracion-sistema':
+        return hasPermission(role, Permission.accessSystemConfig);
       default:
         return false;
     }
@@ -275,6 +294,14 @@ class RolePermissions {
         return 'Modificar precio en carrito';
       case Permission.reprintInvoices:
         return 'Reimprimir facturas';
+      case Permission.accessCompanyConfig:
+        return 'Acceder a configuración de empresa';
+      case Permission.modifyCompanyConfig:
+        return 'Modificar configuración de empresa';
+      case Permission.accessSystemConfig:
+        return 'Acceder a configuración del sistema';
+      case Permission.modifySystemConfig:
+        return 'Modificar configuración del sistema';
     }
   }
 } 

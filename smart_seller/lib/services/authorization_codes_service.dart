@@ -73,6 +73,13 @@ class AuthorizationCodesService {
       name: 'Supervisor',
       createdAt: DateTime.now(),
     ),
+    AuthorizationCode(
+      code: 'MAINT001',
+      barcode: 'MAINT001234567',
+      role: UserRole.maintenance,
+      name: 'Usuario de Mantenimiento',
+      createdAt: DateTime.now(),
+    ),
   ];
 
   // Generar código aleatorio

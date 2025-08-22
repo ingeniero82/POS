@@ -16,4 +16,5 @@ enum UserRole {
   cashier,
   manager,
   supervisor,
+  maintenance, // Nuevo rol para mantenimiento del sistema
 } 

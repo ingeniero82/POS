@@ -357,6 +357,8 @@ class _UsersScreenState extends State<UsersScreen> {
         return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
+      case UserRole.maintenance:
+        return 'Mantenimiento';
     }
   }
 
@@ -669,6 +671,8 @@ class _UserCard extends StatelessWidget {
         return 'Supervisor';
       case UserRole.cashier:
         return 'Cajero';
+      case UserRole.maintenance:
+        return 'Mantenimiento';
     }
   }
 
@@ -682,6 +686,8 @@ class _UserCard extends StatelessWidget {
         return Colors.purple;
       case UserRole.cashier:
         return Colors.blue;
+      case UserRole.maintenance:
+        return Colors.orange; // Color naranja para mantenimiento
     }
   }
 
