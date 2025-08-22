@@ -8,6 +8,17 @@ class CompanyConfig {
   final String? taxId; // NIT o RUT
   final String headerText;
   final String footerText;
+  
+  // ✅ NUEVOS CAMPOS PARA FACTURACIÓN ELECTRÓNICA
+  final String? documentType; // Tipo de documento (31 = NIT)
+  final String? nitNumber; // Número de NIT sin guión ni puntos
+  final String? verificationDigit; // DV (Dígito de Verificación)
+  final String? city; // Ciudad
+  final String? department; // Departamento
+  final String? country; // País
+  final String? fiscalRegime; // Régimen fiscal (común, simplificado, etc.)
+  final String? fiscalResponsibilities; // Responsabilidades fiscales (O-13, I-23, etc.)
+  
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +32,15 @@ class CompanyConfig {
     this.taxId,
     required this.headerText,
     required this.footerText,
+    // ✅ NUEVOS CAMPOS
+    this.documentType,
+    this.nitNumber,
+    this.verificationDigit,
+    this.city,
+    this.department,
+    this.country,
+    this.fiscalRegime,
+    this.fiscalResponsibilities,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -36,6 +56,15 @@ class CompanyConfig {
       'tax_id': taxId,
       'header_text': headerText,
       'footer_text': footerText,
+      // ✅ NUEVOS CAMPOS
+      'document_type': documentType,
+      'nit_number': nitNumber,
+      'verification_digit': verificationDigit,
+      'city': city,
+      'department': department,
+      'country': country,
+      'fiscal_regime': fiscalRegime,
+      'fiscal_responsibilities': fiscalResponsibilities,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -52,6 +81,15 @@ class CompanyConfig {
       taxId: map['tax_id'],
       headerText: map['header_text'] ?? 'FACTURA DE VENTA',
       footerText: map['footer_text'] ?? 'Gracias por su compra',
+      // ✅ NUEVOS CAMPOS
+      documentType: map['document_type'],
+      nitNumber: map['nit_number'],
+      verificationDigit: map['verification_digit'],
+      city: map['city'],
+      department: map['department'],
+      country: map['country'],
+      fiscalRegime: map['fiscal_regime'],
+      fiscalResponsibilities: map['fiscal_responsibilities'],
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
     );
@@ -67,6 +105,15 @@ class CompanyConfig {
     String? taxId,
     String? headerText,
     String? footerText,
+    // ✅ NUEVOS CAMPOS
+    String? documentType,
+    String? nitNumber,
+    String? verificationDigit,
+    String? city,
+    String? department,
+    String? country,
+    String? fiscalRegime,
+    String? fiscalResponsibilities,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -80,6 +127,15 @@ class CompanyConfig {
       taxId: taxId ?? this.taxId,
       headerText: headerText ?? this.headerText,
       footerText: footerText ?? this.footerText,
+      // ✅ NUEVOS CAMPOS
+      documentType: documentType ?? this.documentType,
+      nitNumber: nitNumber ?? this.nitNumber,
+      verificationDigit: verificationDigit ?? this.verificationDigit,
+      city: city ?? this.city,
+      department: department ?? this.department,
+      country: country ?? this.country,
+      fiscalRegime: fiscalRegime ?? this.fiscalRegime,
+      fiscalResponsibilities: fiscalResponsibilities ?? this.fiscalResponsibilities,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

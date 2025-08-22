@@ -238,14 +238,55 @@ class SQLiteDatabaseService {
             tax_id TEXT,
             header_text TEXT NOT NULL,
             footer_text TEXT NOT NULL,
+            document_type TEXT,
+            nit_number TEXT,
+            verification_digit TEXT,
+            city TEXT,
+            department TEXT,
+            country TEXT,
+            fiscal_regime TEXT,
+            fiscal_responsibilities TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
           )
         ''');
         print('✅ Tabla company_config creada');
       } else {
-        print('✅ Tabla company_config ya existe, saltando creación');
+        print('✅ Tabla company_config ya existe, verificando columnas...');
+        // Verificar si necesitamos agregar las nuevas columnas para facturación electrónica
+        await _migrateCompanyConfigTable(db);
       }
+    }
+  }
+  
+  // Migrar tabla company_config para agregar campos de facturación electrónica
+  static Future<void> _migrateCompanyConfigTable(Database db) async {
+    try {
+      // Lista de nuevas columnas a agregar
+      final newColumns = [
+        'document_type',
+        'nit_number', 
+        'verification_digit',
+        'city',
+        'department',
+        'country',
+        'fiscal_regime',
+        'fiscal_responsibilities'
+      ];
+      
+      // Verificar cada columna y agregarla si no existe
+      for (final column in newColumns) {
+        try {
+          await db.execute('ALTER TABLE company_config ADD COLUMN $column TEXT');
+          print('✅ Columna $column agregada a company_config');
+        } catch (e) {
+          // La columna ya existe, continuar
+          print('ℹ️ Columna $column ya existe en company_config');
+        }
+      }
+      print('✅ Migración de company_config completada');
+    } catch (e) {
+      print('❌ Error en migración de company_config: $e');
     }
   }
   

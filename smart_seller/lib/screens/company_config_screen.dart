@@ -21,6 +21,16 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
   final _headerTextController = TextEditingController();
   final _footerTextController = TextEditingController();
   
+  // ✅ NUEVOS CONTROLADORES PARA FACTURACIÓN ELECTRÓNICA
+  final _documentTypeController = TextEditingController();
+  final _nitNumberController = TextEditingController();
+  final _verificationDigitController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _countryController = TextEditingController();
+  final _fiscalRegimeController = TextEditingController();
+  final _fiscalResponsibilitiesController = TextEditingController();
+  
   bool _isLoading = true;
   CompanyConfig? _currentConfig;
 
@@ -43,6 +53,16 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
         _taxIdController.text = config.taxId ?? '';
         _headerTextController.text = config.headerText;
         _footerTextController.text = config.footerText;
+        
+        // ✅ CARGAR NUEVOS CAMPOS DE FACTURACIÓN ELECTRÓNICA
+        _documentTypeController.text = config.documentType ?? '31'; // Por defecto NIT
+        _nitNumberController.text = config.nitNumber ?? '';
+        _verificationDigitController.text = config.verificationDigit ?? '';
+        _cityController.text = config.city ?? '';
+        _departmentController.text = config.department ?? '';
+        _countryController.text = config.country ?? 'CO'; // Por defecto Colombia
+        _fiscalRegimeController.text = config.fiscalRegime ?? '';
+        _fiscalResponsibilitiesController.text = config.fiscalResponsibilities ?? '';
         _isLoading = false;
       });
     } catch (e) {
@@ -67,6 +87,15 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
         taxId: _taxIdController.text.trim().isEmpty ? null : _taxIdController.text.trim(),
         headerText: _headerTextController.text.trim(),
         footerText: _footerTextController.text.trim(),
+        // ✅ NUEVOS CAMPOS DE FACTURACIÓN ELECTRÓNICA
+        documentType: _documentTypeController.text.trim().isEmpty ? null : _documentTypeController.text.trim(),
+        nitNumber: _nitNumberController.text.trim().isEmpty ? null : _nitNumberController.text.trim(),
+        verificationDigit: _verificationDigitController.text.trim().isEmpty ? null : _verificationDigitController.text.trim(),
+        city: _cityController.text.trim().isEmpty ? null : _cityController.text.trim(),
+        department: _departmentController.text.trim().isEmpty ? null : _departmentController.text.trim(),
+        country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
+        fiscalRegime: _fiscalRegimeController.text.trim().isEmpty ? null : _fiscalRegimeController.text.trim(),
+        fiscalResponsibilities: _fiscalResponsibilitiesController.text.trim().isEmpty ? null : _fiscalResponsibilitiesController.text.trim(),
         createdAt: _currentConfig?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -205,6 +234,170 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // ✅ NUEVA SECCIÓN: DATOS PARA FACTURACIÓN ELECTRÓNICA
+                  const Text(
+                    'Datos para Facturación Electrónica DIAN',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Tipo de documento
+                  TextFormField(
+                    controller: _documentTypeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de Documento *',
+                      prefixIcon: Icon(Icons.description),
+                      border: OutlineInputBorder(),
+                      helperText: '31 = NIT (obligatorio para facturación electrónica)',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'El tipo de documento es obligatorio para facturación electrónica';
+                      }
+                      if (value != '31') {
+                        return 'Para facturación electrónica debe ser 31 (NIT)';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Número de NIT
+                  TextFormField(
+                    controller: _nitNumberController,
+                    decoration: const InputDecoration(
+                      labelText: 'Número de NIT *',
+                      prefixIcon: Icon(Icons.numbers),
+                      border: OutlineInputBorder(),
+                      helperText: 'Solo números, sin guión ni puntos',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'El número de NIT es obligatorio para facturación electrónica';
+                      }
+                      if (!RegExp(r'^\d+$').hasMatch(value)) {
+                        return 'Solo debe contener números';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Dígito de verificación
+                  TextFormField(
+                    controller: _verificationDigitController,
+                    decoration: const InputDecoration(
+                      labelText: 'DV (Dígito de Verificación) *',
+                      prefixIcon: Icon(Icons.verified),
+                      border: OutlineInputBorder(),
+                      helperText: 'Dígito de verificación del NIT',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'El dígito de verificación es obligatorio para facturación electrónica';
+                      }
+                      if (!RegExp(r'^\d+$').hasMatch(value)) {
+                        return 'Solo debe contener números';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Ciudad
+                  TextFormField(
+                    controller: _cityController,
+                    decoration: const InputDecoration(
+                      labelText: 'Ciudad *',
+                      prefixIcon: Icon(Icons.location_city),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'La ciudad es obligatoria para facturación electrónica';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Departamento
+                  TextFormField(
+                    controller: _departmentController,
+                    decoration: const InputDecoration(
+                      labelText: 'Departamento *',
+                      prefixIcon: Icon(Icons.map),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'El departamento es obligatorio para facturación electrónica';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // País
+                  TextFormField(
+                    controller: _countryController,
+                    decoration: const InputDecoration(
+                      labelText: 'País *',
+                      prefixIcon: Icon(Icons.public),
+                      border: OutlineInputBorder(),
+                      helperText: 'Código de país (ej: CO para Colombia)',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'El país es obligatorio para facturación electrónica';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Régimen fiscal
+                  TextFormField(
+                    controller: _fiscalRegimeController,
+                    decoration: const InputDecoration(
+                      labelText: 'Régimen Fiscal *',
+                      prefixIcon: Icon(Icons.account_balance),
+                      border: OutlineInputBorder(),
+                      helperText: 'Común, simplificado, etc.',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'El régimen fiscal es obligatorio para facturación electrónica';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Responsabilidades fiscales
+                  TextFormField(
+                    controller: _fiscalResponsibilitiesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Responsabilidades Fiscales *',
+                      prefixIcon: Icon(Icons.receipt_long),
+                      border: OutlineInputBorder(),
+                      helperText: 'O-13, I-23, etc. (separadas por coma)',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Las responsabilidades fiscales son obligatorias para facturación electrónica';
+                      }
+                      return null;
+                    },
+                  ),
                   const SizedBox(height: 24),
                   
                   const Text(
@@ -333,6 +526,17 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
     _taxIdController.dispose();
     _headerTextController.dispose();
     _footerTextController.dispose();
+    
+    // ✅ DISPOSE DE NUEVOS CONTROLADORES
+    _documentTypeController.dispose();
+    _nitNumberController.dispose();
+    _verificationDigitController.dispose();
+    _cityController.dispose();
+    _departmentController.dispose();
+    _countryController.dispose();
+    _fiscalRegimeController.dispose();
+    _fiscalResponsibilitiesController.dispose();
+    
     super.dispose();
   }
 } 

@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import '../models/sale.dart';
 import '../models/product.dart';
 import '../models/customer.dart';
+import '../models/client.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/auth_service.dart';
+import '../services/client_validation_service.dart';
 
 import '../services/print_service.dart';
 import 'package:intl/intl.dart';
@@ -37,6 +39,12 @@ class PosController extends GetxController {
   var isSearchingCustomer = false.obs;
   var customerSearchResults = <Customer>[].obs;
   var customerSearchQuery = ''.obs;
+  
+  // ✅ NUEVO: Variables para gestión de clientes de facturación electrónica
+  var selectedClient = Rxn<Client>();
+  var isSearchingClient = false.obs;
+  var clientSearchResults = <Client>[].obs;
+  var clientSearchQuery = ''.obs;
 
   @override
   void onInit() {
@@ -93,6 +101,95 @@ class PosController extends GetxController {
       'No hay cliente seleccionado',
       duration: const Duration(seconds: 1),
     );
+  }
+  
+  // ✅ NUEVO: Método para buscar clientes de facturación electrónica
+  Future<void> searchClients(String query) async {
+    if (query.trim().isEmpty) {
+      clientSearchResults.clear();
+      return;
+    }
+    
+    try {
+      isSearchingClient.value = true;
+      // Por ahora simulamos la búsqueda, en el futuro se conectará con la base de datos
+      final allClients = await _getAllClients();
+      
+      // Filtrar por nombre, email, documento o teléfono
+      final filtered = allClients.where((client) {
+        final searchLower = query.toLowerCase();
+        return client.businessName.toLowerCase().contains(searchLower) ||
+               (client.email?.toLowerCase().contains(searchLower) ?? false) ||
+               client.documentNumber.toLowerCase().contains(searchLower) ||
+               (client.phone?.contains(query) ?? false);
+      }).toList();
+      
+      clientSearchResults.value = filtered;
+    } catch (e) {
+      print('Error buscando clientes: $e');
+      clientSearchResults.clear();
+    } finally {
+      isSearchingClient.value = false;
+    }
+  }
+  
+  // ✅ NUEVO: Método para seleccionar cliente de facturación electrónica
+  void selectClient(Client client) {
+    selectedClient.value = client;
+    Get.back(); // Cerrar modal de búsqueda
+    Get.snackbar(
+      'Cliente seleccionado',
+      '${client.businessName} (${client.documentType} ${client.documentNumber})',
+      duration: const Duration(seconds: 2),
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+    );
+  }
+  
+  // ✅ NUEVO: Método para limpiar cliente seleccionado
+  void clearSelectedClient() {
+    selectedClient.value = null;
+    Get.snackbar(
+      'Cliente removido',
+      'No hay cliente seleccionado para facturación electrónica',
+      duration: const Duration(seconds: 1),
+    );
+  }
+  
+  // ✅ NUEVO: Método temporal para obtener clientes (simulado)
+  Future<List<Client>> _getAllClients() async {
+    // Simular delay de base de datos
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    // Retornar clientes de ejemplo
+    return [
+      Client(
+        documentType: 'CC',
+        documentNumber: '123456789',
+        businessName: 'Juan Pérez',
+        email: 'juan.perez@email.com',
+        phone: '3001234567',
+        address: 'Calle 123 #45-67',
+        city: 'Bogotá',
+        department: 'Cundinamarca',
+        fiscalResponsibility: 'Responsable de IVA',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      Client(
+        documentType: 'NIT',
+        documentNumber: '900123456-7',
+        businessName: 'Empresa ABC Ltda',
+        email: 'contacto@empresaabc.com',
+        phone: '6012345678',
+        address: 'Carrera 78 #90-12',
+        city: 'Bogotá',
+        department: 'Cundinamarca',
+        fiscalResponsibility: 'Responsable de IVA',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    ];
   }
   
   // ✅ NUEVO: Método para mostrar modal de selección de cliente
@@ -362,6 +459,9 @@ class PosController extends GetxController {
   double get total {
     return subtotal + taxes;
   }
+  
+  // ✅ NUEVO: Getter para obtener el cliente actual
+  Client? get currentClient => selectedClient.value;
   
   // ✅ NUEVA FUNCIÓN: Forzar limpieza de focus después de completar venta
   void _forceFocusCleanup() {

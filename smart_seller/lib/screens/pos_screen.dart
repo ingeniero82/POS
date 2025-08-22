@@ -14,6 +14,10 @@ import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 
 import '../modules/electronic_invoicing/controllers/electronic_invoice_controller.dart';
+import '../services/client_validation_service.dart';
+import '../models/client.dart';
+import '../modules/electronic_invoicing/services/system_configuration_service.dart';
+import '../modules/electronic_invoicing/models/system_configuration.dart';
 
 import 'package:intl/intl.dart';
 
@@ -476,8 +480,12 @@ class _PosScreenState extends State<PosScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // ✅ NUEVO: Selección de cliente
+          // ✅ NUEVO: Selección de cliente del sistema
           _buildCustomerSelection(),
+          const SizedBox(height: 16),
+          
+          // ✅ NUEVO: Cliente para facturación electrónica
+          _buildElectronicInvoiceClient(),
           const SizedBox(height: 16),
           
           // Totales
@@ -509,7 +517,7 @@ class _PosScreenState extends State<PosScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Cliente',
+                  'Cliente del Sistema',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Obx(() {
@@ -580,6 +588,123 @@ class _PosScreenState extends State<PosScreen> {
                         label: const Text('Seleccionar Cliente'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // ✅ NUEVO: Widget para cliente de facturación electrónica
+  Widget _buildElectronicInvoiceClient() {
+    return Card(
+      color: Colors.green[50],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Cliente Facturación Electrónica',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Obx(() {
+                  if (_posController.currentClient != null) {
+                    final validationSummary = ClientValidationService.getClientValidationSummary(_posController.currentClient!);
+                    final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
+                    
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: canReceiveInvoice ? Colors.green[100] : Colors.red[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        canReceiveInvoice ? '✅ Válido' : '❌ Incompleto',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: canReceiveInvoice ? Colors.green[800] : Colors.red[800],
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Obx(() {
+              if (_posController.currentClient != null) {
+                final client = _posController.currentClient!;
+                final validationSummary = ClientValidationService.getClientValidationSummary(client);
+                final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
+                final missingFields = validationSummary['missingFields'] as List<String>;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      client.businessName,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: canReceiveInvoice ? Colors.green[800] : Colors.red[800],
+                      ),
+                    ),
+                    Text(
+                      '${client.documentType} ${client.documentNumber}',
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    Text(
+                      '${client.email ?? 'Sin email'}',
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    if (client.city != null && client.department != null)
+                      Text(
+                        '${client.city}, ${client.department}',
+                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                    if (!canReceiveInvoice && missingFields.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Faltan: ${missingFields.join(', ')}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red[700],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              } else {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sin cliente para facturación electrónica',
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _showClientSelectionDialog,
+                        icon: const Icon(Icons.person_add),
+                        label: const Text('Seleccionar Cliente'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -767,6 +892,54 @@ class _PosScreenState extends State<PosScreen> {
                 ),
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        
+        // ✅ NUEVO: Fila de botones secundarios
+        Row(
+          children: [
+            Expanded(
+              child: Obx(() => ElevatedButton.icon(
+                onPressed: _showClientSelectionDialog,
+                icon: Icon(
+                  _posController.currentClient != null ? Icons.person : Icons.person_add,
+                  color: _posController.currentClient != null ? Colors.white : Colors.blue[700],
+                ),
+                label: Text(
+                  _posController.currentClient != null 
+                      ? 'Cliente: ${_posController.currentClient!.businessName}'
+                      : 'Seleccionar Cliente',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _posController.currentClient != null ? Colors.white : Colors.blue[700],
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _posController.currentClient != null ? Colors.blue : Colors.blue[50],
+                  foregroundColor: _posController.currentClient != null ? Colors.white : Colors.blue[700],
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+              )),
+            ),
+            if (_posController.currentClient != null) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    _posController.clearSelectedClient();
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.clear, size: 16),
+                  label: const Text('Limpiar Cliente', style: TextStyle(fontSize: 12)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ],
@@ -1140,21 +1313,257 @@ class _PosScreenState extends State<PosScreen> {
 
   
   void _showPaymentOptionsDialog() {
+    // Obtener información del cliente actual si existe
+    final currentClient = _posController.currentClient;
+    final clientValidationSummary = currentClient != null 
+        ? ClientValidationService.getClientValidationSummary(currentClient)
+        : null;
+    
+    // Verificar si el cliente puede recibir facturación electrónica
+    final canReceiveElectronicInvoice = clientValidationSummary?['canReceiveElectronicInvoice'] as bool? ?? false;
+    final missingFields = clientValidationSummary?['missingFields'] as List<String>? ?? [];
+    
+
+    
     Get.dialog(
       AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.payment, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Finalizar Venta'),
-          ],
-        ),
-        content: const Column(
+            title: const Row(
+              children: [
+                Icon(Icons.payment, color: Colors.blue),
+                SizedBox(width: 12),
+                Text('Finalizar Venta'),
+              ],
+            ),
+            content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Selecciona el tipo de facturación:',
               style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            
+            // Información del cliente actual
+            if (currentClient != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person,
+                          color: Colors.blue[700],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Cliente Seleccionado:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('${currentClient.businessName} (${currentClient.documentType} ${currentClient.documentNumber})'),
+                    Text('${currentClient.email}'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            
+            // Estado de validación del cliente para facturación electrónica
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: canReceiveElectronicInvoice ? Colors.green.shade50 : Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: canReceiveElectronicInvoice ? Colors.green : Colors.red,
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        canReceiveElectronicInvoice ? Icons.check_circle : Icons.error,
+                        color: canReceiveElectronicInvoice ? Colors.green : Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        canReceiveElectronicInvoice 
+                            ? '✅ Cliente válido para facturación electrónica'
+                            : '❌ Cliente incompleto para facturación electrónica',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: canReceiveElectronicInvoice ? Colors.green.shade800 : Colors.red.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!canReceiveElectronicInvoice && missingFields.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Campos faltantes: ${missingFields.join(', ')}',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Get.back();
+                            _showClientSelectionDialog();
+                          },
+                          icon: const Icon(Icons.person_add),
+                          label: const Text('Seleccionar Cliente'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                        ),
+                      ),
+                      if (currentClient != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              _posController.clearSelectedClient();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.clear),
+                            label: const Text('Limpiar'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // ✅ NUEVO: Información de configuración del sistema
+            FutureBuilder<SystemConfiguration>(
+              future: SystemConfigurationService.getConfiguration(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red, width: 1),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '❌ Configuración del sistema no disponible',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                final config = snapshot.data!;
+                final hasValidConfig = config.dianResolutionNumber.isNotEmpty &&
+                                    config.softwareId.isNotEmpty &&
+                                    config.softwarePin.isNotEmpty;
+                
+
+                
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: hasValidConfig ? Colors.blue.shade50 : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: hasValidConfig ? Colors.blue : Colors.orange,
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            hasValidConfig ? Icons.settings : Icons.warning,
+                            color: hasValidConfig ? Colors.blue : Colors.orange,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            hasValidConfig 
+                                ? '✅ Configuración del sistema válida'
+                                : '⚠️ Configuración del sistema incompleta',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: hasValidConfig ? Colors.blue.shade800 : Colors.orange.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (hasValidConfig) ...[
+                        Text('Resolución DIAN: ${config.dianResolutionNumber}'),
+                        Text('Software ID: ${config.softwareId}'),
+                        Text('Ambiente: ${config.environment}'),
+                        Text('Prefijo: ${config.invoicePrefix}'),
+                        Text('Consecutivo: ${config.currentConsecutive}'),
+                      ] else ...[
+                        Text(
+                          'Para facturación electrónica necesitas configurar:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text('• Número de resolución DIAN'),
+                        Text('• ID del software'),
+                        Text('• PIN del software'),
+                        Text('• Ambiente (Pruebas/Producción)'),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -1178,14 +1587,16 @@ class _PosScreenState extends State<PosScreen> {
           ),
           const SizedBox(width: 8),
           ElevatedButton.icon(
-            onPressed: () {
+            onPressed: canReceiveElectronicInvoice ? () {
               Get.back();
               _openElectronicInvoiceModal();
-            },
+            } : null,
             icon: const Icon(Icons.description),
-            label: const Text('Facturación Electrónica'),
+            label: Text(canReceiveElectronicInvoice 
+                ? 'Facturación Electrónica' 
+                : 'Facturación Electrónica (Cliente Incompleto)'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: canReceiveElectronicInvoice ? Colors.blue : Colors.grey,
               foregroundColor: Colors.white,
             ),
           ),
@@ -1213,12 +1624,12 @@ class _PosScreenState extends State<PosScreen> {
           child: _ElectronicInvoiceModalContent(
             cartProducts: cartProducts,
             cartTotal: _posController.total,
-            onComplete: (success) {
+                            onComplete: (success) {
               if (success) {
                 _posController.clearCart();
                 Get.snackbar(
                   'Éxito',
-                  'Factura electrónica procesada correctamente',
+                  'Factura electrónica generada (pendiente de envío)',
                   backgroundColor: Colors.green,
                   colorText: Colors.white,
                 );
@@ -1269,6 +1680,127 @@ class _PosScreenState extends State<PosScreen> {
             child: const Text('Cerrar'),
           ),
         ],
+      ),
+    );
+  }
+  
+  // ✅ NUEVO: Método para mostrar diálogo de selección de cliente
+  void _showClientSelectionDialog() {
+    Get.dialog(
+      Dialog(
+        child: Container(
+          width: 600,
+          height: 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Seleccionar Cliente para Facturación Electrónica',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    onPressed: () => Get.back(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Campo de búsqueda
+              TextField(
+                onChanged: (value) {
+                  _posController.clientSearchQuery.value = value;
+                  _posController.searchClients(value);
+                },
+                decoration: InputDecoration(
+                  hintText: 'Buscar por nombre, email, documento o teléfono...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Lista de resultados
+              Expanded(
+                child: Obx(() {
+                  if (_posController.isSearchingClient.value) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (_posController.clientSearchResults.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No se encontraron clientes',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    );
+                  }
+                  
+                  return ListView.builder(
+                    itemCount: _posController.clientSearchResults.length,
+                    itemBuilder: (context, index) {
+                      final client = _posController.clientSearchResults[index];
+                      final validationSummary = ClientValidationService.getClientValidationSummary(client);
+                      final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
+                      
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: canReceiveInvoice ? Colors.green : Colors.red,
+                            child: Icon(
+                              canReceiveInvoice ? Icons.check_circle : Icons.error,
+                              color: Colors.white,
+                            ),
+                          ),
+                          title: Text(
+                            client.businessName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${client.documentType} ${client.documentNumber}'),
+                              Text('${client.email ?? 'Sin email'}'),
+                              if (client.city != null && client.department != null)
+                                Text('${client.city}, ${client.department}'),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: canReceiveInvoice ? Colors.green.shade100 : Colors.red.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  canReceiveInvoice ? '✅ Válido' : '❌ Incompleto',
+                                  style: TextStyle(
+                                    color: canReceiveInvoice ? Colors.green.shade800 : Colors.red.shade800,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            _posController.selectClient(client);
+                            setState(() {});
+                            Get.back();
+                          },
+                        ),
+                      );
+                    },
+                  );
+                }),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1613,8 +2145,13 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
   final _clientAddressController = TextEditingController();
   final _observationsController = TextEditingController();
   
+  // ✅ NUEVOS CONTROLADORES PARA VALIDACIÓN
+  final _clientCityController = TextEditingController();
+  final _clientDepartmentController = TextEditingController();
+  
   String _selectedPaymentMethod = 'Efectivo';
   String _selectedClientType = 'CUANTIAS MENORES';
+  String _selectedDocumentType = 'CC'; // ✅ NUEVO: Tipo de documento por defecto
   
   bool _isLoading = false;
 
@@ -1626,6 +2163,29 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
     // Generar número de factura automático
     final now = DateTime.now();
     _invoiceNumberController.text = 'FE-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+    
+    // ✅ NUEVO: Agregar listeners para validación en tiempo real
+    _addClientFieldListeners();
+  }
+  
+  // ✅ NUEVO: Agregar listeners a los campos del cliente para validación en tiempo real
+  void _addClientFieldListeners() {
+    _clientNitController.addListener(_onClientFieldChanged);
+    _clientNameController.addListener(_onClientFieldChanged);
+    _clientEmailController.addListener(_onClientFieldChanged);
+    _clientPhoneController.addListener(_onClientFieldChanged);
+    _clientAddressController.addListener(_onClientFieldChanged);
+    _clientCityController.addListener(_onClientFieldChanged);
+    _clientDepartmentController.addListener(_onClientFieldChanged);
+  }
+  
+  // ✅ NUEVO: Callback cuando cambian los campos del cliente
+  void _onClientFieldChanged() {
+    if (mounted) {
+      setState(() {
+        // Esto forzará la reconstrucción del widget de validación
+      });
+    }
   }
 
   @override
@@ -1638,7 +2198,96 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
     _clientPhoneController.dispose();
     _clientAddressController.dispose();
     _observationsController.dispose();
+    
+    // ✅ DISPOSE DE NUEVOS CONTROLADORES
+    _clientCityController.dispose();
+    _clientDepartmentController.dispose();
+    
     super.dispose();
+  }
+  
+  // ✅ NUEVO: Widget para mostrar estado de validación del cliente
+  Widget _buildClientValidationStatus() {
+    // Crear un cliente temporal para validación
+    final tempClient = Client(
+      documentType: _selectedDocumentType,
+      documentNumber: _clientNitController.text,
+      businessName: _clientNameController.text,
+      email: _clientEmailController.text,
+      phone: _clientPhoneController.text,
+      address: _clientAddressController.text,
+      city: _clientCityController.text,
+      department: _clientDepartmentController.text,
+      fiscalResponsibility: 'Responsable de IVA', // Valor por defecto
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    
+    final validationSummary = ClientValidationService.getClientValidationSummary(tempClient);
+    final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
+    final missingFields = validationSummary['missingFields'] as List<String>;
+    final validationMessage = validationSummary['validationMessage'] as String;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: canReceiveInvoice ? Colors.green.shade50 : Colors.red.shade50,
+        border: Border.all(
+          color: canReceiveInvoice ? Colors.green : Colors.red,
+          width: 2,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                canReceiveInvoice ? Icons.check_circle : Icons.error,
+                color: canReceiveInvoice ? Colors.green : Colors.red,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  canReceiveInvoice ? '✅ Cliente válido para facturación electrónica' : '❌ Cliente incompleto',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: canReceiveInvoice ? Colors.green.shade800 : Colors.red.shade800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            validationMessage,
+            style: TextStyle(
+              color: canReceiveInvoice ? Colors.green.shade700 : Colors.red.shade700,
+            ),
+          ),
+          if (!canReceiveInvoice && missingFields.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Campos faltantes:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red.shade700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...missingFields.map((field) => Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: Text(
+                '• $field',
+                style: TextStyle(color: Colors.red.shade600),
+              ),
+            )),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -1884,50 +2533,99 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
               
               if (_selectedClientType == 'CLIENTE REGISTRADO') ...[
                 const SizedBox(height: 16),
+                
+                // ✅ NUEVO: Tipo de documento
+                DropdownButtonFormField<String>(
+                  value: _selectedDocumentType,
+                  items: ['CC', 'NIT', 'TI', 'CE', 'PASAPORTE', 'RC', 'OTRO']
+                      .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                      .toList(),
+                  onChanged: (value) => setState(() => _selectedDocumentType = value!),
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de Documento *',
+                    border: OutlineInputBorder(),
+                    helperText: 'Obligatorio para facturación electrónica',
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _clientNitController,
                   decoration: const InputDecoration(
-                    labelText: 'NIT/RUT *',
+                    labelText: 'Número de Documento *',
                     hintText: 'Ej: 123456789-0',
                     border: OutlineInputBorder(),
+                    helperText: 'Obligatorio para facturación electrónica',
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _clientNameController,
                   decoration: const InputDecoration(
-                    labelText: 'Razón Social *',
+                    labelText: 'Nombre o Razón Social *',
                     hintText: 'Nombre completo o razón social',
                     border: OutlineInputBorder(),
+                    helperText: 'Obligatorio para facturación electrónica',
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _clientEmailController,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
+                    labelText: 'Email *',
                     hintText: 'correo@ejemplo.com',
                     border: OutlineInputBorder(),
+                    helperText: 'OBLIGATORIO para envío de factura electrónica',
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _clientPhoneController,
                   decoration: const InputDecoration(
-                    labelText: 'Teléfono',
+                    labelText: 'Teléfono *',
                     hintText: 'Ej: 3001234567',
                     border: OutlineInputBorder(),
+                    helperText: 'Recomendado para facturación electrónica',
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _clientAddressController,
                   decoration: const InputDecoration(
-                    labelText: 'Dirección',
+                    labelText: 'Dirección *',
                     hintText: 'Dirección completa',
                     border: OutlineInputBorder(),
+                    helperText: 'Obligatorio para facturación electrónica',
                   ),
                 ),
+                
+                const SizedBox(height: 16),
+                // ✅ NUEVO: Ciudad
+                TextFormField(
+                  controller: _clientCityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Ciudad *',
+                    hintText: 'Ej: Bogotá',
+                    border: OutlineInputBorder(),
+                    helperText: 'Obligatorio para facturación electrónica',
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                // ✅ NUEVO: Departamento
+                TextFormField(
+                  controller: _clientDepartmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Departamento *',
+                    hintText: 'Ej: Cundinamarca',
+                    border: OutlineInputBorder(),
+                    helperText: 'Obligatorio para facturación electrónica',
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                // ✅ NUEVO: Validación en tiempo real
+                _buildClientValidationStatus(),
               ],
             ],
           ),
@@ -2160,17 +2858,84 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
     }
   }
 
+
+
   void _sendToDIAN() async {
-    // Validaciones
+    // Validaciones básicas
     if (_invoiceNumberController.text.isEmpty) {
       Get.snackbar('Error', 'El número de factura es obligatorio');
       return;
     }
 
-    if (_selectedClientType == 'CLIENTE REGISTRADO' && 
-        (_clientNitController.text.isEmpty || _clientNameController.text.isEmpty)) {
-      Get.snackbar('Error', 'Los datos del cliente son obligatorios');
+    // ✅ NUEVA VALIDACIÓN COMPLETA DEL CLIENTE PARA FACTURACIÓN ELECTRÓNICA
+    if (_selectedClientType == 'CLIENTE REGISTRADO') {
+      // Crear cliente temporal para validación
+      final tempClient = Client(
+        documentType: _selectedDocumentType,
+        documentNumber: _clientNitController.text,
+        businessName: _clientNameController.text,
+        email: _clientEmailController.text,
+        phone: _clientPhoneController.text,
+        address: _clientAddressController.text,
+        city: _clientCityController.text,
+        department: _clientDepartmentController.text,
+        fiscalResponsibility: 'Responsable de IVA', // Valor por defecto
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      
+      // Validar si el cliente puede recibir facturación electrónica
+      if (!ClientValidationService.canReceiveElectronicInvoice(tempClient)) {
+        final missingFields = ClientValidationService.getMissingFields(tempClient);
+        final errorMessage = ClientValidationService.getValidationErrorMessage(tempClient);
+        
+        Get.dialog(
+          AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Cliente Incompleto'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No se puede emitir factura electrónica porque el cliente no cumple con los requisitos obligatorios:',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Campos faltantes:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...missingFields.map((field) => Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Text('• $field'),
+                )),
+                const SizedBox(height: 16),
+                Text(
+                  'Por favor, complete todos los campos obligatorios antes de continuar.',
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
       return;
+      }
     }
 
     setState(() => _isLoading = true);
@@ -2184,7 +2949,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
       
       Get.snackbar(
         'Éxito',
-        'Factura electrónica enviada a DIAN correctamente',
+        'Factura electrónica generada (pendiente de envío)',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 4),

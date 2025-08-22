@@ -2,34 +2,52 @@
 
 class ElectronicDocument {
   int? id;
+  
+  // ✅ a) ENCABEZADO DEL DOCUMENTO
   late String documentType; // FE, NC, ND, DS, etc.
-  late String documentNumber;
-  late DateTime issueDate;
+  late String prefix; // Prefijo configurable: FV, FA, etc.
+  late String consecutive; // Consecutivo único dentro del rango de resolución
+  late DateTime issueDate; // Fecha y hora de emisión
+  late String operationType; // Estándar, exportación, etc.
+  late String paymentMethod; // Contado, crédito
+  late String paymentForm; // Efectivo, transferencia, tarjeta, etc.
   late DateTime dueDate;
-  late String paymentMethod;
   String? observations;
   late String status; // DRAFT, SENT, APPROVED, REJECTED
   late DateTime createdAt;
   late DateTime updatedAt;
   
-  // Campos del cliente
+  // ✅ b) INFORMACIÓN DEL EMISOR Y ADQUIRIENTE
+  // Emisor (ya implementado en CompanyConfig)
   String? clientDocumentType;
   String? clientDocumentNumber;
   String? clientBusinessName;
   String? clientEmail;
   String? clientPhone;
   String? clientAddress;
+  String? clientCity;
+  String? clientDepartment;
   String? clientFiscalResponsibility;
   
-  // Campos de productos
+  // ✅ c) DETALLE DE LOS ITEMS
   List<DocumentItem> items = [];
   
-  // Campos de totales
+  // ✅ d) TOTALES
   double subtotal = 0.0;
-  double taxes = 0.0;
+  double totalDiscounts = 0.0;
+  double totalTaxes = 0.0;
+  double totalCharges = 0.0;
   double total = 0.0;
   
-  // Campos DIAN
+  // ✅ e) INFORMACIÓN TÉCNICA (SOFTWARE DE FACTURACIÓN)
+  late String softwareId; // ID del software asignado por DIAN
+  late String softwarePin; // PIN del software (5 dígitos)
+  late String environment; // Pruebas o Producción
+  late String dianResolutionNumber; // Número de resolución DIAN
+  late DateTime dianResolutionDate; // Fecha de resolución DIAN
+  late String dianResolutionRange; // Rango de facturas permitido
+  
+  // Campos DIAN de respuesta
   String? dianResponse;
   String? dianAuthorizationNumber;
   DateTime? dianAuthorizationDate;
@@ -41,10 +59,13 @@ class ElectronicDocument {
   ElectronicDocument({
     this.id,
     required this.documentType,
-    required this.documentNumber,
+    required this.prefix,
+    required this.consecutive,
     required this.issueDate,
-    required this.dueDate,
+    required this.operationType,
     required this.paymentMethod,
+    required this.paymentForm,
+    required this.dueDate,
     this.observations,
     required this.status,
     required this.createdAt,
@@ -55,11 +76,21 @@ class ElectronicDocument {
     this.clientEmail,
     this.clientPhone,
     this.clientAddress,
+    this.clientCity,
+    this.clientDepartment,
     this.clientFiscalResponsibility,
     this.items = const [],
     this.subtotal = 0.0,
-    this.taxes = 0.0,
+    this.totalDiscounts = 0.0,
+    this.totalTaxes = 0.0,
+    this.totalCharges = 0.0,
     this.total = 0.0,
+    required this.softwareId,
+    required this.softwarePin,
+    required this.environment,
+    required this.dianResolutionNumber,
+    required this.dianResolutionDate,
+    required this.dianResolutionRange,
     this.dianResponse,
     this.dianAuthorizationNumber,
     this.dianAuthorizationDate,
@@ -72,10 +103,13 @@ class ElectronicDocument {
   ElectronicDocument.fromMap(Map<String, dynamic> map) {
     id = map['id'];
     documentType = map['documentType'];
-    documentNumber = map['documentNumber'];
+    prefix = map['prefix'] ?? 'FV';
+    consecutive = map['consecutive'] ?? '';
     issueDate = DateTime.parse(map['issueDate']);
-    dueDate = DateTime.parse(map['dueDate']);
+    operationType = map['operationType'] ?? 'ESTANDAR';
     paymentMethod = map['paymentMethod'];
+    paymentForm = map['paymentForm'] ?? 'CONTADO';
+    dueDate = DateTime.parse(map['dueDate']);
     observations = map['observations'];
     status = map['status'];
     createdAt = DateTime.parse(map['createdAt']);
@@ -87,11 +121,24 @@ class ElectronicDocument {
     clientEmail = map['clientEmail'];
     clientPhone = map['clientPhone'];
     clientAddress = map['clientAddress'];
+    clientCity = map['clientCity'];
+    clientDepartment = map['clientDepartment'];
     clientFiscalResponsibility = map['clientFiscalResponsibility'];
     
     subtotal = map['subtotal'] ?? 0.0;
-    taxes = map['taxes'] ?? 0.0;
+    totalDiscounts = map['totalDiscounts'] ?? 0.0;
+    totalTaxes = map['totalTaxes'] ?? 0.0;
+    totalCharges = map['totalCharges'] ?? 0.0;
     total = map['total'] ?? 0.0;
+    
+    softwareId = map['softwareId'] ?? '';
+    softwarePin = map['softwarePin'] ?? '';
+    environment = map['environment'] ?? 'PRUEBAS';
+    dianResolutionNumber = map['dianResolutionNumber'] ?? '';
+    dianResolutionDate = map['dianResolutionDate'] != null 
+        ? DateTime.parse(map['dianResolutionDate']) 
+        : DateTime.now();
+    dianResolutionRange = map['dianResolutionRange'] ?? '';
     
     dianResponse = map['dianResponse'];
     dianAuthorizationNumber = map['dianAuthorizationNumber'];
@@ -115,10 +162,13 @@ class ElectronicDocument {
     return {
       'id': id,
       'documentType': documentType,
-      'documentNumber': documentNumber,
+      'prefix': prefix,
+      'consecutive': consecutive,
       'issueDate': issueDate.toIso8601String(),
-      'dueDate': dueDate.toIso8601String(),
+      'operationType': operationType,
       'paymentMethod': paymentMethod,
+      'paymentForm': paymentForm,
+      'dueDate': dueDate.toIso8601String(),
       'observations': observations,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
@@ -130,11 +180,22 @@ class ElectronicDocument {
       'clientEmail': clientEmail,
       'clientPhone': clientPhone,
       'clientAddress': clientAddress,
+      'clientCity': clientCity,
+      'clientDepartment': clientDepartment,
       'clientFiscalResponsibility': clientFiscalResponsibility,
       
       'subtotal': subtotal,
-      'taxes': taxes,
+      'totalDiscounts': totalDiscounts,
+      'totalTaxes': totalTaxes,
+      'totalCharges': totalCharges,
       'total': total,
+      
+      'softwareId': softwareId,
+      'softwarePin': softwarePin,
+      'environment': environment,
+      'dianResolutionNumber': dianResolutionNumber,
+      'dianResolutionDate': dianResolutionDate.toIso8601String(),
+      'dianResolutionRange': dianResolutionRange,
       
       'dianResponse': dianResponse,
       'dianAuthorizationNumber': dianAuthorizationNumber,
@@ -150,26 +211,41 @@ class ElectronicDocument {
   // Calcular totales
   void calculateTotals() {
     subtotal = items.fold(0.0, (sum, item) => sum + item.subtotal);
-    taxes = subtotal * 0.19; // IVA 19%
-    total = subtotal + taxes;
+    totalDiscounts = items.fold(0.0, (sum, item) => sum + (item.discounts ?? 0.0));
+    totalTaxes = items.fold(0.0, (sum, item) => sum + item.totalTaxes);
+    totalCharges = items.fold(0.0, (sum, item) => sum + (item.charges ?? 0.0));
+    total = subtotal - totalDiscounts + totalTaxes + totalCharges;
   }
   
   // Validar documento
   bool get isValid {
     return documentNumber.isNotEmpty &&
            documentType.isNotEmpty &&
+           prefix.isNotEmpty &&
+           consecutive.isNotEmpty &&
            paymentMethod.isNotEmpty &&
+           paymentForm.isNotEmpty &&
+           softwareId.isNotEmpty &&
+           softwarePin.isNotEmpty &&
+           dianResolutionNumber.isNotEmpty &&
            clientDocumentNumber != null &&
            clientBusinessName != null &&
            items.isNotEmpty;
   }
   
+  // Obtener número completo del documento
+  String get documentNumber => '$prefix$consecutive';
+  
   // Obtener errores de validación
   List<String> get validationErrors {
     List<String> errors = [];
     
-    if (documentNumber.isEmpty) {
-      errors.add('El número de documento es obligatorio');
+    if (prefix.isEmpty) {
+      errors.add('El prefijo del documento es obligatorio');
+    }
+    
+    if (consecutive.isEmpty) {
+      errors.add('El consecutivo del documento es obligatorio');
     }
     
     if (documentType.isEmpty) {
@@ -178,6 +254,22 @@ class ElectronicDocument {
     
     if (paymentMethod.isEmpty) {
       errors.add('El método de pago es obligatorio');
+    }
+    
+    if (paymentForm.isEmpty) {
+      errors.add('La forma de pago es obligatoria');
+    }
+    
+    if (softwareId.isEmpty) {
+      errors.add('El ID del software de facturación es obligatorio');
+    }
+    
+    if (softwarePin.isEmpty) {
+      errors.add('El PIN del software es obligatorio');
+    }
+    
+    if (dianResolutionNumber.isEmpty) {
+      errors.add('El número de resolución DIAN es obligatorio');
     }
     
     if (clientDocumentNumber == null || clientDocumentNumber!.isEmpty) {
@@ -195,10 +287,13 @@ class ElectronicDocument {
   ElectronicDocument copyWith({
     int? id,
     String? documentType,
-    String? documentNumber,
+    String? prefix,
+    String? consecutive,
     DateTime? issueDate,
-    DateTime? dueDate,
+    String? operationType,
     String? paymentMethod,
+    String? paymentForm,
+    DateTime? dueDate,
     String? observations,
     String? status,
     DateTime? createdAt,
@@ -209,11 +304,21 @@ class ElectronicDocument {
     String? clientEmail,
     String? clientPhone,
     String? clientAddress,
+    String? clientCity,
+    String? clientDepartment,
     String? clientFiscalResponsibility,
     List<DocumentItem>? items,
     double? subtotal,
-    double? taxes,
+    double? totalDiscounts,
+    double? totalTaxes,
+    double? totalCharges,
     double? total,
+    String? softwareId,
+    String? softwarePin,
+    String? environment,
+    String? dianResolutionNumber,
+    DateTime? dianResolutionDate,
+    String? dianResolutionRange,
     String? dianResponse,
     String? dianAuthorizationNumber,
     DateTime? dianAuthorizationDate,
@@ -224,10 +329,13 @@ class ElectronicDocument {
     return ElectronicDocument(
       id: id ?? this.id,
       documentType: documentType ?? this.documentType,
-      documentNumber: documentNumber ?? this.documentNumber,
+      prefix: prefix ?? this.prefix,
+      consecutive: consecutive ?? this.consecutive,
       issueDate: issueDate ?? this.issueDate,
-      dueDate: dueDate ?? this.dueDate,
+      operationType: operationType ?? this.operationType,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      paymentForm: paymentForm ?? this.paymentForm,
+      dueDate: dueDate ?? this.dueDate,
       observations: observations ?? this.observations,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -238,11 +346,21 @@ class ElectronicDocument {
       clientEmail: clientEmail ?? this.clientEmail,
       clientPhone: clientPhone ?? this.clientPhone,
       clientAddress: clientAddress ?? this.clientAddress,
+      clientCity: clientCity ?? this.clientCity,
+      clientDepartment: clientDepartment ?? this.clientDepartment,
       clientFiscalResponsibility: clientFiscalResponsibility ?? this.clientFiscalResponsibility,
       items: items ?? this.items,
       subtotal: subtotal ?? this.subtotal,
-      taxes: taxes ?? this.taxes,
+      totalDiscounts: totalDiscounts ?? this.totalDiscounts,
+      totalTaxes: totalTaxes ?? this.totalTaxes,
+      totalCharges: totalCharges ?? this.totalCharges,
       total: total ?? this.total,
+      softwareId: softwareId ?? this.softwareId,
+      softwarePin: softwarePin ?? this.softwarePin,
+      environment: environment ?? this.environment,
+      dianResolutionNumber: dianResolutionNumber ?? this.dianResolutionNumber,
+      dianResolutionDate: dianResolutionDate ?? this.dianResolutionDate,
+      dianResolutionRange: dianResolutionRange ?? this.dianResolutionRange,
       dianResponse: dianResponse ?? this.dianResponse,
       dianAuthorizationNumber: dianAuthorizationNumber ?? this.dianAuthorizationNumber,
       dianAuthorizationDate: dianAuthorizationDate ?? this.dianAuthorizationDate,
@@ -253,15 +371,20 @@ class ElectronicDocument {
   }
 }
 
-// Modelo para items del documento
+// ✅ c) DETALLE DE LOS ITEMS - Modelo actualizado para items del documento
 class DocumentItem {
   int? id;
-  late String productCode;
-  late String productName;
-  late String unit;
+  late String productCode; // SKU, código interno
+  late String productName; // Descripción
+  late String unit; // Unidad de medida: EA, UN, KGM, etc.
   late double quantity;
   late double unitPrice;
   late double subtotal;
+  
+  // ✅ NUEVOS CAMPOS PARA IMPUESTOS Y DESCUENTOS
+  double? discounts; // Descuentos si aplica
+  double? charges; // Cargos si aplica
+  List<ItemTax> taxes = []; // Impuestos aplicables con porcentaje y valor
   String? observations;
   
   // Constructor
@@ -273,6 +396,9 @@ class DocumentItem {
     required this.quantity,
     required this.unitPrice,
     required this.subtotal,
+    this.discounts,
+    this.charges,
+    this.taxes = const [],
     this.observations,
   });
   
@@ -285,7 +411,16 @@ class DocumentItem {
     quantity = map['quantity']?.toDouble() ?? 0.0;
     unitPrice = map['unitPrice']?.toDouble() ?? 0.0;
     subtotal = map['subtotal']?.toDouble() ?? 0.0;
+    discounts = map['discounts']?.toDouble();
+    charges = map['charges']?.toDouble();
     observations = map['observations'];
+    
+    // Cargar impuestos si existen
+    if (map['taxes'] != null) {
+      taxes = (map['taxes'] as List)
+          .map((tax) => ItemTax.fromMap(tax))
+          .toList();
+    }
   }
   
   // Convertir a Map
@@ -298,6 +433,9 @@ class DocumentItem {
       'quantity': quantity,
       'unitPrice': unitPrice,
       'subtotal': subtotal,
+      'discounts': discounts,
+      'charges': charges,
+      'taxes': taxes.map((tax) => tax.toMap()).toList(),
       'observations': observations,
     };
   }
@@ -305,6 +443,94 @@ class DocumentItem {
   // Calcular subtotal
   void calculateSubtotal() {
     subtotal = quantity * unitPrice;
+  }
+  
+  // Calcular total de impuestos del item
+  double get totalTaxes {
+    return taxes.fold(0.0, (sum, tax) => sum + tax.taxAmount);
+  }
+  
+  // Calcular total del item con impuestos y descuentos
+  double get totalWithTaxesAndDiscounts {
+    return subtotal - (discounts ?? 0.0) + totalTaxes + (charges ?? 0.0);
+  }
+}
+
+// ✅ NUEVO: Modelo para impuestos de items
+class ItemTax {
+  late String taxType; // IVA, ICA, etc.
+  late double taxPercentage; // Porcentaje del impuesto
+  late double taxAmount; // Valor del impuesto
+  late String taxCode; // Código del impuesto según DIAN
+  
+  ItemTax({
+    required this.taxType,
+    required this.taxPercentage,
+    required this.taxAmount,
+    required this.taxCode,
+  });
+  
+  ItemTax.fromMap(Map<String, dynamic> map) {
+    taxType = map['taxType'];
+    taxPercentage = map['taxPercentage']?.toDouble() ?? 0.0;
+    taxAmount = map['taxAmount']?.toDouble() ?? 0.0;
+    taxCode = map['taxCode'];
+  }
+  
+  Map<String, dynamic> toMap() {
+    return {
+      'taxType': taxType,
+      'taxPercentage': taxPercentage,
+      'taxAmount': taxAmount,
+      'taxCode': taxCode,
+    };
+  }
+}
+
+// ✅ NUEVO: Modelo para configuración del software de facturación
+class SoftwareConfiguration {
+  late String softwareId; // ID asignado por DIAN
+  late String softwarePin; // PIN de 5 dígitos
+  late String environment; // PRUEBAS o PRODUCCION
+  late String dianResolutionNumber; // Número de resolución
+  late DateTime dianResolutionDate; // Fecha de resolución
+  late String dianResolutionRange; // Rango de facturas permitido
+  late String softwareName; // Nombre del software
+  late String softwareVersion; // Versión del software
+  
+  SoftwareConfiguration({
+    required this.softwareId,
+    required this.softwarePin,
+    required this.environment,
+    required this.dianResolutionNumber,
+    required this.dianResolutionDate,
+    required this.dianResolutionRange,
+    required this.softwareName,
+    required this.softwareVersion,
+  });
+  
+  SoftwareConfiguration.fromMap(Map<String, dynamic> map) {
+    softwareId = map['softwareId'];
+    softwarePin = map['softwarePin'];
+    environment = map['environment'];
+    dianResolutionNumber = map['dianResolutionNumber'];
+    dianResolutionDate = DateTime.parse(map['dianResolutionDate']);
+    dianResolutionRange = map['dianResolutionRange'];
+    softwareName = map['softwareName'];
+    softwareVersion = map['softwareVersion'];
+  }
+  
+  Map<String, dynamic> toMap() {
+    return {
+      'softwareId': softwareId,
+      'softwarePin': softwarePin,
+      'environment': environment,
+      'dianResolutionNumber': dianResolutionNumber,
+      'dianResolutionDate': dianResolutionDate.toIso8601String(),
+      'dianResolutionRange': dianResolutionRange,
+      'softwareName': softwareName,
+      'softwareVersion': softwareVersion,
+    };
   }
 }
 
@@ -331,6 +557,65 @@ enum DocumentStatus {
   pending('PENDING', 'Pendiente');
   
   const DocumentStatus(this.code, this.name);
+  final String code;
+  final String name;
+}
+
+// ✅ NUEVO: Tipos de operación
+enum OperationType {
+  estandar('ESTANDAR', 'Estándar'),
+  exportacion('EXPORTACION', 'Exportación'),
+  contingencia('CONTINGENCIA', 'Contingencia');
+  
+  const OperationType(this.code, this.name);
+  final String code;
+  final String name;
+}
+
+// ✅ NUEVO: Métodos de pago
+enum PaymentMethod {
+  contado('CONTADO', 'Contado'),
+  credito('CREDITO', 'Crédito');
+  
+  const PaymentMethod(this.code, this.name);
+  final String code;
+  final String name;
+}
+
+// ✅ NUEVO: Formas de pago
+enum PaymentForm {
+  efectivo('EFECTIVO', 'Efectivo'),
+  transferencia('TRANSFERENCIA', 'Transferencia'),
+  tarjeta('TARJETA', 'Tarjeta'),
+  cheque('CHEQUE', 'Cheque'),
+  otro('OTRO', 'Otro');
+  
+  const PaymentForm(this.code, this.name);
+  final String code;
+  final String name;
+}
+
+// ✅ NUEVO: Tipos de impuesto
+enum TaxType {
+  iva('IVA', 'Impuesto al Valor Agregado'),
+  ica('ICA', 'Impuesto de Industria y Comercio'),
+  inc('INC', 'Impuesto Nacional al Consumo');
+  
+  const TaxType(this.code, this.name);
+  final String code;
+  final String name;
+}
+
+// ✅ NUEVO: Unidades de medida
+enum UnitOfMeasure {
+  ea('EA', 'Unidad'),
+  un('UN', 'Unidad'),
+  kgm('KGM', 'Kilogramo'),
+  ltr('LTR', 'Litro'),
+  mtr('MTR', 'Metro'),
+  pza('PZA', 'Pieza');
+  
+  const UnitOfMeasure(this.code, this.name);
   final String code;
   final String name;
 } 
