@@ -721,13 +721,22 @@ class SQLiteDatabaseService {
   }
   
   // Obtener historial de ventas
-  static Future<List<Sale>> getSales({DateTime? date, String? user}) async {
+  static Future<List<Sale>> getSales({DateTime? date, DateTime? endDate, String? user}) async {
     String whereClause = '';
     List<dynamic> whereArgs = [];
     
     if (date != null) {
       final start = DateTime(date.year, date.month, date.day);
-      final end = start.add(const Duration(days: 1));
+      DateTime end;
+      
+      if (endDate != null) {
+        // Rango de fechas (para reportes de semana, mes, etc.)
+        end = DateTime(endDate.year, endDate.month, endDate.day).add(const Duration(days: 1));
+      } else {
+        // Solo un día
+        end = start.add(const Duration(days: 1));
+      }
+      
       whereClause = 'date >= ? AND date < ?';
       whereArgs = [start.toIso8601String(), end.toIso8601String()];
     }

@@ -13,6 +13,12 @@ class ProductFormDialog extends StatefulWidget {
   State<ProductFormDialog> createState() => _ProductFormDialogState();
 }
 
+// ✅ NUEVO: Enum para modos de cálculo de precios
+enum PriceCalculationMode {
+  fixedPrice,    // Precio fijo (comportamiento actual)
+  fixedMargin    // Utilidad fija (nueva funcionalidad)
+}
+
 class _ProductFormDialogState extends State<ProductFormDialog> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _codeController = TextEditingController();
@@ -26,6 +32,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
   final _unitController = TextEditingController();
   final _groupController = TextEditingController();
   
+  // ✅ NUEVO: Controlador para % de utilidad
+  final _profitMarginController = TextEditingController();
 
   
   String? _selectedGroup;
@@ -33,6 +41,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
   bool _isActive = true;
 
   bool _isLoading = false;
+  
+  // ✅ NUEVO: Modo de cálculo de precios (por defecto mantiene comportamiento actual)
+  PriceCalculationMode _priceMode = PriceCalculationMode.fixedPrice;
   
   // Controlador para las pestañas
   late TabController _tabController;
@@ -56,13 +67,22 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       _groupController.text = _selectedGroup ?? '';
       _isActive = widget.product!.isActive;
       
+      // ✅ NUEVO: Calcular % de utilidad inicial
+      _calculateProfitMargin();
 
     }
+    
+    // ✅ NUEVO: Agregar listeners para cálculo automático
+    _priceController.addListener(_onPriceChanged);
+    _costController.addListener(_onCostChanged);
+    _profitMarginController.addListener(_onProfitMarginChanged);
   }
   
   @override
   void dispose() {
     _tabController.dispose();
+    // ✅ NUEVO: Dispose de los nuevos controladores
+    _profitMarginController.dispose();
     super.dispose();
   }
   
@@ -101,6 +121,65 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       _loadGroups();
     });
   }
+
+  // ✅ NUEVO: Funciones de cálculo automático
+  void _calculateProfitMargin() {
+    final cost = double.tryParse(_costController.text);
+    final price = double.tryParse(_priceController.text);
+    
+    if (cost != null && price != null && price > 0) {
+      // ✅ CORREGIDO: Fórmula estándar de POS: (Precio de venta - Costo) / Precio de venta × 100
+      final margin = ((price - cost) / price) * 100;
+      _profitMarginController.text = margin.toStringAsFixed(1);
+    } else {
+      _profitMarginController.text = '0.0';
+    }
+  }
+  
+  void _calculatePriceFromMargin() {
+    final cost = double.tryParse(_costController.text);
+    final margin = double.tryParse(_profitMarginController.text);
+    
+    if (cost != null && margin != null && cost > 0) {
+      // ✅ CORREGIDO: Fórmula inversa estándar de POS: Costo / (1 - Margen/100)
+      // Si margen = (precio - costo) / precio, entonces precio = costo / (1 - margen/100)
+      final price = cost / (1 - margin / 100);
+      _priceController.text = price.toStringAsFixed(2);
+    }
+  }
+  
+  void _onPriceChanged() {
+    if (_priceMode == PriceCalculationMode.fixedPrice) {
+      _calculateProfitMargin();
+    }
+  }
+  
+  void _onCostChanged() {
+    if (_priceMode == PriceCalculationMode.fixedPrice) {
+      _calculateProfitMargin();
+    } else if (_priceMode == PriceCalculationMode.fixedMargin) {
+      _calculatePriceFromMargin();
+    }
+  }
+  
+  void _onProfitMarginChanged() {
+    if (_priceMode == PriceCalculationMode.fixedMargin) {
+      _calculatePriceFromMargin();
+    }
+  }
+  
+  void _changePriceMode(PriceCalculationMode newMode) {
+    setState(() {
+      _priceMode = newMode;
+    });
+    
+    // Recalcular según el nuevo modo
+    if (newMode == PriceCalculationMode.fixedPrice) {
+      _calculateProfitMargin();
+    } else if (newMode == PriceCalculationMode.fixedMargin) {
+      _calculatePriceFromMargin();
+    }
+  }
   
 
 
@@ -112,6 +191,15 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
     });
 
     try {
+      // ✅ NUEVO: Validar y sincronizar datos según el modo
+      if (_priceMode == PriceCalculationMode.fixedMargin) {
+        // En modo utilidad fija, recalcular precio antes de guardar
+        _calculatePriceFromMargin();
+      } else {
+        // En modo precio fijo, recalcular utilidad antes de guardar
+        _calculateProfitMargin();
+      }
+
       final code = _codeController.text.trim();
       final shortCode = _shortCodeController.text.trim();
       final excludeId = widget.product?.id;
@@ -174,10 +262,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         });
         Get.snackbar(
           '✅ Producto Creado',
-          'El producto "${product.name}" ha sido creado correctamente',
+          'El producto "${product.name}" ha sido creado correctamente\n'
+          'Modo: ${_priceMode == PriceCalculationMode.fixedPrice ? "Precio Fijo" : "Utilidad Fija"}',
           backgroundColor: Colors.green,
           colorText: Colors.white,
-          duration: const Duration(seconds: 2),
+          duration: const Duration(seconds: 3),
           snackPosition: SnackPosition.TOP,
         );
         // Preguntar si desea ingresar otro producto
@@ -230,7 +319,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         Future.delayed(const Duration(milliseconds: 100), () {
         Get.snackbar(
             '✅ Producto Actualizado',
-            'El producto "${product.name}" ha sido actualizado correctamente',
+            'El producto "${product.name}" ha sido actualizado correctamente\n'
+            'Modo: ${_priceMode == PriceCalculationMode.fixedPrice ? "Precio Fijo" : "Utilidad Fija"}',
           backgroundColor: Colors.green,
           colorText: Colors.white,
             duration: const Duration(seconds: 3),
@@ -495,6 +585,51 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          
+          // ✅ NUEVO: Selector de modo de cálculo de precios
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Modo de Cálculo de Precios',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<PriceCalculationMode>(
+                        title: const Text('Precio Fijo'),
+                        subtitle: const Text('Ingresa precio de venta y costo'),
+                        value: PriceCalculationMode.fixedPrice,
+                        groupValue: _priceMode,
+                        onChanged: (value) => _changePriceMode(value!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<PriceCalculationMode>(
+                        title: const Text('Utilidad Fija'),
+                        subtitle: const Text('Ingresa costo y % de utilidad'),
+                        value: PriceCalculationMode.fixedMargin,
+                        groupValue: _priceMode,
+                        onChanged: (value) => _changePriceMode(value!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           
@@ -912,6 +1047,49 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           ),
           const SizedBox(height: 16),
           
+          // ✅ NUEVO: Indicador del modo actual
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _priceMode == PriceCalculationMode.fixedPrice 
+                  ? Colors.green.shade50 
+                  : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _priceMode == PriceCalculationMode.fixedPrice 
+                    ? Colors.green.shade200 
+                    : Colors.orange.shade200,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _priceMode == PriceCalculationMode.fixedPrice 
+                      ? Icons.calculate 
+                      : Icons.percent,
+                  color: _priceMode == PriceCalculationMode.fixedPrice 
+                      ? Colors.green 
+                      : Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _priceMode == PriceCalculationMode.fixedPrice 
+                        ? 'Modo Precio Fijo: El % de utilidad se calcula automáticamente'
+                        : 'Modo Utilidad Fija: El precio de venta se calcula automáticamente',
+                    style: TextStyle(
+                      color: _priceMode == PriceCalculationMode.fixedPrice 
+                          ? Colors.green.shade700 
+                          : Colors.orange.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
           // Primera fila - Stock actual y Stock mínimo
           Row(
             children: [
@@ -979,13 +1157,35 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
               const SizedBox(width: 16),
               Expanded(
                 child: TextFormField(
-                  decoration: const InputDecoration(
+                  controller: _profitMarginController,
+                  decoration: InputDecoration(
                     labelText: '% de Utilidad',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                     suffixText: '%',
                     hintText: '30',
+                    // ✅ NUEVO: Indicar si el campo es editable según el modo
+                    filled: _priceMode == PriceCalculationMode.fixedPrice,
+                    fillColor: _priceMode == PriceCalculationMode.fixedPrice 
+                        ? Colors.grey.shade100 
+                        : null,
+                    helperText: _priceMode == PriceCalculationMode.fixedPrice 
+                        ? 'Calculado automáticamente: (Precio - Costo) / Precio × 100'
+                        : 'Ingresa el % de utilidad deseado (sobre precio de venta)',
                   ),
                   keyboardType: TextInputType.number,
+                  readOnly: _priceMode == PriceCalculationMode.fixedPrice,
+                  validator: (value) {
+                    if (_priceMode == PriceCalculationMode.fixedMargin) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'El % de utilidad es obligatorio';
+                      }
+                      final margin = double.tryParse(value);
+                      if (margin == null || margin < 0) {
+                        return 'Utilidad inválida';
+                      }
+                    }
+                    return null;
+                  },
                 ),
               ),
             ],

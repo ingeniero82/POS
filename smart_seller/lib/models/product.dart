@@ -26,7 +26,8 @@ class Product {
 
   // Campos calculados
   double get profit => price - cost;
-  double get profitMargin => cost > 0 ? ((price - cost) / cost) * 100 : 0;
+  // ✅ CORREGIDO: Fórmula estándar de POS: (Precio de venta - Costo) / Precio de venta × 100
+  double get profitMargin => price > 0 ? ((price - cost) / price) * 100 : 0;
   bool get isLowStock => stock <= minStock;
   
   // Para productos pesados, el precio se calcula dinámicamente
