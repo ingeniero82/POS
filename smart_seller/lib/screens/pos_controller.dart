@@ -45,6 +45,9 @@ class PosController extends GetxController {
   var isSearchingClient = false.obs;
   var clientSearchResults = <Client>[].obs;
   var clientSearchQuery = ''.obs;
+  
+  // ✅ NUEVO: Callback para limpiar campo de búsqueda
+  Function()? onClearSearchField;
 
   @override
   void onInit() {
@@ -671,6 +674,12 @@ class PosController extends GetxController {
       // ✅ MEJORADO: Limpiar carrito después de cerrar modal
       Future.delayed(const Duration(milliseconds: 100), () {
         clearCart();
+        
+        // ✅ NUEVO: Limpiar campo de búsqueda para evitar que la "N" quede ahí
+        print('🔧 DEBUG: Llamando callback para limpiar campo de búsqueda...');
+        onClearSearchField?.call();
+        print('🔧 DEBUG: Callback ejecutado correctamente');
+        
         // ✅ NUEVO: Notificar que se debe restaurar el foco
         Get.snackbar(
           '✅ Listo para siguiente cliente',

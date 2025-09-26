@@ -67,6 +67,15 @@ class _PosScreenState extends State<PosScreen> {
   void initState() {
     super.initState();
     _posController = Get.put(PosController());
+    
+    // ✅ NUEVO: Configurar callback para limpiar campo de búsqueda
+    _posController.onClearSearchField = () {
+      print('🔧 DEBUG: Callback ejecutado - Limpiando campo de búsqueda...');
+      _barcodeController.clear();
+      print('🔧 DEBUG: Campo limpiado, restaurando foco...');
+      _ensureBarcodeFocus();
+      print('🔧 DEBUG: Foco restaurado correctamente');
+    };
 
     _loadProducts();
     
@@ -1327,13 +1336,13 @@ class _PosScreenState extends State<PosScreen> {
     
     Get.dialog(
       AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.payment, color: Colors.blue),
-                SizedBox(width: 12),
-                Text('Finalizar Venta'),
-              ],
-            ),
+        title: const Row(
+          children: [
+            Icon(Icons.payment, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Finalizar Venta'),
+          ],
+        ),
             content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1624,7 +1633,7 @@ class _PosScreenState extends State<PosScreen> {
           child: _ElectronicInvoiceModalContent(
             cartProducts: cartProducts,
             cartTotal: _posController.total,
-                            onComplete: (success) {
+            onComplete: (success) {
               if (success) {
                 _posController.clearCart();
                 Get.snackbar(

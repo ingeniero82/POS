@@ -177,9 +177,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Row(
             children: [
               const Icon(Icons.analytics, color: Color(0xFF22315B)),
@@ -195,33 +195,33 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ],
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
+            Row(
+              children: [
               // Tipo de Reporte
-              Expanded(
+                Expanded(
                 flex: 2,
                 child: DropdownButtonFormField<ReportType>(
-                  value: selectedReport,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo de Reporte',
+                    value: selectedReport,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de Reporte',
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.assessment),
-                  ),
-                  items: const [
+                      prefixIcon: Icon(Icons.assessment),
+                    ),
+                    items: const [
                     DropdownMenuItem(value: ReportType.sales, child: Text('📊 Ventas')),
                     DropdownMenuItem(value: ReportType.products, child: Text('🏆 Productos Top')),
                     DropdownMenuItem(value: ReportType.inventory, child: Text('📦 Inventario')),
                     DropdownMenuItem(value: ReportType.profitability, child: Text('💰 Rentabilidad')),
                     DropdownMenuItem(value: ReportType.payments, child: Text('💳 Métodos de Pago')),
                     DropdownMenuItem(value: ReportType.groups, child: Text('📂 Por Grupos')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => selectedReport = value!);
-                    _loadReportData();
-                  },
+                    ],
+                    onChanged: (value) {
+                      setState(() => selectedReport = value!);
+                      _loadReportData();
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
+                const SizedBox(width: 16),
               // Período
               Expanded(
                 child: DropdownButtonFormField<ReportPeriod>(
@@ -249,26 +249,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               ),
               const SizedBox(width: 16),
               // Fecha
-              Expanded(
-                child: InkWell(
-                  onTap: () => _selectDate(context),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Fecha',
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _selectDate(context),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Fecha',
                       border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.calendar_today),
-                    ),
-                    child: Text(
-                      DateFormat('dd/MM/yyyy').format(selectedDate),
-                      style: const TextStyle(fontSize: 16),
+                        prefixIcon: Icon(Icons.calendar_today),
+                      ),
+                      child: Text(
+                        DateFormat('dd/MM/yyyy').format(selectedDate),
+                        style: const TextStyle(fontSize: 16),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
+          ],
+        ),
     );
   }
 
@@ -544,13 +544,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-
+  
   Widget _buildTopProductsSection() {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Top 10 Productos Más Vendidos',
@@ -571,8 +571,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
+        children: [
+          Text(
                       '\$${NumberFormat('#,###').format(product.totalAmount)}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -603,8 +603,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             const Text(
               'Transacciones Detalladas',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
             ...salesReport!.transactions.map((transaction) {
               return ExpansionTile(
                 title: Text('${transaction.time} - \$${NumberFormat('#,###').format(transaction.total)}'),
@@ -640,7 +640,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-
+  
   Widget _buildInventoryReport() {
     if (inventoryReport == null) {
       return const Center(child: CircularProgressIndicator());
@@ -656,12 +656,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           const SizedBox(height: 24),
           
           // Lista de productos
-          _buildInventoryList(),
+            _buildInventoryList(),
         ],
       ),
     );
   }
-
+  
   Widget _buildProfitabilityReport() {
     if (profitabilityReport == null) {
       return const Center(child: CircularProgressIndicator());
@@ -1095,7 +1095,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       );
 
       if (outputFile == null) {
-        Get.snackbar(
+      Get.snackbar(
           'Información',
           'Operación cancelada',
           backgroundColor: Colors.orange,

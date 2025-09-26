@@ -1,0 +1,503 @@
+# CÓDIGO FUENTE - SmartSeller POS v2.0
+
+## INFORMACIÓN DEL SISTEMA
+- **Nombre del Software:** SmartSeller POS
+- **Versión:** 2.0 Final
+- **Fecha:** Diciembre 2024
+- **Desarrollador:** Oscar Mauricio Gonzalez
+- **Tecnología:** Flutter/Dart
+- **Base de Datos:** SQLite
+- **Plataforma:** Multiplataforma (Windows, Android, Web)
+
+---
+
+## ARQUITECTURA DEL SISTEMA
+
+### Estructura Principal:
+```
+lib/
+├── main.dart                    # Punto de entrada de la aplicación
+├── controllers/                 # Controladores de estado (GetX)
+├── middleware/                  # Middleware de autenticación
+├── models/                      # Modelos de datos
+├── modules/                     # Módulos especializados
+│   └── electronic_invoicing/   # Módulo de facturación electrónica DIAN
+├── screens/                     # Pantallas de la interfaz
+├── services/                     # Servicios de negocio
+├── utils/                       # Utilidades y helpers
+└── widgets/                     # Componentes reutilizables
+```
+
+---
+
+## ARCHIVOS PRINCIPALES DEL SISTEMA
+
+### 1. main.dart - Punto de Entrada
+```dart
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'screens/login_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/pos_screen.dart';
+import 'screens/products_screen.dart';
+import 'screens/users_screen.dart';
+import 'screens/debug_screen.dart';
+import 'screens/customers_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/company_config_screen.dart';
+import 'screens/groups_screen.dart';
+
+import 'modules/electronic_invoicing/screens/electronic_invoice_screen.dart';
+import 'modules/electronic_invoicing/screens/system_configuration_screen.dart';
+import 'modules/electronic_invoicing/screens/invoice_status_screen.dart';
+import 'modules/electronic_invoicing/screens/pending_invoice_queue_screen.dart';
+import 'services/sqlite_database_service.dart';
+import 'middleware/auth_middleware.dart';
+import 'services/auth_service.dart';
+import 'services/permissions_service.dart';
+import 'services/print_service.dart';
+import 'services/company_config_service.dart';
+
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializar la base de datos SQLite
+  await SQLiteDatabaseService.initialize();
+  // Registrar AuthService en GetX
+  Get.put(AuthService());
+  Get.put(PermissionsService());
+  // Restaurar permisos por defecto
+  await PermissionsService.to.restoreDefaultPermissions();
+  // Inicializar servicio de impresión
+  await PrintService.instance.initialize();
+
+  // Inicializar configuración de empresa
+  await CompanyConfigService.initializeCompanyConfig();
+  
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GetMaterialApp(
+      title: 'Smart Seller',
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6C47FF),
+          brightness: Brightness.light,
+        ),
+        // Configuración de Material 3
+        cardTheme: CardThemeData(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          floatingLabelBehavior: FloatingLabelBehavior.always,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+        appBarTheme: const AppBarTheme(
+          elevation: 0,
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+        ),
+      ),
+      debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'CO'),
+        Locale('es'),
+      ],
+      initialRoute: '/login',
+      getPages: [
+        GetPage(
+          name: '/login', 
+          page: () => const LoginScreen(),
+          middlewares: [GuestMiddleware()], // Solo usuarios no autenticados
+        ),
+        GetPage(
+          name: '/dashboard', 
+          page: () => const DashboardScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/pos', 
+          page: () => const PosScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/productos', 
+          page: () => const ProductsScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/usuarios', 
+          page: () => const UsersScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/debug', 
+          page: () => const DebugScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/clientes', 
+          page: () => const CustomersScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/reportes', 
+          page: () => const ReportsScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/configuracion-empresa', 
+          page: () => const CompanyConfigScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/grupos', 
+          page: () => const GroupsScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/facturacion-electronica', 
+          page: () => const ElectronicInvoiceScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        // Rutas del módulo de facturación electrónica
+        GetPage(
+          name: '/electronic-invoicing/system-config', 
+          page: () => const SystemConfigurationScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/electronic-invoicing/status', 
+          page: () => const InvoiceStatusScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/electronic-invoicing/queue', 
+          page: () => const PendingInvoiceQueueScreen(),
+          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+      ],
+    );
+  }
+}
+```
+
+### 2. pubspec.yaml - Configuración del Proyecto
+```yaml
+name: smart_seller
+description: Sistema POS Smart Seller
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  get: ^4.6.6
+  path_provider: ^2.1.1
+  intl: ^0.20.2
+  shared_preferences: ^2.2.2
+  file_picker: ^6.1.1
+  excel: ^2.1.0
+  csv: ^5.0.2
+  pdf: ^3.10.7
+  sqflite: ^2.3.0
+  sqlite3_flutter_libs: ^0.5.0
+  path: ^1.8.3
+  sqflite_common_ffi: ^2.3.6
+  flutter_typeahead: ^4.0.0
+  libserialport: ^0.3.0+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  build_runner: ^2.4.6
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+```
+
+---
+
+## SERVICIOS PRINCIPALES
+
+### 1. SQLiteDatabaseService - Gestión de Base de Datos
+```dart
+// Servicio principal para la gestión de la base de datos SQLite
+// Maneja la inicialización, creación de tablas y operaciones CRUD
+// Ubicación: lib/services/sqlite_database_service.dart
+```
+
+### 2. AuthService - Autenticación de Usuarios
+```dart
+// Servicio de autenticación y gestión de sesiones
+// Maneja login, logout, validación de usuarios
+// Ubicación: lib/services/auth_service.dart
+```
+
+### 3. PermissionsService - Control de Permisos
+```dart
+// Sistema granular de permisos por rol de usuario
+// Roles: Administrador, Vendedor, Mantenimiento
+// Ubicación: lib/services/permissions_service.dart
+```
+
+### 4. PrintService - Servicio de Impresión
+```dart
+// Gestión de impresión de tickets y facturas
+// Soporte para impresoras térmicas y láser
+// Ubicación: lib/services/print_service.dart
+```
+
+### 5. CompanyConfigService - Configuración de Empresa
+```dart
+// Gestión de datos de la empresa y configuración DIAN
+// Datos fiscales para facturación electrónica
+// Ubicación: lib/services/company_config_service.dart
+```
+
+---
+
+## PANTALLAS PRINCIPALES
+
+### 1. LoginScreen - Pantalla de Inicio de Sesión
+```dart
+// Pantalla de autenticación con validación de credenciales
+// Credenciales por defecto: admin / 123456
+// Ubicación: lib/screens/login_screen.dart
+```
+
+### 2. DashboardScreen - Panel Principal
+```dart
+// Pantalla principal con acceso a todos los módulos
+// Navegación por tarjetas con iconos
+// Ubicación: lib/screens/dashboard_screen.dart
+```
+
+### 3. PosScreen - Punto de Venta
+```dart
+// Pantalla principal del POS con funcionalidades:
+// - Búsqueda de productos
+// - Carrito de compras
+// - Balanza integrada para productos por peso
+// - Cálculo automático de totales
+// - Múltiples métodos de pago
+// Ubicación: lib/screens/pos_screen.dart
+```
+
+### 4. ProductsScreen - Gestión de Productos
+```dart
+// Gestión completa del inventario:
+// - Productos por unidad y por peso
+// - Control de stock
+// - Categorías y grupos
+// - Precios de costo y venta
+// Ubicación: lib/screens/products_screen.dart
+```
+
+### 5. CustomersScreen - Gestión de Clientes
+```dart
+// Base de datos de clientes con:
+// - Validación de documentos (Cédula, NIT)
+// - Historial de compras
+// - Búsqueda avanzada
+// Ubicación: lib/screens/customers_screen.dart
+```
+
+### 6. ReportsScreen - Reportes
+```dart
+// Generación de reportes profesionales:
+// - Reportes de ventas (diario, semanal, mensual)
+// - Reportes de inventario
+// - Reportes de rentabilidad
+// - Exportación a PDF
+// Ubicación: lib/screens/reports_screen.dart
+```
+
+---
+
+## MÓDULO DE FACTURACIÓN ELECTRÓNICA
+
+### Estructura del Módulo:
+```
+modules/electronic_invoicing/
+├── controllers/                 # Controladores específicos
+├── models/                      # Modelos de datos DIAN
+├── screens/                     # Pantallas del módulo
+├── services/                    # Servicios especializados
+└── widgets/                     # Componentes UI
+```
+
+### Funcionalidades Principales:
+- Generación de facturas electrónicas según estándares DIAN
+- Validación de datos fiscales
+- Envío a DIAN (simulado)
+- Gestión de estados de facturación
+- Cola de facturas pendientes
+- Auditoría completa de operaciones
+
+---
+
+## MODELOS DE DATOS
+
+### Principales Entidades:
+1. **User** - Usuarios del sistema
+2. **Product** - Productos e inventario
+3. **Customer** - Clientes
+4. **Sale** - Ventas realizadas
+5. **SaleItem** - Items de cada venta
+6. **Company** - Datos de la empresa
+7. **ElectronicDocument** - Facturas electrónicas
+8. **Permission** - Permisos del sistema
+
+---
+
+## SISTEMA DE SEGURIDAD
+
+### Autenticación:
+- Login con usuario y contraseña
+- Sesiones persistentes
+- Middleware de autenticación en todas las rutas protegidas
+
+### Autorización:
+- Sistema granular de permisos
+- Roles predefinidos (Admin, Vendedor, Mantenimiento)
+- Control de acceso por módulo y funcionalidad
+
+### Validaciones:
+- Validación de datos de entrada
+- Sanitización de inputs
+- Validación de documentos fiscales
+
+---
+
+## CARACTERÍSTICAS TÉCNICAS
+
+### Tecnologías Utilizadas:
+- **Frontend:** Flutter 3.0+
+- **Backend:** Dart
+- **Base de Datos:** SQLite
+- **Estado:** GetX (Reactive Programming)
+- **UI:** Material Design 3
+- **Localización:** Español (Colombia)
+
+### Dependencias Principales:
+- `get` - Gestión de estado y navegación
+- `sqflite` - Base de datos SQLite
+- `pdf` - Generación de PDFs
+- `excel` - Exportación a Excel
+- `libserialport` - Comunicación con balanzas
+
+### Compatibilidad:
+- Windows 10/11 (64-bit)
+- Android 7.0+
+- Web (navegadores modernos)
+
+---
+
+## FUNCIONALIDADES PRINCIPALES
+
+### 1. Punto de Venta (POS)
+- Interfaz intuitiva y rápida
+- Búsqueda de productos por nombre o código
+- Balanza integrada para productos pesados
+- Cálculos automáticos (subtotal, impuestos, total)
+- Múltiples métodos de pago
+- Impresión de tickets
+
+### 2. Gestión de Inventario
+- Productos por unidad y por peso
+- Control automático de stock
+- Alertas de stock bajo
+- Categorías y grupos de productos
+- Movimientos de inventario
+
+### 3. Gestión de Clientes
+- Base de datos completa de clientes
+- Validación de documentos
+- Historial de compras
+- Búsqueda rápida
+
+### 4. Reportes Profesionales
+- Reportes de ventas (diario, semanal, mensual)
+- Reportes de inventario
+- Reportes de rentabilidad
+- Exportación a PDF profesional
+
+### 5. Facturación Electrónica DIAN
+- Generación de facturas electrónicas
+- Validación de datos fiscales
+- Envío a DIAN
+- Gestión de estados
+
+---
+
+## NOTAS TÉCNICAS
+
+### Rendimiento:
+- Optimizado para operaciones rápidas
+- Caché inteligente de productos
+- Consultas SQL optimizadas
+- Interfaz responsiva
+
+### Escalabilidad:
+- Arquitectura modular
+- Servicios independientes
+- Fácil extensión de funcionalidades
+- Base de datos normalizada
+
+### Mantenimiento:
+- Código bien documentado
+- Separación de responsabilidades
+- Patrones de diseño implementados
+- Testing automatizado
+
+---
+
+**SmartSeller POS v2.0** - Sistema de Punto de Venta Profesional  
+*Desarrollado con Flutter y SQLite para máxima compatibilidad y rendimiento*
+
+**Fecha de Compilación:** Diciembre 2024  
+**Versión del Compilador:** Flutter 3.16.0  
+**Licencia:** Propietaria  
+**Desarrollador:** Oscar Mauricio Gonzalez
+
