@@ -15,6 +15,9 @@ import '../models/group.dart'; // Added for Group model
 class SQLiteDatabaseService {
   static Database? _database;
   
+  // Getter público para acceder a la base de datos
+  static Database? get database => _database;
+  
   // Inicializar la base de datos
   static Future<void> initialize() async {
     print('🚀 Inicializando base de datos SQLite...');
@@ -61,9 +64,69 @@ class SQLiteDatabaseService {
     
     // ✅ NUEVO: Asegurar que la tabla customers existe (SOLO CLIENTES)
     await ensureCustomersTableExists();
+    
+    // ✅ NUEVO: Migración para tablas de proveedores y contabilidad
+    await migrateAddSuppliersTables();
+    
+    // ✅ NUEVO: Migración para tablas de contabilidad
+    await migrateAddAccountingTables();
+    
+    // ✅ NUEVO: Limpiar sesiones de caja abiertas al iniciar
+    await _cleanupOpenCashSessions();
+    
+    // ✅ NUEVO: Migración para cuentas por cobrar y pagar
+    await migrateAddAccountsReceivablePayableTables();
+}
+
+// ✅ NUEVO: Limpiar sesiones de caja abiertas al iniciar la aplicación
+static Future<void> _cleanupOpenCashSessions() async {
+  try {
+    print('🧹 Limpiando sesiones de caja abiertas...');
+    
+    // Obtener todas las sesiones abiertas
+    final List<Map<String, dynamic>> openSessions = await _database!.query(
+      'cash_sessions',
+      where: 'status = ? AND is_active = ?',
+      whereArgs: ['open', 1],
+    );
+
+    if (openSessions.isEmpty) {
+      print('ℹ️ No hay sesiones de caja abiertas');
+      return;
+    }
+
+    // Cerrar cada sesión abierta
+    for (var sessionMap in openSessions) {
+      final sessionId = sessionMap['id'] as int;
+      final userId = sessionMap['user_id'] as int;
+      
+      await _database!.update(
+        'cash_sessions',
+        {
+          'status': 'closed',
+          'close_date': DateTime.now().toIso8601String(),
+          'final_amount': 0.0,
+          'total_income': 0.0,
+          'total_expense': 0.0,
+          'difference': 0.0,
+          'closed_by_user_id': userId,
+          'updated_at': DateTime.now().toIso8601String(),
+          'notes': 'Cerrada automáticamente al iniciar aplicación',
+        },
+        where: 'id = ?',
+        whereArgs: [sessionId],
+      );
+      
+      print('✅ Sesión de caja cerrada automáticamente: $sessionId');
+    }
+    
+    print('✅ Todas las sesiones de caja abiertas han sido cerradas');
+  } catch (e) {
+    print('❌ Error limpiando sesiones de caja: $e');
   }
-  
-  // Crear las tablas
+}
+
+// Crear las tablas
   static Future<void> _onCreate(Database db, int version) async {
     print('🔧 Creando tablas de la base de datos...');
     
@@ -1539,6 +1602,745 @@ class SQLiteDatabaseService {
       print('✅ Tabla customers creada exitosamente');
     } catch (e) {
       print('❌ Error forzando verificación de tabla customers: $e');
+    }
+  }
+
+  // ========== MIGRACIONES PARA MÓDULO DE PROVEEDORES ==========
+
+  // ✅ NUEVO: Migración para agregar tablas de proveedores
+  static Future<void> migrateAddSuppliersTables() async {
+    try {
+      print('🔧 Migrando: Agregando tablas de proveedores...');
+      
+      // Verificar si las tablas ya existen
+      final suppliersExists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='suppliers'"
+      );
+      
+      if (suppliersExists.isNotEmpty) {
+        print('✅ Tabla suppliers ya existe');
+        return;
+      }
+
+      // Crear tabla de proveedores
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS suppliers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          document TEXT UNIQUE,
+          document_type TEXT,
+          phone TEXT,
+          email TEXT,
+          address TEXT,
+          city TEXT,
+          department TEXT,
+          postal_code TEXT,
+          country TEXT DEFAULT 'Colombia',
+          tax_regime TEXT,
+          economic_activity TEXT,
+          contact_person TEXT,
+          contact_phone TEXT,
+          contact_email TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1
+        )
+      ''');
+
+      // Crear tabla de pagos a proveedores
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS supplier_payments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          supplier_id INTEGER NOT NULL,
+          amount REAL NOT NULL,
+          payment_date TEXT NOT NULL,
+          payment_method TEXT NOT NULL,
+          description TEXT,
+          user_id INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+      ''');
+
+      // Crear tabla de entradas contables
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS accounting_entries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          type TEXT NOT NULL,
+          amount REAL NOT NULL,
+          description TEXT NOT NULL,
+          category TEXT,
+          date TEXT NOT NULL,
+          user_id INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+      ''');
+
+      print('✅ Tablas de proveedores creadas exitosamente');
+    } catch (e) {
+      print('❌ Error creando tablas de proveedores: $e');
+    }
+  }
+
+  // ✅ NUEVO: Verificar estado de las tablas de proveedores
+  static Future<Map<String, dynamic>> getSuppliersTablesStatus() async {
+    try {
+      final suppliersExists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='suppliers'"
+      );
+      
+      final paymentsExists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='supplier_payments'"
+      );
+      
+      final accountingExists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='accounting_entries'"
+      );
+
+      return {
+        'suppliers_exists': suppliersExists.isNotEmpty,
+        'payments_exists': paymentsExists.isNotEmpty,
+        'accounting_exists': accountingExists.isNotEmpty,
+      };
+    } catch (e) {
+      return {
+        'suppliers_exists': false,
+        'payments_exists': false,
+        'accounting_exists': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  // ✅ NUEVO: Migración para tablas de contabilidad
+  static Future<void> migrateAddAccountingTables() async {
+    try {
+      print('🔄 Verificando tablas de contabilidad...');
+      
+      // Verificar si las tablas ya existen
+      final accountingExists = await getAccountingTablesStatus();
+      print('📋 Tablas contables existentes: $accountingExists');
+      
+      // Solo crear las tablas que faltan
+      final requiredTables = [
+        'accounting_entries',
+        'cash_movements', 
+        'cash_sessions',
+        'payment_methods',
+        'transaction_categories'
+      ];
+      
+      final missingTables = requiredTables.where((table) => !accountingExists.contains(table)).toList();
+      
+      if (missingTables.isEmpty) {
+        print('✅ Todas las tablas de contabilidad ya existen');
+        // Verificar columnas faltantes en accounting_entries
+        print('🔧 Verificando columnas de accounting_entries...');
+        
+        // Verificar si existe la columna subcategory
+        try {
+          await _database!.rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
+          print('✅ Columna subcategory ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna subcategory...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
+          print('✅ Columna subcategory agregada');
+        }
+        
+        // Verificar si existe la columna cash_session_id
+        try {
+          await _database!.rawQuery('SELECT cash_session_id FROM accounting_entries LIMIT 1');
+          print('✅ Columna cash_session_id ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna cash_session_id...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
+          print('✅ Columna cash_session_id agregada');
+        }
+        
+        // Verificar si existe la columna document_number
+        try {
+          await _database!.rawQuery('SELECT document_number FROM accounting_entries LIMIT 1');
+          print('✅ Columna document_number ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna document_number...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
+          print('✅ Columna document_number agregada');
+        }
+        
+        // Verificar si existe la columna reference
+        try {
+          await _database!.rawQuery('SELECT reference FROM accounting_entries LIMIT 1');
+          print('✅ Columna reference ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna reference...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN reference TEXT');
+          print('✅ Columna reference agregada');
+        }
+        
+        // Verificar si existe la columna related_entity
+        try {
+          await _database!.rawQuery('SELECT related_entity FROM accounting_entries LIMIT 1');
+          print('✅ Columna related_entity ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna related_entity...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN related_entity TEXT');
+          print('✅ Columna related_entity agregada');
+        }
+        
+        // Verificar si existe la columna related_entity_id
+        try {
+          await _database!.rawQuery('SELECT related_entity_id FROM accounting_entries LIMIT 1');
+          print('✅ Columna related_entity_id ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna related_entity_id...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN related_entity_id INTEGER');
+          print('✅ Columna related_entity_id agregada');
+        }
+        
+        // Verificar si existe la columna notes
+        try {
+          await _database!.rawQuery('SELECT notes FROM accounting_entries LIMIT 1');
+          print('✅ Columna notes ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna notes...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN notes TEXT');
+          print('✅ Columna notes agregada');
+        }
+        
+        // Verificar si existe la columna payment_method
+        try {
+          await _database!.rawQuery('SELECT payment_method FROM accounting_entries LIMIT 1');
+          print('✅ Columna payment_method ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna payment_method...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN payment_method TEXT');
+          print('✅ Columna payment_method agregada');
+        }
+        
+        // Verificar si existe la columna updated_at
+        try {
+          await _database!.rawQuery('SELECT updated_at FROM accounting_entries LIMIT 1');
+          print('✅ Columna updated_at ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna updated_at...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN updated_at TEXT');
+          print('✅ Columna updated_at agregada');
+        }
+        return;
+      }
+      
+      print('🔨 Creando tablas faltantes: $missingTables');
+
+      // Crear tabla de entradas contables (si no existe)
+      if (missingTables.contains('accounting_entries')) {
+        await _database!.execute('''
+          CREATE TABLE IF NOT EXISTS accounting_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT,
+            subcategory TEXT,
+            date TEXT NOT NULL,
+            reference TEXT,
+            payment_method TEXT,
+            user_id INTEGER NOT NULL,
+            cash_session_id INTEGER,
+            related_entity TEXT,
+            related_entity_id INTEGER,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            notes TEXT,
+            document_number TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (cash_session_id) REFERENCES cash_sessions (id)
+          )
+        ''');
+        print('✅ Tabla accounting_entries creada');
+      } else {
+        // Verificar y agregar columnas faltantes a accounting_entries si ya existe
+        print('🔧 Verificando columnas de accounting_entries...');
+        
+        // Verificar si existe la columna subcategory
+        try {
+          await _database!.rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
+          print('✅ Columna subcategory ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna subcategory...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
+          print('✅ Columna subcategory agregada');
+        }
+        
+        // Verificar si existe la columna cash_session_id
+        try {
+          await _database!.rawQuery('SELECT cash_session_id FROM accounting_entries LIMIT 1');
+          print('✅ Columna cash_session_id ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna cash_session_id...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
+          print('✅ Columna cash_session_id agregada');
+        }
+        
+        // Verificar si existe la columna document_number
+        try {
+          await _database!.rawQuery('SELECT document_number FROM accounting_entries LIMIT 1');
+          print('✅ Columna document_number ya existe');
+        } catch (e) {
+          print('🔧 Agregando columna document_number...');
+          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
+          print('✅ Columna document_number agregada');
+        }
+      }
+
+      // Crear tabla de movimientos de caja (si no existe)
+      if (missingTables.contains('cash_movements')) {
+        await _database!.execute('''
+          CREATE TABLE IF NOT EXISTS cash_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            amount REAL NOT NULL,
+            description TEXT NOT NULL,
+            payment_method TEXT,
+            date TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            cash_session_id INTEGER,
+            reference TEXT,
+            reference_id INTEGER,
+            category TEXT,
+            created_at TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            notes TEXT,
+            document_number TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (cash_session_id) REFERENCES cash_sessions (id)
+          )
+        ''');
+        print('✅ Tabla cash_movements creada');
+      }
+
+      // Crear tabla de sesiones de caja (si no existe)
+      if (missingTables.contains('cash_sessions')) {
+        await _database!.execute('''
+          CREATE TABLE IF NOT EXISTS cash_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            open_date TEXT NOT NULL,
+            close_date TEXT,
+            initial_amount REAL NOT NULL,
+            final_amount REAL,
+            total_income REAL,
+            total_expense REAL,
+            difference REAL,
+            user_id INTEGER NOT NULL,
+            closed_by_user_id INTEGER,
+            status TEXT NOT NULL DEFAULT 'open',
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (closed_by_user_id) REFERENCES users (id)
+          )
+        ''');
+        print('✅ Tabla cash_sessions creada');
+      }
+
+      // Crear tabla de métodos de pago (si no existe)
+      if (missingTables.contains('payment_methods')) {
+        await _database!.execute('''
+          CREATE TABLE IF NOT EXISTS payment_methods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            type TEXT NOT NULL,
+            requires_change INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        print('✅ Tabla payment_methods creada');
+      }
+
+      // Crear tabla de categorías de transacciones (si no existe)
+      if (missingTables.contains('transaction_categories')) {
+        await _database!.execute('''
+          CREATE TABLE IF NOT EXISTS transaction_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            type TEXT NOT NULL,
+            parent_category TEXT,
+            description TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        print('✅ Tabla transaction_categories creada');
+      }
+
+      // Insertar métodos de pago por defecto
+      print('📝 Insertando métodos de pago por defecto...');
+      await _insertDefaultPaymentMethods();
+      
+      // Insertar categorías por defecto
+      print('📝 Insertando categorías por defecto...');
+      await _insertDefaultTransactionCategories();
+
+      print('✅ Tablas de contabilidad creadas exitosamente');
+    } catch (e) {
+      print('❌ Error al crear tablas de contabilidad: $e');
+    }
+  }
+
+  // Verificar estado de las tablas de contabilidad
+  static Future<List<String>> getAccountingTablesStatus() async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return [];
+
+      final List<String> existingTables = [];
+      final tableNames = [
+        'accounting_entries',
+        'cash_movements', 
+        'cash_sessions',
+        'payment_methods',
+        'transaction_categories'
+      ];
+
+      for (final tableName in tableNames) {
+        final result = await db.rawQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+          [tableName]
+        );
+        if (result.isNotEmpty) {
+          existingTables.add(tableName);
+        }
+      }
+
+      print('🔍 Tablas contables verificadas: $existingTables');
+      return existingTables;
+    } catch (e) {
+      print('❌ Error al verificar tablas de contabilidad: $e');
+      return [];
+    }
+  }
+
+  // Insertar métodos de pago por defecto
+  static Future<void> _insertDefaultPaymentMethods() async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return;
+
+      final defaultMethods = [
+        {
+          'name': 'Efectivo',
+          'code': 'CASH',
+          'type': 'cash',
+          'requires_change': 1,
+          'description': 'Pago en efectivo',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Tarjeta Débito',
+          'code': 'DEBIT_CARD',
+          'type': 'card',
+          'requires_change': 0,
+          'description': 'Pago con tarjeta débito',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Tarjeta Crédito',
+          'code': 'CREDIT_CARD',
+          'type': 'card',
+          'requires_change': 0,
+          'description': 'Pago con tarjeta crédito',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Transferencia',
+          'code': 'TRANSFER',
+          'type': 'transfer',
+          'requires_change': 0,
+          'description': 'Transferencia bancaria',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Cheque',
+          'code': 'CHECK',
+          'type': 'check',
+          'requires_change': 0,
+          'description': 'Pago con cheque',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+      ];
+
+      for (final method in defaultMethods) {
+        await db.insert('payment_methods', method, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+
+      print('✅ Métodos de pago por defecto insertados');
+    } catch (e) {
+      print('❌ Error al insertar métodos de pago: $e');
+    }
+  }
+
+  // Insertar categorías por defecto
+  static Future<void> _insertDefaultTransactionCategories() async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return;
+
+      final defaultCategories = [
+        // Categorías de ingresos
+        {
+          'name': 'Ventas',
+          'code': 'SALES',
+          'type': 'income',
+          'description': 'Ingresos por ventas de productos',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Abonos de Clientes',
+          'code': 'CUSTOMER_PAYMENTS',
+          'type': 'income',
+          'description': 'Abonos de clientes',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Otros Ingresos',
+          'code': 'OTHER_INCOME',
+          'type': 'income',
+          'description': 'Otros tipos de ingresos',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Facturas Electrónicas',
+          'code': 'ELECTRONIC_INVOICE',
+          'type': 'income',
+          'description': 'Ingresos por facturas electrónicas',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Pagos de Facturas',
+          'code': 'INVOICE_PAYMENT',
+          'type': 'income',
+          'description': 'Pagos recibidos de facturas pendientes',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        // Categorías de egresos
+        {
+          'name': 'Pagos a Proveedores',
+          'code': 'SUPPLIER_PAYMENTS',
+          'type': 'expense',
+          'description': 'Pagos a proveedores',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Gastos Operativos',
+          'code': 'OPERATIONAL',
+          'type': 'expense',
+          'description': 'Gastos operativos del negocio',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Gastos Administrativos',
+          'code': 'ADMINISTRATIVE',
+          'type': 'expense',
+          'description': 'Gastos administrativos',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Devoluciones',
+          'code': 'REFUNDS',
+          'type': 'expense',
+          'description': 'Devoluciones a clientes',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Devoluciones a Proveedores',
+          'code': 'SUPPLIER_RETURNS',
+          'type': 'expense',
+          'description': 'Devoluciones de productos a proveedores',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Servicios Públicos',
+          'code': 'UTILITIES',
+          'type': 'expense',
+          'description': 'Pago de servicios públicos (luz, agua, gas)',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Arriendo',
+          'code': 'RENT',
+          'type': 'expense',
+          'description': 'Pago de arriendo del local',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Mantenimiento',
+          'code': 'MAINTENANCE',
+          'type': 'expense',
+          'description': 'Gastos de mantenimiento y reparaciones',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        {
+          'name': 'Ajustes Contables',
+          'code': 'ADJUSTMENTS',
+          'type': 'expense',
+          'description': 'Ajustes contables (notas crédito, débito)',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+      ];
+
+      // Limpiar categorías existentes para evitar duplicados
+      await db.delete('transaction_categories');
+      print('🗑️ Categorías existentes eliminadas');
+      
+      for (final category in defaultCategories) {
+        await db.insert('transaction_categories', category, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+
+      print('✅ Categorías por defecto insertadas');
+    } catch (e) {
+      print('❌ Error al insertar categorías: $e');
+    }
+  }
+
+  // ✅ NUEVO: Migración para tablas de cuentas por cobrar y pagar
+  static Future<void> migrateAddAccountsReceivablePayableTables() async {
+    try {
+      print('🔄 Verificando tablas de cuentas por cobrar y pagar...');
+      
+      // Verificar si las tablas ya existen
+      final tables = await _database!.rawQuery("""
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name IN (
+          'accounts_receivable', 
+          'accounts_payable', 
+          'receivable_payments', 
+          'payable_payments'
+        )
+      """);
+      
+      final existingTables = tables.map((table) => table['name'] as String).toList();
+      print('📋 Tablas de cuentas existentes: $existingTables');
+      
+      // Crear tabla accounts_receivable
+      if (!existingTables.contains('accounts_receivable')) {
+        await _database!.execute('''
+          CREATE TABLE accounts_receivable (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER NOT NULL,
+            customer_name TEXT NOT NULL,
+            customer_document TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            paid_amount REAL NOT NULL DEFAULT 0,
+            pending_amount REAL NOT NULL,
+            invoice_number TEXT NOT NULL,
+            invoice_date TEXT NOT NULL,
+            due_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        print('✅ Tabla accounts_receivable creada');
+      }
+      
+      // Crear tabla accounts_payable
+      if (!existingTables.contains('accounts_payable')) {
+        await _database!.execute('''
+          CREATE TABLE accounts_payable (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            supplier_id INTEGER NOT NULL,
+            supplier_name TEXT NOT NULL,
+            supplier_document TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            paid_amount REAL NOT NULL DEFAULT 0,
+            pending_amount REAL NOT NULL,
+            invoice_number TEXT NOT NULL,
+            invoice_date TEXT NOT NULL,
+            due_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        print('✅ Tabla accounts_payable creada');
+      }
+      
+      // Crear tabla receivable_payments
+      if (!existingTables.contains('receivable_payments')) {
+        await _database!.execute('''
+          CREATE TABLE receivable_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            accounts_receivable_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            payment_date TEXT NOT NULL,
+            payment_method TEXT NOT NULL,
+            reference TEXT,
+            notes TEXT,
+            user_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (accounts_receivable_id) REFERENCES accounts_receivable (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+          )
+        ''');
+        print('✅ Tabla receivable_payments creada');
+      }
+      
+      // Crear tabla payable_payments
+      if (!existingTables.contains('payable_payments')) {
+        await _database!.execute('''
+          CREATE TABLE payable_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            accounts_payable_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            payment_date TEXT NOT NULL,
+            payment_method TEXT NOT NULL,
+            reference TEXT,
+            notes TEXT,
+            user_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (accounts_payable_id) REFERENCES accounts_payable (id),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+          )
+        ''');
+        print('✅ Tabla payable_payments creada');
+      }
+
+      print('✅ Tablas de cuentas por cobrar y pagar creadas exitosamente');
+    } catch (e) {
+      print('❌ Error al crear tablas de cuentas por cobrar y pagar: $e');
     }
   }
 } 

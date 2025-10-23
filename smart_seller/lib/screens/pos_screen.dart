@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io';
 import 'pos_controller.dart';
 import '../models/product.dart';
 import '../services/sqlite_database_service.dart';
-import '../services/authorization_service.dart';
-import '../services/print_service.dart';
 import '../widgets/authorization_modal.dart';
 import '../services/permissions_service.dart';
 import '../models/permissions.dart';
 import '../widgets/reprint_menu_widget.dart';
-import 'package:flutter/services.dart';
+import '../modules/accounting/widgets/accounting_modal.dart';
+import '../modules/accounting/services/accounting_service.dart';
 import '../services/auth_service.dart';
 
-import '../modules/electronic_invoicing/controllers/electronic_invoice_controller.dart';
 import '../services/client_validation_service.dart';
 import '../models/client.dart';
 import '../modules/electronic_invoicing/services/system_configuration_service.dart';
@@ -38,7 +38,7 @@ class _PosScreenState extends State<PosScreen> {
   bool _isLoading = true;
   String _currentMode = 'barcode'; // barcode, quantity, payment
   Product? _selectedProduct;
-  bool _isShowingProductDialog = false;
+  bool _isTactileMode = false; // Modo táctil activado/desactivado
   
   // Controlador del POS
   late PosController _posController;
@@ -50,18 +50,6 @@ class _PosScreenState extends State<PosScreen> {
   DateTime? _authorizationTime;
   String? _authorizedUser;
   
-  // Códigos de autorización válidos
-  static const List<String> _validBarcodes = [
-    'BARCODE001', // Tarjeta Admin
-    'BARCODE002', // Tarjeta Supervisor  
-    'BARCODE003', // Tarjeta Gerente
-  ];
-  
-  static const Map<String, String> _validPersonalCodes = {
-    'ADMIN123': 'Administrador',
-    'SUPER456': 'Supervisor',
-    'MANAGER789': 'Gerente',
-  };
   
   @override
   void initState() {
@@ -82,7 +70,19 @@ class _PosScreenState extends State<PosScreen> {
     // ✅ Auto-focus al barcode al iniciar
     _ensureBarcodeFocus();
     
-
+    // ✅ Verificar sesión de caja abierta; si no existe, solicitar apertura
+    Future.microtask(() async {
+      try {
+        final session = await AccountingService.getOpenCashSession();
+        if (session == null) {
+          Get.snackbar('Caja cerrada', 'Debes abrir la caja antes de vender');
+          Get.dialog(
+            AccountingModal(),
+            barrierDismissible: false,
+          );
+        }
+      } catch (_) {}
+    });
   }
   
   @override
@@ -312,8 +312,11 @@ class _PosScreenState extends State<PosScreen> {
               children: [
                 _buildModeButton('barcode', '📱 Escanear', Icons.qr_code_scanner),
                 const SizedBox(width: 8),
-                _buildModeButton('quantity', '⌨️ Cantidad', Icons.keyboard),
-                const SizedBox(width: 8),
+                // Botón de cantidad solo en modo táctil
+                if (_isTactileMode) ...[
+                  _buildModeButton('quantity', '⌨️ Cantidad', Icons.keyboard),
+                  const SizedBox(width: 8),
+                ],
                 _buildModeButton('payment', '💳 Pago', Icons.payment),
               ],
             ),
@@ -461,12 +464,12 @@ class _PosScreenState extends State<PosScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : GridView.builder(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3, // 3 columnas
-                        childAspectRatio: 1.2, // Proporción ancho:alto
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
+                        crossAxisCount: 4, // 4 columnas para más productos
+                        childAspectRatio: 0.9, // Más alto que ancho para mejor visualización
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
                       ),
-                      itemCount: _products.take(9).length,
+                      itemCount: _products.take(12).length,
                       itemBuilder: (context, index) {
                         final product = _products[index];
                         
@@ -867,9 +870,9 @@ class _PosScreenState extends State<PosScreen> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: _clearCart,
-                icon: const Icon(Icons.clear),
-                label: const Text('Limpiar (F4)'),
+                onPressed: _showAccountingModal,
+                icon: const Icon(Icons.account_balance),
+                label: const Text('Conta (F4)'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
@@ -885,6 +888,19 @@ class _PosScreenState extends State<PosScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _toggleTactileMode,
+                icon: Icon(_isTactileMode ? Icons.keyboard : Icons.touch_app),
+                label: Text(_isTactileMode ? 'KB' : 'Touch'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isTactileMode ? Colors.grey[600] : Colors.purple,
+                  foregroundColor: Colors.white,
+                  elevation: _isTactileMode ? 2 : 8,
                 ),
               ),
             ),
@@ -968,7 +984,7 @@ class _PosScreenState extends State<PosScreen> {
           _showReprintMenu(); // ✅ NUEVO: Abrir menú de reimpresión
           break;
         case 'F4':
-          _clearCart();
+          _showAccountingModal();
           break;
         case 'F5':
           _openCashDrawer();
@@ -1016,6 +1032,12 @@ class _PosScreenState extends State<PosScreen> {
       }
     });
     
+    // Si está en modo táctil y se selecciona cantidad, mostrar diálogo táctil
+    if (_isTactileMode && mode == 'quantity') {
+      _showTactileQuantityDialog();
+      return;
+    }
+    
     // ✅ MEJORAR FOCUS - Con delay para asegurar que el widget se haya reconstruido
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -1028,6 +1050,186 @@ class _PosScreenState extends State<PosScreen> {
         }
       });
     });
+  }
+  
+  void _toggleTactileMode() {
+    setState(() {
+      _isTactileMode = !_isTactileMode;
+    });
+  }
+  
+  void _showTactileQuantityDialog() {
+    final controller = TextEditingController(text: ''); // Campo vacío por defecto
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('🎯 TECLADO TÁCTIL - Ingresar Cantidad'),
+          content: SizedBox(
+            width: 400, // Ancho fijo para asegurar que se vea
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Campo de cantidad más grande
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    border: Border.all(color: Colors.blue),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.numbers, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          controller.text.isEmpty ? 'Ingrese cantidad...' : controller.text,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: controller.text.isEmpty ? Colors.grey : Colors.blue,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Teclado virtual más grande
+                _buildVirtualKeyboard(controller, setState),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('❌ Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final quantity = int.tryParse(controller.text) ?? 1;
+                if (quantity > 0) {
+                  _addToCart(quantity);
+                  Navigator.of(context).pop();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('✅ Agregar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildVirtualKeyboard(TextEditingController controller, StateSetter setState) {
+    return Container(
+      width: double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Fila 1: 1, 2, 3
+          Row(
+            children: [
+              Expanded(child: _buildNumberButton('1', controller, setState)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildNumberButton('2', controller, setState)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildNumberButton('3', controller, setState)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Fila 2: 4, 5, 6
+          Row(
+            children: [
+              Expanded(child: _buildNumberButton('4', controller, setState)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildNumberButton('5', controller, setState)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildNumberButton('6', controller, setState)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Fila 3: 7, 8, 9
+          Row(
+            children: [
+              Expanded(child: _buildNumberButton('7', controller, setState)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildNumberButton('8', controller, setState)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildNumberButton('9', controller, setState)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Fila 4: 0, Borrar, Enter
+          Row(
+            children: [
+              Expanded(child: _buildNumberButton('0', controller, setState)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildActionButton('⌫', () {
+                if (controller.text.isNotEmpty) {
+                  controller.text = controller.text.substring(0, controller.text.length - 1);
+                  setState(() {}); // Actualizar la interfaz
+                }
+              })),
+              const SizedBox(width: 8),
+              Expanded(child: _buildActionButton('✓', () {
+                final quantity = int.tryParse(controller.text) ?? 1;
+                if (quantity > 0) {
+                  _addToCart(quantity);
+                  Navigator.of(context).pop();
+                }
+              })),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildNumberButton(String number, TextEditingController controller, StateSetter setState) {
+    return ElevatedButton(
+      onPressed: () {
+        controller.text += number;
+        setState(() {}); // Actualizar la interfaz
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 4,
+      ),
+      child: Text(
+        number,
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+  
+  Widget _buildActionButton(String text, VoidCallback onPressed) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.orange,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 4,
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+    );
   }
   
   void _searchProduct(String code) {
@@ -1276,14 +1478,6 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
   
-  void _clearCart() {
-    if (_isAuthorizationValid()) {
-      _performClearCart();
-      return;
-    }
-    
-    _showAuthorizationDialog();
-  }
   
   void _performClearCart() {
     _posController.clearCart();
@@ -1305,6 +1499,39 @@ class _PosScreenState extends State<PosScreen> {
   }
   
   void _finalizeSale() {
+    // Bloquear si no hay sesión de caja abierta
+    // Consulta ligera; en caso de error, previene finalizar
+    // Nota: usamos Future.microtask + Get.snackbar para UX consistente
+    AccountingService.getOpenCashSession().then((session) {
+      if (session == null) {
+        Get.snackbar(
+          'Caja cerrada',
+          'Debes abrir la caja antes de finalizar una venta',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        Get.dialog(
+          AccountingModal(),
+          barrierDismissible: false,
+        );
+        return;
+      }
+      _finalizeSaleProceed();
+    }).catchError((_) {
+      Get.snackbar(
+        'Caja cerrada',
+        'Debes abrir la caja antes de finalizar una venta',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      Get.dialog(
+        AccountingModal(),
+        barrierDismissible: false,
+      );
+    });
+  }
+
+  void _finalizeSaleProceed() {
     if (_posController.cartItems.isEmpty) {
       Get.snackbar(
         'Carrito vacío',
@@ -1894,6 +2121,25 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  // ✅ NUEVO: Mostrar modal de proveedores
+  void _showAccountingModal() {
+    Get.dialog(
+      AccountingModal(
+        onTransactionProcessed: (entry) {
+          // Callback cuando se procesa una transacción
+          Get.snackbar(
+            'Transacción Registrada',
+            '${entry.type == 'income' ? 'Ingreso' : 'Egreso'} de \$${entry.amount.toStringAsFixed(2)} registrado',
+            backgroundColor: Colors.green.shade100,
+            colorText: Colors.green.shade800,
+            duration: const Duration(seconds: 3),
+          );
+        },
+      ),
+      barrierDismissible: true,
+    );
+  }
+
   // Verificar permisos y ejecutar acción o solicitar autorización
   void _checkPermissionAndExecute(String action, VoidCallback executeAction) {
     final currentUser = AuthService.to.currentUser;
@@ -2035,6 +2281,69 @@ class _ProductButton extends StatelessWidget {
     required this.onTap,
   });
 
+  Widget _buildProductImage() {
+    // Si el producto tiene una imagen URL
+    if (product.imageUrl != null && product.imageUrl!.isNotEmpty) {
+      // Si es una URL de red
+      if (product.imageUrl!.startsWith('http')) {
+        return CachedNetworkImage(
+          imageUrl: product.imageUrl!,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) => _buildDefaultIcon(),
+        );
+      }
+      // Si es una ruta local de assets
+      else if (product.imageUrl!.startsWith('assets/')) {
+        return Image.asset(
+          product.imageUrl!,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildDefaultIcon(),
+        );
+      }
+      // Si es una ruta de archivo local
+      else {
+        return Image.file(
+          File(product.imageUrl!),
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildDefaultIcon(),
+        );
+      }
+    }
+    
+    // Si no hay imagen, mostrar icono por defecto
+    return _buildDefaultIcon();
+  }
+
+  Widget _buildDefaultIcon() {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.inventory_2,
+          color: Colors.blue[700],
+          size: 48,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Colors.blue;
@@ -2050,7 +2359,6 @@ class _ProductButton extends StatelessWidget {
         splashColor: primaryColor.withOpacity(0.3),
         highlightColor: primaryColor.withOpacity(0.1),
         child: Container(
-          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -2059,53 +2367,46 @@ class _ProductButton extends StatelessWidget {
             ),
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-
-                ],
-              ),
-              
-              // Centro: Icono principal
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.inventory_2,
-                  color: iconColor,
-                  size: 24,
-                ),
-              ),
-              
-              // Parte inferior: Nombre y precio
-              Column(
-                children: [
-                  Text(
-                    product.name,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+              // Imagen que ocupa todo el ancho y altura hasta el texto
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
                   ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green[100],
-                      borderRadius: BorderRadius.circular(8),
+                  child: _buildProductImage(),
+                ),
+              ),
+              
+              // Texto y precio en la parte inferior - altura fija
+              Container(
+                width: double.infinity, // Ocupa todo el ancho
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.name,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    child: Text(
+                    const SizedBox(width: 8),
+                    Text(
                       '\$${NumberFormat('#,###').format(product.price)}',
                       style: TextStyle(
                         fontSize: 10,
@@ -2113,8 +2414,8 @@ class _ProductButton extends StatelessWidget {
                         color: Colors.green[700],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -2896,7 +3197,6 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
       // Validar si el cliente puede recibir facturación electrónica
       if (!ClientValidationService.canReceiveElectronicInvoice(tempClient)) {
         final missingFields = ClientValidationService.getMissingFields(tempClient);
-        final errorMessage = ClientValidationService.getValidationErrorMessage(tempClient);
         
         Get.dialog(
           AlertDialog(

@@ -83,6 +83,36 @@ class DashboardScreen extends StatelessWidget {
                             Get.toNamed('/clientes');
                           },
                         ),
+                      // Proveedores - Solo si tiene permisos
+                      if (authService.hasPermission(Permission.viewClients))
+                        _SidebarButton(
+                          icon: Icons.business,
+                          label: 'Proveedores',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/proveedores');
+                          },
+                        ),
+                      // Cuentas por Cobrar y Pagar - Solo si tiene permisos
+                      if (authService.hasPermission(Permission.viewReports))
+                        _SidebarButton(
+                          icon: Icons.account_balance,
+                          label: 'Cuentas por Cobrar',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/cuentas-cobrar-pagar');
+                          },
+                        ),
+                      // Reportes Contables - Solo si tiene permisos
+                      if (authService.hasPermission(Permission.viewReports))
+                        _SidebarButton(
+                          icon: Icons.analytics,
+                          label: 'Reportes Contables',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/reportes-contables');
+                          },
+                        ),
                       // Reportes - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewReports))
                         _SidebarButton(

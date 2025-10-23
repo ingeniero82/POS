@@ -8,6 +8,8 @@ import '../services/system_configuration_service.dart';
 import '../services/pending_invoice_queue_service.dart';
 import '../../../models/client.dart';
 import '../../../models/product.dart';
+import '../../../modules/accounting/services/electronic_invoicing_integration_service.dart';
+import '../../../modules/accounting/services/accounting_service.dart';
 
 class DocumentGenerationService {
   // ✅ Generar estructura de datos interna (JSON)
@@ -225,6 +227,7 @@ ${_generateXMLItems(document.items)}
     required String pdfPath,
     required String xmlPath,
     required String jsonPath,
+    int? userId,
   }) async {
     try {
       // ✅ Actualizar el documento con las rutas de archivos
@@ -242,6 +245,52 @@ ${_generateXMLItems(document.items)}
       print('XML: $xmlPath');
       print('JSON: $jsonPath');
       
+      // ✅ INTEGRACIÓN CON MÓDULO CONTABLE
+      if (userId != null) {
+        // Obtener sesión de caja activa
+        final openSession = await AccountingService.getOpenCashSession();
+        
+        // Registrar en contabilidad según el tipo de documento
+        bool accountingRecorded = false;
+        
+        switch (document.documentType.toUpperCase()) {
+          case 'FE': // Factura Electrónica
+            accountingRecorded = await ElectronicInvoicingIntegrationService.recordElectronicInvoice(
+              document: updatedDocument,
+              userId: userId,
+              cashSessionId: openSession?.id,
+            );
+            break;
+            
+          case 'NC': // Nota Crédito
+            accountingRecorded = await ElectronicInvoicingIntegrationService.recordCreditNote(
+              document: updatedDocument,
+              userId: userId,
+              cashSessionId: openSession?.id,
+              reason: document.observations,
+            );
+            break;
+            
+          case 'ND': // Nota Débito
+            accountingRecorded = await ElectronicInvoicingIntegrationService.recordDebitNote(
+              document: updatedDocument,
+              userId: userId,
+              cashSessionId: openSession?.id,
+              reason: document.observations,
+            );
+            break;
+            
+          default:
+            print('⚠️ Tipo de documento no reconocido para integración contable: ${document.documentType}');
+        }
+        
+        if (accountingRecorded) {
+          print('✅ Documento registrado automáticamente en módulo contable');
+        } else {
+          print('⚠️ Error registrando documento en módulo contable');
+        }
+      }
+      
       return true;
     } catch (e) {
       print('Error guardando en base de datos: $e');
@@ -256,6 +305,7 @@ ${_generateXMLItems(document.items)}
     required List<Product> products,
     String? logoPath,
     String? outputDirectory,
+    int? userId,
   }) async {
     try {
       final outputDir = outputDirectory ?? './facturas';
@@ -302,6 +352,7 @@ ${_generateXMLItems(document.items)}
            pdfPath: pdfPath,
            xmlPath: xmlPath,
            jsonPath: jsonPath,
+           userId: userId,
          );
 
          // ✅ 6. Intentar envío a DIAN (simulado)

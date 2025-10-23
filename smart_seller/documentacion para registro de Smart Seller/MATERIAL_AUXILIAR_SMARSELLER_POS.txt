@@ -1,0 +1,875 @@
+MATERIAL AUXILIAR - SmartSeller POS v2.0
+
+INDICE DE DOCUMENTACION AUXILIAR
+
+1. Manuales de Usuario
+- Manual de Usuario Profesional
+- Guia de Configuracion Inicial
+- Manual de Facturacion Electronica DIAN
+- Guia de Solucion de Problemas
+
+2. Guias Tecnicas
+- Guia de Exportacion a Excel
+- Configuracion de Impresoras
+- Integracion con Balanzas
+- Sistema de Autorizacion Profesional
+
+3. Documentacion de Soporte
+- Solucion de Problemas Comunes
+- Guia de Mantenimiento
+- Plan de Testing
+- Correcciones de Compilacion
+
+MANUAL DE USUARIO PROFESIONAL
+
+Smart Seller POS - Manual de Usuario Profesional
+
+INFORMACION DEL SISTEMA
+- Version: 2.0 Final
+- Fecha: Septiembre 2025
+- Tipo: Sistema de Punto de Venta Profesional
+- Plataforma: Windows 10/11 (64-bit)
+
+INSTALACION RAPIDA
+
+Requisitos del Sistema:
+- Windows 10 o superior (64-bit)
+- 4GB RAM minimo (8GB recomendado)
+- 2GB espacio libre en disco
+- Conexion a internet (opcional, para actualizaciones)
+
+Pasos de Instalacion:
+1. Extraer el archivo ZIP en cualquier carpeta
+2. Ejecutar smart_seller.exe como administrador
+3. ¡Listo! El sistema se instalara automaticamente
+
+ACCESO AL SISTEMA
+
+Credenciales por Defecto:
+- Usuario: admin
+- Contrasena: 123456
+
+IMPORTANTE: Cambiar la contrasena en la primera sesion por seguridad.
+
+FUNCIONALIDADES PRINCIPALES
+
+1. PUNTO DE VENTA (POS)
+- Interfaz intuitiva y rapida
+- Busqueda de productos por nombre o codigo
+- Balanza integrada para productos pesados
+- Calculos automaticos (subtotal, impuestos, total)
+- Multiples metodos de pago
+- Impresion de tickets
+
+2. GESTION DE INVENTARIO
+- Productos por unidad (botellas, cajas, etc.)
+- Productos por peso (frutas, carnes, etc.)
+- Control automatico de stock
+- Alertas de stock bajo
+- Categorias y grupos de productos
+- Movimientos de inventario (entradas, salidas, ajustes)
+
+3. GESTION DE CLIENTES
+- Base de datos completa de clientes
+- Validacion de documentos (Cedula, NIT, etc.)
+- Historial de compras por cliente
+- Busqueda rapida de clientes
+
+4. REPORTES PROFESIONALES
+- Reportes de Ventas (diario, semanal, mensual)
+- Reportes de Inventario (stock actual, movimientos)
+- Reportes de Rentabilidad (margen de ganancia)
+- Exportacion a PDF profesional
+- Filtros avanzados por fecha, producto, cliente
+
+5. GESTION DE USUARIOS
+- Multiples usuarios con diferentes roles
+- Sistema de permisos granular
+- Roles: Administrador, Vendedor, Mantenimiento
+- Control de acceso por modulo
+
+6. CONFIGURACION DE EMPRESA
+- Datos completos de la empresa
+- Configuracion para Facturacion Electronica DIAN
+- Personalizacion de facturas y tickets
+- Textos personalizables
+
+GUIA DE USO RAPIDO
+
+Hacer una Venta:
+1. Buscar producto: Escribe el nombre en el campo de busqueda
+2. Agregar al carrito: Haz clic en "Agregar" o presiona Enter
+3. Para productos pesados: Usa la balanza integrada (parte inferior)
+4. Finalizar venta: Presiona F2 o clic en "Procesar Venta"
+5. Seleccionar metodo de pago: Efectivo, tarjeta, etc.
+6. Imprimir ticket: Se imprime automaticamente
+
+Gestionar Inventario:
+1. Ve a "Inventario" en el menu principal
+2. Agregar producto: Boton "+" (esquina superior derecha)
+3. Configurar producto:
+   - Nombre y descripcion
+   - Precio de costo y venta
+   - Stock inicial
+   - Categoria/grupo
+   - Tipo: Unidad o Peso
+
+Ver Reportes:
+1. Ve a "Reportes" en el menu principal
+2. Seleccionar tipo: Ventas, Inventario, Rentabilidad
+3. Filtrar por fecha: Hoy, semana, mes, personalizado
+4. Exportar PDF: Boton "Exportar" (esquina superior derecha)
+
+Configurar Empresa:
+1. Ve a "Configuracion" en el menu principal
+2. Completar datos basicos: Nombre, direccion, telefono
+3. Configurar facturacion electronica: NIT, ciudad, regimen fiscal
+4. Personalizar facturas: Textos de cabecera y pie
+
+USANDO LA BALANZA INTEGRADA
+
+Para Productos Pesados:
+1. Selecciona un producto que se vende por peso (ej: Manzanas)
+2. Veras el widget de balanza en la parte inferior
+3. Peso simulado: El sistema simula un peso aleatorio
+4. Haz clic en "Usar Peso Actual" para agregar al carrito
+5. Calculo automatico: Precio = Peso × Precio por KG
+
+CONFIGURACION AVANZADA
+
+Crear Usuarios:
+1. Ve a "Usuarios" en el menu principal
+2. Agregar usuario: Boton "+" (esquina superior derecha)
+3. Asignar rol: Administrador, Vendedor, Mantenimiento
+4. Configurar permisos: Acceso a modulos especificos
+
+Configurar Permisos:
+1. Ve a "Permisos" en el menu principal
+2. Seleccionar rol a modificar
+3. Activar/desactivar permisos especificos
+4. Guardar cambios
+
+TIPOS DE PRODUCTOS
+
+Productos por Unidad:
+- Botellas, cajas, paquetes
+- Se vende por cantidad fija
+- Ejemplo: 1 botella de Coca Cola
+
+Productos por Peso:
+- Frutas, verduras, carnes
+- Se vende por kilogramo
+- Usa la balanza integrada
+- Ejemplo: 2.5 kg de Manzanas
+
+SOLUCION DE PROBLEMAS
+
+El programa no abre:
+1. Ejecutar como administrador (clic derecho → "Ejecutar como administrador")
+2. Verificar Windows Defender no este bloqueando
+3. Reinstalar el paquete completo
+
+Error de base de datos:
+1. Verificar permisos de escritura en la carpeta
+2. Ejecutar como administrador
+3. Contactar soporte tecnico
+
+Problemas de impresion:
+1. Verificar impresora conectada y encendida
+2. Configurar impresora como predeterminada
+3. Reiniciar el programa
+
+SOPORTE TECNICO
+
+Informacion de Contacto:
+- Desarrollador: Oscar Mauricio Gonzalez
+- Email: [tu-email@ejemplo.com]
+- Telefono: [tu-telefono]
+- Horario: Lunes a Viernes, 8:00 AM - 6:00 PM
+
+Antes de Contactar:
+1. Anotar el mensaje de error exacto
+2. Describir los pasos que llevaron al problema
+3. Incluir captura de pantalla si es posible
+
+ACTUALIZACIONES
+
+Verificar Actualizaciones:
+- El sistema se actualiza automaticamente
+- No es necesario descargar archivos adicionales
+- Mantener conexion a internet para actualizaciones
+
+NOTAS IMPORTANTES
+
+Seguridad:
+- Cambiar contrasena por defecto inmediatamente
+- Crear usuarios con permisos limitados para vendedores
+- Hacer respaldos regulares de la base de datos
+
+Rendimiento:
+- Cerrar otros programas innecesarios
+- Mantener al menos 2GB de RAM libre
+- Reiniciar el programa si se vuelve lento
+
+Base de Datos:
+- Ubicacion: C:\Users\[Usuario]\Documents\smart_seller.db
+- Respaldo automatico: Se crea cada 24 horas
+- Tamano tipico: 1-10 MB dependiendo del uso
+
+GUIA DE CONFIGURACION INICIAL
+
+CONFIGURACION RECOMENDADA PARA EL CLIENTE
+
+1. PRIMER INICIO DE SESION
+Usuario: admin
+Contrasena: 123456
+
+2. CONFIGURACION DE EMPRESA (OBLIGATORIA)
+
+Datos Basicos:
+- Nombre de la Empresa: [Nombre del negocio del cliente]
+- Direccion: [Direccion completa]
+- Telefono: [Telefono principal]
+- Email: [Email de contacto]
+- Sitio Web: [Opcional]
+
+Para Facturacion Electronica DIAN:
+- Tipo de Documento: 31 (NIT)
+- Numero de NIT: [NIT de la empresa]
+- Digito de Verificacion: [DV del NIT]
+- Ciudad: [Ciudad donde opera]
+- Departamento: [Departamento]
+- Pais: CO (Colombia)
+- Regimen Fiscal: [Comun, Simplificado, etc.]
+- Responsabilidades Fiscales: [O-13, I-23, etc.]
+
+Textos de Factura:
+- Texto de Cabecera: "Gracias por su compra"
+- Texto de Pie: "Vuelva pronto"
+
+3. CREAR USUARIOS DEL SISTEMA
+
+Usuario Administrador (Principal):
+- Nombre: [Nombre del dueno/gerente]
+- Usuario: admin_principal
+- Contrasena: [Contrasena segura]
+- Rol: Administrador
+- Permisos: Todos
+
+Usuarios Vendedores:
+- Nombre: [Nombre del vendedor]
+- Usuario: vendedor1
+- Contrasena: [Contrasena segura]
+- Rol: Vendedor
+- Permisos: POS, Clientes, Reportes basicos
+
+4. CONFIGURAR PRODUCTOS INICIALES
+
+Productos de Ejemplo (Eliminar despues):
+- Manzanas - $3,000/kg - Peso
+- Coca Cola - $2,500 - Unidad
+- Pan - $1,200 - Unidad
+- Carne - $15,000/kg - Peso
+
+Categorias Recomendadas:
+- Bebidas
+- Frutas y Verduras
+- Carnes
+- Panaderia
+- Lacteos
+- Aseo
+
+5. CONFIGURAR METODOS DE PAGO
+
+Metodos Disponibles:
+- Efectivo (Principal)
+- Tarjeta Debito
+- Tarjeta Credito
+- Transferencia
+- Cheque (Opcional)
+
+6. CONFIGURAR IMPRESION
+
+Impresora de Tickets:
+- Modelo: [Modelo de impresora termica]
+- Puerto: USB o Red
+- Configuracion: 80mm de ancho
+
+Impresora de Facturas:
+- Modelo: [Impresora laser/inyeccion]
+- Formato: A4
+- Configuracion: Facturacion electronica
+
+7. CONFIGURAR BALANZA (SI APLICA)
+
+Productos por Peso:
+- Frutas: Manzanas, Peras, Bananos
+- Verduras: Tomates, Cebollas, Papas
+- Carnes: Res, Pollo, Cerdo
+- Granos: Arroz, Frijoles, Lentejas
+
+8. CONFIGURAR REPORTES
+
+Reportes Diarios:
+- Horario: Al final del dia
+- Tipo: Ventas, Inventario, Caja
+- Formato: PDF
+
+Reportes Semanales:
+- Dia: Domingo
+- Tipo: Resumen semanal
+- Envio: Email (opcional)
+
+9. CONFIGURAR RESPALDOS
+
+Respaldo Automatico:
+- Frecuencia: Diaria
+- Hora: 23:00
+- Ubicacion: C:\SmartSellerPOS\Backups\
+- Retencion: 30 dias
+
+10. CONFIGURAR SEGURIDAD
+
+Contrasenas:
+- Minimo 8 caracteres
+- Incluir numeros y letras
+- Cambiar cada 3 meses
+
+Permisos:
+- Vendedores: Solo POS y clientes
+- Cajeros: POS y caja
+- Administradores: Acceso completo
+
+CHECKLIST DE CONFIGURACION
+
+Antes de Entregar al Cliente:
+- Configurar datos de empresa
+- Crear usuarios principales
+- Configurar productos basicos
+- Probar venta completa
+- Probar reportes
+- Configurar impresion
+- Crear respaldo inicial
+- Documentar credenciales
+- Entregar manual de usuario
+
+Configuracion del Cliente:
+- Cambiar contrasena admin
+- Agregar productos reales
+- Configurar impresoras
+- Crear usuarios vendedores
+- Probar todas las funciones
+- Configurar respaldos
+- Personalizar textos de factura
+
+NOTAS IMPORTANTES
+
+Base de Datos:
+- Ubicacion: C:\Users\[Usuario]\Documents\smart_seller.db
+- Respaldo: C:\SmartSellerPOS\Backups\
+- Tamano inicial: ~1MB
+- Crecimiento: ~1MB por mes
+
+Rendimiento:
+- RAM recomendada: 8GB
+- Espacio disco: 2GB minimo
+- Procesador: Intel i3 o superior
+
+Soporte:
+- Horario: Lunes a Viernes, 8:00 AM - 6:00 PM
+- Tiempo respuesta: 24 horas
+- Canal preferido: Email o WhatsApp
+
+MANUAL DE FACTURACION ELECTRONICA DIAN
+
+Descripcion
+El modulo de Facturacion Electronica DIAN es una funcionalidad completa para generar facturas electronicas segun los estandares de la DIAN (Direccion de Impuestos y Aduanas Nacionales) de Colombia.
+
+Caracteristicas Principales
+
+Acceso Rapido
+- F2: Abre el modulo de facturacion electronica desde cualquier pantalla
+- Pantalla Completa: Se abre como un modulo independiente, no como dialogo
+- Navegacion por Pestanas: Organizacion clara de la informacion
+
+Funcionalidades
+
+Datos de Factura
+- Numero de factura con formato personalizable
+- Fecha de emision y vencimiento con selector de calendario
+- Medio de pago (Efectivo, Tarjeta, Transferencia, etc.)
+- Observaciones adicionales
+- Validacion de campos obligatorios
+
+Informacion del Cliente
+- Tipo de cliente (Cuantias Menores / Cliente Registrado)
+- NIT/RUT del cliente
+- Nombre/Razon Social
+- Direccion completa
+- Telefono y Email
+- Busqueda de clientes existentes
+
+Productos de la Factura
+- Lista de productos con cantidades y precios
+- Calculo automatico de subtotales
+- IVA del 19% calculado automaticamente
+- Total general de la factura
+- Eliminacion de productos individuales
+
+Botones de Accion
+- Guardar Borrador: Guarda la factura como borrador
+- Enviar a DIAN: Envia la factura a la DIAN para autorizacion
+
+Flujo de Trabajo
+
+Paso 1: Acceso al Modulo
+1. Presiona F2 desde cualquier pantalla del sistema
+2. Se abre la pantalla completa de facturacion electronica
+3. El sistema inicia en la pestana "Datos Factura"
+
+Paso 2: Configurar Datos de Factura
+1. Ingresa el numero de factura (ej: FE-001)
+2. Selecciona fecha de emision y vencimiento
+3. Elige el medio de pago
+4. Agrega observaciones si es necesario
+
+Paso 3: Configurar Cliente
+1. Cambia a la pestana "Cliente"
+2. Selecciona tipo de cliente:
+   - Cuantias Menores: Para ventas menores a $35,000
+   - Cliente Registrado: Para clientes con NIT
+3. Completa los datos del cliente
+4. Usa "Buscar Cliente" para cargar datos existentes
+
+Paso 4: Agregar Productos
+1. Cambia a la pestana "Productos"
+2. Haz clic en "Agregar Producto"
+3. Selecciona productos de la lista
+4. Especifica cantidades
+5. Los totales se calculan automaticamente
+
+Paso 5: Finalizar Factura
+1. Revisa todos los datos
+2. Presiona "Guardar Borrador" o "Enviar a DIAN"
+3. El sistema valida todos los campos
+4. Se procesa la factura segun la accion seleccionada
+
+Validaciones del Sistema
+
+Validaciones de Factura
+- Numero de factura obligatorio
+- Fecha de emision obligatoria
+- Fecha de vencimiento obligatoria
+- Medio de pago obligatorio
+
+Validaciones de Cliente
+- Para "Cuantias Menores": No requiere validacion adicional
+- Para "Cliente Registrado": NIT y nombre obligatorios
+
+Validaciones de Productos
+- Al menos un producto en la factura
+- Cantidades mayores a cero
+- Precios validos
+
+Calculos Automaticos
+
+Subtotal
+Subtotal = Σ(Producto.precio × Producto.cantidad)
+
+IVA (19%)
+IVA = Subtotal × 0.19
+
+Total
+Total = Subtotal + IVA
+
+Interfaz de Usuario
+
+Colores del Sistema
+- Azul Principal: #1976D2 - Headers y elementos principales
+- Verde: #4CAF50 - Boton "Enviar a DIAN"
+- Rojo: #F44336 - Botones de eliminar
+- Gris: #424242 - Textos principales
+
+Componentes UI
+- Pestanas: Navegacion clara entre secciones
+- Formularios: Campos con validacion visual
+- Tablas: Lista de productos con encabezados
+- Botones: Estados de carga y feedback visual
+
+Seguridad y Permisos
+
+Permisos Requeridos
+- Permission.accessElectronicInvoicing: Acceso al modulo
+- Permission.createInvoices: Crear facturas
+- Permission.sendToDIAN: Enviar a DIAN
+
+Validaciones de Seguridad
+- Usuario autenticado obligatorio
+- Permisos verificados antes de cada accion
+- Log de todas las operaciones
+
+Manejo de Errores
+
+Errores de Validacion
+- Campos obligatorios no completados
+- Datos de cliente incompletos
+- Sin productos en la factura
+
+Errores de Conexion
+- Problemas de red al enviar a DIAN
+- Errores de base de datos
+- Timeouts de conexion
+
+Feedback al Usuario
+- Mensajes de error claros y especificos
+- Indicadores de carga durante operaciones
+- Confirmaciones de exito
+
+Compatibilidad
+
+Dispositivos Soportados
+- Windows (Desktop)
+- Android (Tablets POS)
+- Web (Navegadores modernos)
+
+Resoluciones Optimizadas
+- Desktop: 1920x1080 y superiores
+- Tablet: 1024x768 y superiores
+- Responsive: Adaptable a diferentes tamanos
+
+Integracion con el Sistema
+
+Base de Datos
+- Almacenamiento de facturas en SQLite
+- Historial de borradores
+- Registro de envios a DIAN
+
+Servicios Conectados
+- ClientService: Busqueda y gestion de clientes
+- ProductService: Catalogo de productos
+- AuthService: Autenticacion y permisos
+
+Navegacion
+- Integrado con el sistema de rutas de GetX
+- Middleware de autenticacion
+- Navegacion fluida entre modulos
+
+Proximas Mejoras
+
+Funcionalidades Planificadas
+- Integracion real con DIAN
+- Generacion de PDF de facturas
+- Envio por email automatico
+- Historial de facturas enviadas
+- Notas credito y debito
+- Facturas de contingencia
+
+Mejoras de UX
+- Busqueda avanzada de productos
+- Autocompletado de clientes
+- Plantillas de facturacion
+- Atajos de teclado adicionales
+
+Soporte
+
+Documentacion Adicional
+- Ver BALANZA_INTEGRATION.md para integracion con basculas
+- Ver SISTEMA_AUTORIZACION_PROFESIONAL.md para permisos
+- Ver POS_OPTIMIZADO_GUIA.md para optimizacion del POS
+
+Contacto
+- Para problemas tecnicos: Revisar logs del sistema
+- Para funcionalidades: Consultar documentacion de DIAN
+- Para soporte: Contactar al equipo de desarrollo
+
+GUIA DE EXPORTACION A EXCEL
+
+Funcionalidades de Exportacion
+
+Tipos de Reportes Exportables:
+1. Reportes de Ventas
+   - Ventas por periodo
+   - Ventas por producto
+   - Ventas por cliente
+   - Ventas por vendedor
+
+2. Reportes de Inventario
+   - Stock actual
+   - Movimientos de inventario
+   - Productos con stock bajo
+   - Valorizacion de inventario
+
+3. Reportes de Clientes
+   - Lista completa de clientes
+   - Historial de compras por cliente
+   - Analisis de comportamiento
+
+Procedimiento de Exportacion:
+1. Generar Reporte: Seleccionar tipo y filtros
+2. Exportar: Hacer clic en boton "Exportar a Excel"
+3. Descargar: El archivo se descarga automaticamente
+4. Abrir: Usar Excel o LibreOffice para visualizar
+
+Formato del Archivo:
+- Extension: .xlsx (Excel 2007+)
+- Codificacion: UTF-8
+- Separadores: Configurables
+- Formato: Tablas con encabezados
+
+CONFIGURACION DE IMPRESORAS
+
+Tipos de Impresoras Soportadas
+
+1. Impresoras Termicas (Tickets)
+- Modelos: Epson TM-T20, TM-T82, TM-T88
+- Puerto: USB, Serial, Red
+- Ancho: 80mm estandar
+- Configuracion: Automatica
+
+2. Impresoras Laser (Facturas)
+- Modelos: HP LaserJet, Canon LBP
+- Formato: A4
+- Resolucion: 300-600 DPI
+- Configuracion: Manual
+
+Procedimiento de Configuracion
+
+Configurar Impresora Termica:
+1. Conectar: USB o puerto serial
+2. Instalar: Drivers del fabricante
+3. Configurar: En el sistema POS
+4. Probar: Imprimir ticket de prueba
+
+Configurar Impresora Laser:
+1. Instalar: Drivers completos
+2. Configurar: Puerto de red o USB
+3. Seleccionar: Como impresora predeterminada
+4. Probar: Imprimir pagina de prueba
+
+Solucion de Problemas
+
+Problemas Comunes:
+- No imprime: Verificar conexion y drivers
+- Texto cortado: Ajustar configuracion de papel
+- Caracteres extranos: Verificar codificacion
+- Lento: Optimizar configuracion de puerto
+
+INTEGRACION CON BALANZAS
+
+Balanzas Soportadas
+
+Tipos de Balanzas:
+1. Balanzas Serial: Comunicacion RS-232
+2. Balanzas USB: Comunicacion USB-HID
+3. Balanzas de Red: Comunicacion TCP/IP
+
+Protocolos Soportados:
+- Mettler Toledo: Protocolo estandar
+- Sartorius: Protocolo especifico
+- Ohaus: Protocolo generico
+- Adam: Protocolo industrial
+
+Configuracion de Balanza
+
+Configuracion Serial:
+1. Puerto: COM1, COM2, etc.
+2. Velocidad: 9600 baudios
+3. Bits: 8 bits de datos
+4. Paridad: Sin paridad
+5. Stop: 1 bit de parada
+
+Configuracion USB:
+1. Instalar: Drivers especificos
+2. Detectar: Puerto virtual
+3. Configurar: Parametros de comunicacion
+4. Probar: Lectura de peso
+
+Integracion con Productos
+
+Productos por Peso:
+- Frutas: Manzanas, Peras, Bananos
+- Verduras: Tomates, Cebollas, Papas
+- Carnes: Res, Pollo, Cerdo
+- Granos: Arroz, Frijoles, Lentejas
+
+Procedimiento de Venta:
+1. Seleccionar: Producto por peso
+2. Pesar: En balanza conectada
+3. Capturar: Peso automaticamente
+4. Calcular: Precio por peso
+5. Agregar: Al carrito de venta
+
+SISTEMA DE AUTORIZACION PROFESIONAL
+
+Roles del Sistema
+
+1. Administrador
+- Acceso: Completo a todos los modulos
+- Permisos: Crear, modificar, eliminar usuarios
+- Funciones: Configuracion del sistema, respaldos
+
+2. Vendedor
+- Acceso: POS, Clientes, Reportes basicos
+- Permisos: Procesar ventas, consultar clientes
+- Restricciones: No puede modificar configuracion
+
+3. Mantenimiento
+- Acceso: Solo modulos de mantenimiento
+- Permisos: Actualizar productos, respaldos
+- Restricciones: No puede procesar ventas
+
+Configuracion de Permisos
+
+Permisos Granulares:
+- POS: Acceso al punto de venta
+- Productos: Gestion de inventario
+- Clientes: Gestion de clientes
+- Reportes: Generacion de reportes
+- Usuarios: Gestion de usuarios
+- Configuracion: Configuracion del sistema
+- Facturacion: Facturacion electronica
+
+Asignacion de Permisos:
+1. Seleccionar: Usuario o rol
+2. Configurar: Permisos especificos
+3. Aplicar: Cambios inmediatamente
+4. Verificar: Funcionamiento correcto
+
+SOLUCION DE PROBLEMAS COMUNES
+
+Problemas Frecuentes
+
+1. El programa no inicia
+Causas:
+- Permisos insuficientes
+- Archivos corruptos
+- Antivirus bloqueando
+
+Soluciones:
+- Ejecutar como administrador
+- Desactivar antivirus temporalmente
+- Reinstalar el programa
+
+2. Error de base de datos
+Causas:
+- Archivo de BD corrupto
+- Permisos de escritura
+- Espacio en disco insuficiente
+
+Soluciones:
+- Restaurar desde respaldo
+- Verificar permisos de carpeta
+- Liberar espacio en disco
+
+3. Problemas de impresion
+Causas:
+- Impresora no conectada
+- Drivers incorrectos
+- Configuracion incorrecta
+
+Soluciones:
+- Verificar conexion
+- Reinstalar drivers
+- Reconfigurar impresora
+
+4. Lentitud del sistema
+Causas:
+- Memoria RAM insuficiente
+- Base de datos muy grande
+- Otros programas ejecutandose
+
+Soluciones:
+- Cerrar programas innecesarios
+- Optimizar base de datos
+- Aumentar memoria RAM
+
+Herramientas de Diagnostico
+
+Logs del Sistema:
+- Ubicacion: C:\SmartSellerPOS\Logs\
+- Formato: Archivos de texto
+- Rotacion: Diaria
+- Retencion: 30 dias
+
+Verificacion de Sistema:
+- Base de datos: Integridad de datos
+- Permisos: Acceso a archivos
+- Conectividad: Red e impresoras
+- Rendimiento: Uso de recursos
+
+PLAN DE TESTING
+
+Tipos de Pruebas
+
+1. Pruebas Unitarias
+- Funciones: Validacion de calculos
+- Servicios: Operaciones de base de datos
+- Modelos: Validacion de datos
+
+2. Pruebas de Integracion
+- Modulos: Comunicacion entre componentes
+- Servicios: Integracion con sistemas externos
+- Base de datos: Operaciones CRUD
+
+3. Pruebas de Usuario
+- Interfaz: Experiencia de usuario
+- Flujos: Procesos completos de venta
+- Rendimiento: Bajo carga de trabajo
+
+Casos de Prueba
+
+Casos Criticos:
+1. Login de usuario
+2. Procesar venta completa
+3. Generar reporte
+4. Imprimir ticket
+5. Crear factura electronica
+
+Casos de Error:
+1. Credenciales incorrectas
+2. Producto sin stock
+3. Cliente inexistente
+4. Impresora desconectada
+5. Error de base de datos
+
+CORRECCIONES DE COMPILACION
+
+Problemas Comunes
+
+1. Errores de Dependencias
+Problema: Paquetes no encontrados
+Solucion: flutter pub get
+
+2. Errores de Version
+Problema: Version de Flutter incompatible
+Solucion: Actualizar Flutter SDK
+
+3. Errores de Permisos
+Problema: Permisos insuficientes
+Solucion: Ejecutar como administrador
+
+4. Errores de Compilacion
+Problema: Codigo con errores de sintaxis
+Solucion: Revisar y corregir codigo
+
+Proceso de Compilacion
+
+Compilacion para Windows:
+1. Preparar: Entorno de desarrollo
+2. Compilar: flutter build windows
+3. Empaquetar: Crear instalador
+4. Probar: Instalacion y funcionamiento
+
+Compilacion para Android:
+1. Configurar: Android SDK
+2. Compilar: flutter build apk
+3. Firmar: APK para distribucion
+4. Probar: En dispositivos reales
+
+SmartSeller POS v2.0 - Material Auxiliar Completo  
+Documentacion profesional para registro de software
+
+Fecha de Compilacion: Diciembre 2024  
+Version: 2.0 Final  
+Desarrollador: Oscar Mauricio Gonzalez  
+Licencia: Propietaria

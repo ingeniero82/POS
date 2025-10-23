@@ -236,12 +236,158 @@ enum ReportType {
   profitability,
   payments,
   groups,
+  suppliers, // ✅ NUEVO: Reporte de proveedores
+  accounting, // ✅ NUEVO: Reporte contable
 }
 
 enum ExportFormat {
   excel,
   pdf,
   csv,
+}
+
+// ========== NUEVOS MODELOS PARA REPORTES DE PROVEEDORES Y CONTABILIDAD ==========
+
+// Reporte de Proveedores
+class SuppliersReport {
+  final DateTime date;
+  final DateTime? endDate;
+  final int totalSuppliers;
+  final double totalPayments;
+  final int totalPaymentTransactions;
+  final List<SupplierPaymentSummary> supplierPayments;
+  final List<PaymentByMethod> paymentsByMethod;
+  final List<SupplierActivity> supplierActivity;
+
+  SuppliersReport({
+    required this.date,
+    this.endDate,
+    required this.totalSuppliers,
+    required this.totalPayments,
+    required this.totalPaymentTransactions,
+    required this.supplierPayments,
+    required this.paymentsByMethod,
+    required this.supplierActivity,
+  });
+}
+
+class SupplierPaymentSummary {
+  final String supplierName;
+  final int paymentCount;
+  final double totalAmount;
+  final DateTime lastPayment;
+  final double averagePayment;
+
+  SupplierPaymentSummary({
+    required this.supplierName,
+    required this.paymentCount,
+    required this.totalAmount,
+    required this.lastPayment,
+    required this.averagePayment,
+  });
+}
+
+class PaymentByMethod {
+  final String method;
+  final double amount;
+  final int transactions;
+  final double percentage;
+
+  PaymentByMethod({
+    required this.method,
+    required this.amount,
+    required this.transactions,
+    required this.percentage,
+  });
+}
+
+class SupplierActivity {
+  final String supplierName;
+  final DateTime paymentDate;
+  final double amount;
+  final String paymentMethod;
+  final String? description;
+
+  SupplierActivity({
+    required this.supplierName,
+    required this.paymentDate,
+    required this.amount,
+    required this.paymentMethod,
+    this.description,
+  });
+}
+
+// Reporte Contable
+class AccountingReport {
+  final DateTime date;
+  final DateTime? endDate;
+  final double totalIncome;
+  final double totalExpenses;
+  final double netProfit;
+  final List<AccountingEntry> incomeEntries;
+  final List<AccountingEntry> expenseEntries;
+  final List<AccountingByCategory> accountingByCategory;
+  final List<DailyCashFlow> dailyCashFlow;
+
+  AccountingReport({
+    required this.date,
+    this.endDate,
+    required this.totalIncome,
+    required this.totalExpenses,
+    required this.netProfit,
+    required this.incomeEntries,
+    required this.expenseEntries,
+    required this.accountingByCategory,
+    required this.dailyCashFlow,
+  });
+}
+
+class AccountingEntry {
+  final DateTime date;
+  final String type; // 'income' o 'expense'
+  final double amount;
+  final String description;
+  final String? category;
+  final String userName;
+
+  AccountingEntry({
+    required this.date,
+    required this.type,
+    required this.amount,
+    required this.description,
+    this.category,
+    required this.userName,
+  });
+}
+
+class AccountingByCategory {
+  final String category;
+  final double income;
+  final double expenses;
+  final double net;
+
+  AccountingByCategory({
+    required this.category,
+    required this.income,
+    required this.expenses,
+    required this.net,
+  });
+}
+
+class DailyCashFlow {
+  final DateTime date;
+  final double income;
+  final double expenses;
+  final double net;
+  final double cumulativeNet;
+
+  DailyCashFlow({
+    required this.date,
+    required this.income,
+    required this.expenses,
+    required this.net,
+    required this.cumulativeNet,
+  });
 }
 
 

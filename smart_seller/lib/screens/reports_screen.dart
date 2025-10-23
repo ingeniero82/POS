@@ -100,6 +100,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             paymentMethodFilter: selectedPaymentMethod,
           );
           break;
+        case ReportType.suppliers:
+          // TODO: Implementar carga de reporte de proveedores
+          break;
+        case ReportType.accounting:
+          // TODO: Implementar carga de reporte contable
+          break;
       }
     } catch (e) {
       Get.snackbar('Error', 'Error cargando reporte: $e');
@@ -409,6 +415,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         return _buildPaymentsReport();
       case ReportType.groups:
         return _buildGroupsReport();
+      case ReportType.suppliers:
+        return _buildSuppliersReport();
+      case ReportType.accounting:
+        return _buildAccountingReport();
     }
   }
   
@@ -1151,6 +1161,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             reportPeriod: reportPeriod,
           );
           break;
+        case ReportType.suppliers:
+          // TODO: Implementar exportación de reporte de proveedores
+          throw Exception('Exportación de reporte de proveedores no implementada aún');
+        case ReportType.accounting:
+          // TODO: Implementar exportación de reporte contable
+          throw Exception('Exportación de reporte contable no implementada aún');
       }
       
       // Guardar archivo PDF en la ubicación seleccionada
@@ -1197,5 +1213,69 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       case ReportPeriod.custom:
         return 'Personalizado - ${DateFormat('dd/MM/yyyy').format(selectedDate)} a ${DateFormat('dd/MM/yyyy').format(endDate ?? selectedDate)}';
     }
+  }
+
+  // ✅ NUEVO: Widget para reporte de proveedores
+  Widget _buildSuppliersReport() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.business,
+            size: 64,
+            color: Colors.grey,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Reporte de Proveedores',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Funcionalidad en desarrollo',
+            style: TextStyle(
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NUEVO: Widget para reporte contable
+  Widget _buildAccountingReport() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.account_balance,
+            size: 64,
+            color: Colors.grey,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Reporte Contable',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Funcionalidad en desarrollo',
+            style: TextStyle(
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 } 

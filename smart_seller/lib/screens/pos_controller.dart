@@ -8,6 +8,7 @@ import '../models/client.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/auth_service.dart';
 import '../services/client_validation_service.dart';
+import '../modules/accounting/services/accounting_service.dart';
 
 import '../services/print_service.dart';
 import 'package:intl/intl.dart';
@@ -583,6 +584,24 @@ class PosController extends GetxController {
       
       // Guardar la venta
       await SQLiteDatabaseService.saveSale(sale);
+      
+      // ✅ NUEVO: Registrar ingreso contable automático
+      try {
+        final currentUser = AuthService.to.currentUser;
+        if (currentUser != null && currentUser.id != null) {
+          await AccountingService.recordSaleIncome(
+            total,
+            'Venta POS - ${method}',
+            currentUser.id!,
+            paymentMethod: method,
+            reference: 'sale_${sale.id ?? 'temp'}',
+          );
+          print('✅ Ingreso contable registrado automáticamente: \$${total}');
+        }
+      } catch (e) {
+        print('❌ Error registrando ingreso contable: $e');
+        // No interrumpir la venta por error contable
+      }
       
       // ✅ NUEVO: Actualizar puntos del cliente si hay uno seleccionado
       await updateCustomerAfterSale();

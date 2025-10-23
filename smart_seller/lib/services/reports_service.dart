@@ -2,7 +2,10 @@ import '../models/report_models.dart';
 import '../models/sale.dart';
 import '../models/product.dart';
 import '../models/group.dart';
+import '../models/supplier.dart';
+import '../models/supplier_payment.dart';
 import 'sqlite_database_service.dart';
+import 'supplier_service.dart';
 import 'package:intl/intl.dart';
 
 class ReportsService {
@@ -468,6 +471,313 @@ class ReportsService {
         paymentMethod: sale.paymentMethod ?? 'Efectivo',
         user: sale.user,
         items: items,
+      );
+    }).toList();
+  }
+
+  // ========== NUEVOS MÉTODOS PARA REPORTES DE PROVEEDORES Y CONTABILIDAD ==========
+
+  // Generar reporte de proveedores
+  static Future<SuppliersReport> generateSuppliersReport({
+    required DateTime date,
+    DateTime? endDate,
+  }) async {
+    try {
+      final suppliers = await SupplierService.getAllSuppliers();
+      final payments = await SupplierService.getAllSupplierPayments();
+      
+      // Filtrar pagos por fecha
+      final filteredPayments = payments.where((payment) {
+        final paymentDate = payment.paymentDate;
+        if (endDate != null) {
+          return paymentDate.isAfter(date.subtract(const Duration(days: 1))) &&
+                 paymentDate.isBefore(endDate.add(const Duration(days: 1)));
+        } else {
+          return paymentDate.year == date.year &&
+                 paymentDate.month == date.month &&
+                 paymentDate.day == date.day;
+        }
+      }).toList();
+
+      // Calcular totales
+      final totalPayments = filteredPayments.fold(0.0, (sum, payment) => sum + payment.amount);
+      final totalPaymentTransactions = filteredPayments.length;
+
+      // Generar resúmenes por proveedor
+      final supplierPayments = _generateSupplierPaymentSummaries(suppliers, filteredPayments);
+      
+      // Generar pagos por método
+      final paymentsByMethod = _generatePaymentsByMethod(filteredPayments);
+      
+      // Generar actividad de proveedores
+      final supplierActivity = _generateSupplierActivity(suppliers, filteredPayments);
+
+      return SuppliersReport(
+        date: date,
+        endDate: endDate,
+        totalSuppliers: suppliers.length,
+        totalPayments: totalPayments,
+        totalPaymentTransactions: totalPaymentTransactions,
+        supplierPayments: supplierPayments,
+        paymentsByMethod: paymentsByMethod,
+        supplierActivity: supplierActivity,
+      );
+    } catch (e) {
+      print('Error generando reporte de proveedores: $e');
+      rethrow;
+    }
+  }
+
+  // Generar reporte contable
+  static Future<AccountingReport> generateAccountingReport({
+    required DateTime date,
+    DateTime? endDate,
+  }) async {
+    try {
+      // Obtener ventas para ingresos
+      final sales = await SQLiteDatabaseService.getSales(
+        date: date,
+        endDate: endDate,
+      );
+      
+      // Obtener pagos a proveedores para egresos
+      final supplierPayments = await SupplierService.getAllSupplierPayments();
+      
+      // Filtrar pagos por fecha
+      final filteredPayments = supplierPayments.where((payment) {
+        final paymentDate = payment.paymentDate;
+        if (endDate != null) {
+          return paymentDate.isAfter(date.subtract(const Duration(days: 1))) &&
+                 paymentDate.isBefore(endDate.add(const Duration(days: 1)));
+        } else {
+          return paymentDate.year == date.year &&
+                 paymentDate.month == date.month &&
+                 paymentDate.day == date.day;
+        }
+      }).toList();
+
+      // Calcular totales
+      final totalIncome = sales.fold(0.0, (sum, sale) => sum + sale.total);
+      final totalExpenses = filteredPayments.fold(0.0, (sum, payment) => sum + payment.amount);
+      final netProfit = totalIncome - totalExpenses;
+
+      // Generar entradas de ingresos
+      final incomeEntries = _generateIncomeEntries(sales);
+      
+      // Generar entradas de egresos
+      final expenseEntries = _generateExpenseEntries(filteredPayments);
+      
+      // Generar contabilidad por categoría
+      final accountingByCategory = _generateAccountingByCategory(incomeEntries, expenseEntries);
+      
+      // Generar flujo de caja diario
+      final dailyCashFlow = _generateDailyCashFlow(date, endDate, sales, filteredPayments);
+
+      return AccountingReport(
+        date: date,
+        endDate: endDate,
+        totalIncome: totalIncome,
+        totalExpenses: totalExpenses,
+        netProfit: netProfit,
+        incomeEntries: incomeEntries,
+        expenseEntries: expenseEntries,
+        accountingByCategory: accountingByCategory,
+        dailyCashFlow: dailyCashFlow,
+      );
+    } catch (e) {
+      print('Error generando reporte contable: $e');
+      rethrow;
+    }
+  }
+
+  // Métodos auxiliares para reportes de proveedores
+  static List<SupplierPaymentSummary> _generateSupplierPaymentSummaries(
+    List<Supplier> suppliers,
+    List<SupplierPayment> payments,
+  ) {
+    final Map<int, List<SupplierPayment>> paymentsBySupplier = {};
+    
+    for (final payment in payments) {
+      paymentsBySupplier.putIfAbsent(payment.supplierId, () => []).add(payment);
+    }
+
+    return suppliers.map((supplier) {
+      final supplierPayments = paymentsBySupplier[supplier.id] ?? [];
+      final totalAmount = supplierPayments.fold(0.0, (sum, payment) => sum + payment.amount);
+      final paymentCount = supplierPayments.length;
+      final averagePayment = paymentCount > 0 ? totalAmount / paymentCount : 0.0;
+      final lastPayment = supplierPayments.isNotEmpty 
+          ? supplierPayments.map((p) => p.paymentDate).reduce((a, b) => a.isAfter(b) ? a : b)
+          : DateTime.now();
+
+      return SupplierPaymentSummary(
+        supplierName: supplier.name,
+        paymentCount: paymentCount,
+        totalAmount: totalAmount,
+        lastPayment: lastPayment,
+        averagePayment: averagePayment,
+      );
+    }).where((summary) => summary.paymentCount > 0).toList()
+      ..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+  }
+
+  static List<PaymentByMethod> _generatePaymentsByMethod(List<SupplierPayment> payments) {
+    final Map<String, List<SupplierPayment>> paymentsByMethod = {};
+    
+    for (final payment in payments) {
+      paymentsByMethod.putIfAbsent(payment.paymentMethod, () => []).add(payment);
+    }
+
+    final totalAmount = payments.fold(0.0, (sum, payment) => sum + payment.amount);
+
+    return paymentsByMethod.entries.map((entry) {
+      final methodPayments = entry.value;
+      final amount = methodPayments.fold(0.0, (sum, payment) => sum + payment.amount);
+      final transactions = methodPayments.length;
+      final percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0.0;
+
+      return PaymentByMethod(
+        method: entry.key,
+        amount: amount,
+        transactions: transactions,
+        percentage: percentage,
+      );
+    }).toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+  }
+
+  static List<SupplierActivity> _generateSupplierActivity(
+    List<Supplier> suppliers,
+    List<SupplierPayment> payments,
+  ) {
+    return payments.map((payment) {
+      final supplier = suppliers.firstWhere(
+        (s) => s.id == payment.supplierId,
+        orElse: () => Supplier(
+          name: 'Proveedor eliminado',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      return SupplierActivity(
+        supplierName: supplier.name,
+        paymentDate: payment.paymentDate,
+        amount: payment.amount,
+        paymentMethod: payment.paymentMethod,
+        description: payment.description,
+      );
+    }).toList()
+      ..sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
+  }
+
+  // Métodos auxiliares para reportes contables
+  static List<AccountingEntry> _generateIncomeEntries(List<Sale> sales) {
+    return sales.map((sale) {
+      return AccountingEntry(
+        date: sale.date,
+        type: 'income',
+        amount: sale.total,
+        description: 'Venta #${sale.id}',
+        category: 'sales',
+        userName: 'Sistema',
+      );
+    }).toList();
+  }
+
+  static List<AccountingEntry> _generateExpenseEntries(List<SupplierPayment> payments) {
+    return payments.map((payment) {
+      return AccountingEntry(
+        date: payment.paymentDate,
+        type: 'expense',
+        amount: payment.amount,
+        description: payment.description ?? 'Pago a proveedor',
+        category: 'supplier_payment',
+        userName: 'Sistema',
+      );
+    }).toList();
+  }
+
+  static List<AccountingByCategory> _generateAccountingByCategory(
+    List<AccountingEntry> incomeEntries,
+    List<AccountingEntry> expenseEntries,
+  ) {
+    final Map<String, double> incomeByCategory = {};
+    final Map<String, double> expenseByCategory = {};
+
+    for (final entry in incomeEntries) {
+      final category = entry.category ?? 'sin_categoria';
+      incomeByCategory[category] = (incomeByCategory[category] ?? 0.0) + entry.amount;
+    }
+
+    for (final entry in expenseEntries) {
+      final category = entry.category ?? 'sin_categoria';
+      expenseByCategory[category] = (expenseByCategory[category] ?? 0.0) + entry.amount;
+    }
+
+    final allCategories = {...incomeByCategory.keys, ...expenseByCategory.keys};
+
+    return allCategories.map((category) {
+      final income = incomeByCategory[category] ?? 0.0;
+      final expenses = expenseByCategory[category] ?? 0.0;
+      final net = income - expenses;
+
+      return AccountingByCategory(
+        category: category,
+        income: income,
+        expenses: expenses,
+        net: net,
+      );
+    }).toList()
+      ..sort((a, b) => b.net.compareTo(a.net));
+  }
+
+  static List<DailyCashFlow> _generateDailyCashFlow(
+    DateTime startDate,
+    DateTime? endDate,
+    List<Sale> sales,
+    List<SupplierPayment> payments,
+  ) {
+    final Map<String, double> dailyIncome = {};
+    final Map<String, double> dailyExpenses = {};
+
+    // Procesar ventas
+    for (final sale in sales) {
+      final date = sale.date;
+      final dateKey = DateFormat('yyyy-MM-dd').format(date);
+      dailyIncome[dateKey] = (dailyIncome[dateKey] ?? 0.0) + sale.total;
+    }
+
+    // Procesar pagos
+    for (final payment in payments) {
+      final dateKey = DateFormat('yyyy-MM-dd').format(payment.paymentDate);
+      dailyExpenses[dateKey] = (dailyExpenses[dateKey] ?? 0.0) + payment.amount;
+    }
+
+    // Generar días
+    final days = <DateTime>[];
+    final current = DateTime(startDate.year, startDate.month, startDate.day);
+    final end = endDate ?? startDate;
+    
+    while (current.isBefore(end.add(const Duration(days: 1)))) {
+      days.add(current);
+      current.add(const Duration(days: 1));
+    }
+
+    double cumulativeNet = 0.0;
+    return days.map((day) {
+      final dateKey = DateFormat('yyyy-MM-dd').format(day);
+      final income = dailyIncome[dateKey] ?? 0.0;
+      final expenses = dailyExpenses[dateKey] ?? 0.0;
+      final net = income - expenses;
+      cumulativeNet += net;
+
+      return DailyCashFlow(
+        date: day,
+        income: income,
+        expenses: expenses,
+        net: net,
+        cumulativeNet: cumulativeNet,
       );
     }).toList();
   }

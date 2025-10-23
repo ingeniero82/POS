@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../models/product.dart';
 import '../models/group.dart';
 import '../services/sqlite_database_service.dart';
+import '../services/image_service.dart';
+import 'dart:io';
 
 class ProductFormDialog extends StatefulWidget {
   final Product? product;
@@ -35,6 +37,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
   // ✅ NUEVO: Controlador para % de utilidad
   final _profitMarginController = TextEditingController();
 
+  // ✅ NUEVO: Variables para manejo de imagen
+  String? _currentImagePath;
+  bool _isImageLoading = false;
   
   String? _selectedGroup;
   List<Group> _availableGroups = [];
@@ -66,6 +71,9 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
               _selectedGroup = widget.product!.category;
       _groupController.text = _selectedGroup ?? '';
       _isActive = widget.product!.isActive;
+      
+      // ✅ NUEVO: Inicializar imagen del producto
+      _currentImagePath = widget.product!.imageUrl;
       
       // ✅ NUEVO: Calcular % de utilidad inicial
       _calculateProfitMargin();
@@ -250,7 +258,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: _isActive,
-
+        imageUrl: _currentImagePath, // ✅ NUEVO: Incluir imagen
       );
 
       if (widget.product == null) {
@@ -340,6 +348,188 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         duration: Duration(seconds: 3),
       );
     }
+  }
+
+  // ✅ NUEVO: Método para seleccionar imagen del producto
+  Future<void> _selectProductImage() async {
+    setState(() {
+      _isImageLoading = true;
+    });
+
+    try {
+      final String? imagePath = await ImageService.pickProductImage(context);
+      
+      if (imagePath != null) {
+        setState(() {
+          _currentImagePath = imagePath;
+        });
+        
+        Get.snackbar(
+          '✅ Imagen Seleccionada',
+          'La imagen del producto ha sido seleccionada correctamente',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        '❌ Error',
+        'Error al seleccionar imagen: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    } finally {
+      setState(() {
+        _isImageLoading = false;
+      });
+    }
+  }
+
+  // ✅ NUEVO: Método para eliminar imagen del producto
+  Future<void> _removeProductImage() async {
+    if (_currentImagePath == null) return;
+
+    try {
+      await ImageService.deleteProductImage(_currentImagePath);
+      setState(() {
+        _currentImagePath = null;
+      });
+      
+      Get.snackbar(
+        '✅ Imagen Eliminada',
+        'La imagen del producto ha sido eliminada',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      Get.snackbar(
+        '❌ Error',
+        'Error al eliminar imagen: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  // ✅ NUEVO: Widget para la sección de imagen del producto
+  Widget _buildImageSection() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.image, color: Colors.blue),
+                const SizedBox(width: 8),
+                const Text(
+                  'Imagen del Producto',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Vista previa de la imagen
+            Center(
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: _currentImagePath != null
+                      ? Image.file(
+                          File(_currentImagePath!),
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildImagePlaceholder();
+                          },
+                        )
+                      : _buildImagePlaceholder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Botones de acción
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _isImageLoading ? null : _selectProductImage,
+                  icon: _isImageLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_photo_alternate),
+                  label: Text(_isImageLoading ? 'Cargando...' : 'Seleccionar Imagen'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                if (_currentImagePath != null) ...[
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _removeProductImage,
+                    icon: const Icon(Icons.delete),
+                    label: const Text('Eliminar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ NUEVO: Widget placeholder para cuando no hay imagen
+  Widget _buildImagePlaceholder() {
+    return Container(
+      width: 120,
+      height: 120,
+      color: Colors.grey.shade100,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image,
+            size: 40,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sin imagen',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -468,6 +658,10 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          
+          // ✅ NUEVO: Sección de imagen del producto
+          _buildImageSection(),
           const SizedBox(height: 16),
           
           // Segunda fila - Nombre del Producto y Grupo
