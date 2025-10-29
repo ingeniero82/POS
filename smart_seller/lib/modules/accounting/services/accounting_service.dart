@@ -401,7 +401,7 @@ class AccountingService {
         type: 'income',
         amount: amount,
         description: description,
-        category: 'ventas',
+        category: 'Ventas', // ✅ Traducido a español
         date: DateTime.now(),
         paymentMethod: paymentMethod,
         userId: userId,
@@ -431,7 +431,7 @@ class AccountingService {
         type: 'expense',
         amount: amount,
         description: description,
-        category: category ?? 'gastos',
+        category: category ?? 'Gastos Operativos', // ✅ Traducido a español
         date: DateTime.now(),
         paymentMethod: paymentMethod,
         userId: userId,
@@ -461,9 +461,9 @@ class AccountingService {
         type: 'expense',
         amount: amount,
         description: 'Pago a proveedor: $supplierName',
-        category: 'SUPPLIER_PAYMENTS',
+        category: 'Pago a Proveedores', // ✅ Traducido a español
         date: DateTime.now(),
-        paymentMethod: paymentMethod ?? 'CASH',
+        paymentMethod: paymentMethod ?? 'Efectivo',
         userId: userId,
         cashSessionId: openSession.id,
         reference: reference,
@@ -494,7 +494,7 @@ class AccountingService {
         description: description,
         category: category,
         date: DateTime.now(),
-        paymentMethod: paymentMethod ?? 'CASH',
+        paymentMethod: paymentMethod ?? 'Efectivo', // ✅ Traducido a español
         userId: userId,
         cashSessionId: openSession.id,
         reference: reference,
@@ -523,9 +523,9 @@ class AccountingService {
         type: 'expense',
         amount: amount,
         description: 'Devolución a proveedor: $supplierName',
-        category: 'SUPPLIER_RETURNS',
+        category: 'Devoluciones a Proveedores', // ✅ Traducido a español
         date: DateTime.now(),
-        paymentMethod: paymentMethod ?? 'CASH',
+        paymentMethod: paymentMethod ?? 'Efectivo',
         userId: userId,
         cashSessionId: openSession.id,
         reference: reference,

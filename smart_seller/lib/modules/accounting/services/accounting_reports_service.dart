@@ -49,15 +49,15 @@ class AccountingReportsService {
       ]);
 
       // Calcular totales
-      final totalIncome = incomeResults.fold<double>(0, (sum, row) => sum + (row['total_amount'] as double));
-      final totalExpenses = expenseResults.fold<double>(0, (sum, row) => sum + (row['total_amount'] as double));
+      final totalIncome = incomeResults.fold<double>(0, (sum, row) => sum + (row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double)));
+      final totalExpenses = expenseResults.fold<double>(0, (sum, row) => sum + (row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double)));
       final netIncome = totalIncome - totalExpenses;
 
       // Crear categorías de ingresos
       final incomeCategories = incomeResults.map((row) {
-        final amount = row['total_amount'] as double;
+        final amount = row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double);
         return IncomeCategory(
-          category: row['category'] as String,
+          category: _translateCategory(row['category'] as String), // ✅ Traducir categorías
           amount: amount,
           transactionCount: row['transaction_count'] as int,
           percentage: totalIncome > 0 ? (amount / totalIncome) * 100 : 0,
@@ -66,9 +66,9 @@ class AccountingReportsService {
 
       // Crear categorías de egresos
       final expenseCategories = expenseResults.map((row) {
-        final amount = row['total_amount'] as double;
+        final amount = row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double);
         return ExpenseCategory(
-          category: row['category'] as String,
+          category: _translateCategory(row['category'] as String), // ✅ Traducir categorías
           amount: amount,
           transactionCount: row['transaction_count'] as int,
           percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
@@ -116,14 +116,14 @@ class AccountingReportsService {
       ]);
 
       // Calcular totales
-      final totalIncome = dailyResults.fold<double>(0, (sum, row) => sum + (row['daily_income'] as double));
-      final totalExpenses = dailyResults.fold<double>(0, (sum, row) => sum + (row['daily_expenses'] as double));
+      final totalIncome = dailyResults.fold<double>(0, (sum, row) => sum + (row['daily_income'] is int ? (row['daily_income'] as int).toDouble() : (row['daily_income'] as double)));
+      final totalExpenses = dailyResults.fold<double>(0, (sum, row) => sum + (row['daily_expenses'] is int ? (row['daily_expenses'] as int).toDouble() : (row['daily_expenses'] as double)));
       final netCashFlow = totalIncome - totalExpenses;
 
       // Crear flujos diarios
       final dailyFlows = dailyResults.map((row) {
-        final income = row['daily_income'] as double;
-        final expenses = row['daily_expenses'] as double;
+        final income = row['daily_income'] is int ? (row['daily_income'] as int).toDouble() : (row['daily_income'] as double);
+        final expenses = row['daily_expenses'] is int ? (row['daily_expenses'] as int).toDouble() : (row['daily_expenses'] as double);
         return DailyCashFlow(
           date: DateTime.parse(row['flow_date'] as String),
           income: income,
@@ -160,13 +160,10 @@ class AccountingReportsService {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
 
-      // Obtener sesiones de caja con información de usuarios
+      // Obtener sesiones de caja sin JOIN primero
       final sessionQuery = '''
-        SELECT 
-          cs.*,
-          u.full_name as user_name
+        SELECT cs.*
         FROM cash_sessions cs
-        LEFT JOIN users u ON cs.user_id = u.id
         WHERE cs.open_date BETWEEN ? AND ?
         ORDER BY cs.open_date DESC
       ''';
@@ -180,9 +177,24 @@ class AccountingReportsService {
       final sessions = <CashSessionSummary>[];
       for (final row in sessionResults) {
         final transactionCount = await _getTransactionCountForSession(row['id'] as int);
+        
+        // Obtener el nombre del usuario por separado
+        String userName = 'Usuario desconocido';
+        if (row['user_id'] != null) {
+          final userRow = await db.query(
+            'users',
+            columns: ['fullName'],
+            where: 'id = ?',
+            whereArgs: [row['user_id']],
+          );
+          if (userRow.isNotEmpty) {
+            userName = userRow.first['fullName'] as String? ?? 'Usuario desconocido';
+          }
+        }
+        
         sessions.add(CashSessionSummary(
           sessionId: row['id'] as int,
-          userName: row['user_name'] as String? ?? 'Usuario desconocido',
+          userName: userName,
           openDate: DateTime.parse(row['open_date'] as String),
           closeDate: row['close_date'] != null ? DateTime.parse(row['close_date'] as String) : null,
           initialAmount: (row['initial_amount'] as num).toDouble(),
@@ -224,13 +236,10 @@ class AccountingReportsService {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
 
-      // Obtener todas las transacciones con información de usuarios
+      // Obtener todas las transacciones sin JOIN
       final transactionQuery = '''
-        SELECT 
-          ae.*,
-          u.full_name as user_name
+        SELECT ae.*
         FROM accounting_entries ae
-        LEFT JOIN users u ON ae.user_id = u.id
         WHERE ae.date BETWEEN ? AND ?
         ORDER BY ae.date DESC, ae.id DESC
       ''';
@@ -241,21 +250,36 @@ class AccountingReportsService {
       ]);
 
       // Crear entradas de auditoría
-      final entries = transactionResults.map((row) {
-        return TransactionAuditEntry(
+      final entries = <TransactionAuditEntry>[];
+      for (final row in transactionResults) {
+        // Obtener el nombre del usuario por separado
+        String userName = 'Usuario desconocido';
+        if (row['user_id'] != null) {
+          final userRow = await db.query(
+            'users',
+            columns: ['fullName'],
+            where: 'id = ?',
+            whereArgs: [row['user_id']],
+          );
+          if (userRow.isNotEmpty) {
+            userName = userRow.first['fullName'] as String? ?? 'Usuario desconocido';
+          }
+        }
+        
+        entries.add(TransactionAuditEntry(
           id: row['id'] as int,
           type: row['type'] as String,
           amount: (row['amount'] as num).toDouble(),
           description: row['description'] as String,
-          category: row['category'] as String,
-          paymentMethod: row['payment_method'] as String? ?? 'N/A',
-          userName: row['user_name'] as String? ?? 'Usuario desconocido',
+          category: _translateCategory(row['category'] as String), // ✅ Traducir categorías
+          paymentMethod: _translatePaymentMethod(row['payment_method'] as String? ?? 'N/A'), // ✅ Traducir métodos de pago
+          userName: userName,
           date: DateTime.parse(row['date'] as String),
           reference: row['reference'] as String?,
           documentNumber: row['document_number'] as String?,
           notes: row['notes'] as String?,
-        );
-      }).toList();
+        ));
+      }
 
       // Calcular estadísticas
       final totalTransactions = entries.length;
@@ -311,6 +335,77 @@ class AccountingReportsService {
     } catch (e) {
       print('❌ Error al obtener efectivo inicial: $e');
       return 0.0;
+    }
+  }
+
+  // ✅ NUEVO: Función para traducir categorías de inglés a español
+  static String _translateCategory(String category) {
+    switch (category.toUpperCase()) {
+      case 'SALES':
+      case 'VENTAS':
+      case 'PURCHASES':
+      case 'COMPRAS':
+        return 'Ventas';
+      case 'SUPPLIER_PAYMENT':
+      case 'PAGO_PROVEEDORES':
+      case 'PAGO A PROVEEDORES':
+      case 'SUPPLIER_PAYMENTS':
+        return 'Pago a Proveedores';
+      case 'SUPPLIER_RETURNS':
+      case 'DEVOLUCIONES A PROVEEDORES':
+        return 'Devoluciones a Proveedores';
+      case 'INCOME':
+      case 'INGRESOS':
+        return 'Ingresos';
+      case 'EXPENSE':
+      case 'GASTOS':
+      case 'GASTOS OPERATIVOS':
+        return 'Gastos Operativos';
+      case 'CUSTOMER_PAYMENTS':
+      case 'PAGOS DE CLIENTES':
+      case 'PAYMENTS':
+      case 'PAGOS':
+        return 'Pagos de Clientes';
+      case 'CASH':
+      case 'EFECTIVO':
+        return 'Efectivo';
+      case 'OTHER':
+      case 'OTROS':
+      case 'SIN_CATEGORIA':
+        return 'Otros';
+      default:
+        return category; // Si ya está en español, dejarlo igual
+    }
+  }
+
+  // ✅ NUEVO: Función para traducir métodos de pago
+  static String _translatePaymentMethod(String method) {
+    switch (method.toUpperCase()) {
+      case 'CASH':
+      case 'EFECTIVO':
+        return 'Efectivo';
+      case 'CARD':
+      case 'TARJETA':
+      case 'CREDIT_CARD':
+      case 'TARJETA_CREDITO':
+        return 'Tarjeta';
+      case 'TRANSFER':
+      case 'TRANSFERENCIA':
+        return 'Transferencia';
+      case 'DEBIT_CARD':
+      case 'TARJETA_DEBITO':
+        return 'Tarjeta Débito';
+      case 'CREDIT':
+      case 'CREDITO':
+        return 'Crédito';
+      case 'ADJUSTMENT':
+      case 'AJUSTE':
+        return 'Ajuste';
+      case 'N/A':
+      case 'NO_APLICA':
+        return 'N/A';
+      default:
+        return method; // Si ya está en español, dejarlo igual
     }
   }
 

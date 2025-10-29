@@ -7,9 +7,11 @@ import '../models/supplier_payment.dart';
 import 'sqlite_database_service.dart';
 import 'supplier_service.dart';
 import 'package:intl/intl.dart';
+import '../modules/accounting/services/accounting_service.dart' as accounting;
+import '../modules/accounting/models/accounting_entry.dart' as accounting_models;
 
 class ReportsService {
-  // Generar reporte de ventas completo
+  // Generar reporte de ventas completo (ahora incluye datos profesionales)
   static Future<SalesReport> generateSalesReport({
     required DateTime date,
     DateTime? endDate,
@@ -24,37 +26,120 @@ class ReportsService {
     final products = await SQLiteDatabaseService.getAllProducts();
     final groups = await SQLiteDatabaseService.getAllGroups();
 
-    // Calcular totales
-    final totalSales = sales.fold(0.0, (sum, sale) => sum + sale.total);
+    // ✅ NUEVO: Calcular totales incluyendo descuentos y devoluciones
+    double totalSales = 0.0;
+    double totalDiscounts = 0.0;
+    double totalReturns = 0.0;
+    int returnTransactions = 0;
+    
+    for (final sale in sales) {
+      if (sale.isReturn) {
+        // Es una devolución
+        totalReturns += sale.returnedAmount ?? sale.total;
+        returnTransactions++;
+      } else {
+        // Es una venta normal
+        totalSales += sale.total;
+        // Sumar descuentos
+        totalDiscounts += sale.discount ?? 0.0;
+      }
+    }
+    
+    // Ventas netas = Ventas brutas - Descuentos - Devoluciones
+    final netSales = totalSales - totalDiscounts - totalReturns;
     final totalTransactions = sales.length;
     final averageTicket = totalTransactions > 0 ? totalSales / totalTransactions : 0.0;
 
+    // ✅ NUEVO: Filtrar devoluciones para métricas (solo ventas reales)
+    final salesWithoutReturns = sales.where((sale) => !sale.isReturn).toList();
+
     // Generar datos por hora
-    final salesByHour = _generateSalesByHour(sales);
+    final salesByHour = _generateSalesByHour(salesWithoutReturns);
 
     // Generar datos por método de pago
-    final salesByPaymentMethod = _generateSalesByPaymentMethod(sales);
+    final salesByPaymentMethod = _generateSalesByPaymentMethod(salesWithoutReturns);
 
     // Generar datos por grupo
-    final salesByGroup = await _generateSalesByGroup(sales, products, groups, groupFilter);
+    final salesByGroup = await _generateSalesByGroup(salesWithoutReturns, products, groups, groupFilter);
 
     // Generar top productos
-    final topProducts = await _generateTopProducts(sales, products, groups);
+    final topProducts = await _generateTopProducts(salesWithoutReturns, products, groups);
 
     // Generar transacciones detalladas
-    final transactions = _generateTransactions(sales, products, groups);
+    final transactions = _generateTransactions(salesWithoutReturns, products, groups);
 
-    return SalesReport(
-      date: date,
-      totalSales: totalSales,
-      totalTransactions: totalTransactions,
-      averageTicket: averageTicket,
-      salesByHour: salesByHour,
-      salesByPaymentMethod: salesByPaymentMethod,
-      salesByGroup: salesByGroup,
-      topProducts: topProducts,
-      transactions: transactions,
-    );
+    // ✅ NUEVO: Obtener datos contables profesionales (retrocompatible - opcionales)
+    try {
+      final accountingSummary = await accounting.AccountingService.getIncomeExpenseSummary(date);
+      final accountingEntries = await accounting.AccountingService.getAccountingEntriesByDate(date);
+      
+      // Separar ventas de otros ingresos
+      final otherIncome = accountingSummary['income']! - totalSales;
+      final expenses = accountingSummary['expense']!;
+      final netProfit = totalSales + otherIncome - expenses;
+      final profitMargin = totalSales > 0 
+          ? ((totalSales - _calculateTotalCost(transactions)) / totalSales * 100)
+          : 0.0;
+
+      final additionalIncomes = _extractAdditionalIncomes(accountingEntries, totalSales);
+      final expenseDetails = _extractExpenseDetails(accountingEntries);
+
+      // Calcular arqueo de caja
+      final cashData = await _calculateCashBalances(date);
+      final initialBalance = cashData['initial'];
+      final finalBalance = cashData['final'];
+      final theoreticalBalance = totalSales + otherIncome - expenses;
+      final actualBalance = cashData['actual'];
+      final cashDifference = theoreticalBalance - (actualBalance ?? 0.0);
+
+      // Retornar reporte con datos profesionales
+      return SalesReport(
+        date: date,
+        totalSales: totalSales,
+        totalTransactions: totalTransactions,
+        averageTicket: averageTicket,
+        salesByHour: salesByHour,
+        salesByPaymentMethod: salesByPaymentMethod,
+        salesByGroup: salesByGroup,
+        topProducts: topProducts,
+        transactions: transactions,
+        netSales: netSales, // ✅ NUEVO: Ventas netas
+        // ✅ Datos profesionales
+        otherIncome: otherIncome,
+        expenses: expenses,
+        netProfit: netProfit,
+        profitMargin: profitMargin,
+        initialBalance: initialBalance,
+        finalBalance: finalBalance,
+        theoreticalBalance: theoreticalBalance,
+        actualBalance: actualBalance,
+        cashDifference: cashDifference,
+        additionalIncomes: additionalIncomes,
+        expenseDetails: expenseDetails,
+        // ✅ NUEVO: Descuentos y devoluciones
+        totalDiscounts: totalDiscounts > 0 ? totalDiscounts : null,
+        totalReturns: totalReturns > 0 ? totalReturns : null,
+        returnTransactions: returnTransactions > 0 ? returnTransactions : null,
+      );
+    } catch (e) {
+      // Si falla, retornar reporte simple (retrocompatible)
+      print('⚠️ No se pudieron obtener datos profesionales: $e');
+      return SalesReport(
+        date: date,
+        totalSales: totalSales,
+        totalTransactions: totalTransactions,
+        averageTicket: averageTicket,
+        salesByHour: salesByHour,
+        salesByPaymentMethod: salesByPaymentMethod,
+        salesByGroup: salesByGroup,
+        topProducts: topProducts,
+        transactions: transactions,
+        netSales: netSales, // ✅ NUEVO: Ventas netas
+        totalDiscounts: totalDiscounts > 0 ? totalDiscounts : null,
+        totalReturns: totalReturns > 0 ? totalReturns : null,
+        returnTransactions: returnTransactions > 0 ? returnTransactions : null,
+      );
+    }
   }
 
   // Generar reporte de inventario
@@ -671,6 +756,42 @@ class ReportsService {
       ..sort((a, b) => b.paymentDate.compareTo(a.paymentDate));
   }
 
+  // ✅ NUEVO: Función para traducir categorías de inglés a español
+  static String _translateCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'sales':
+      case 'ventas':
+        return 'Ventas';
+      case 'supplier_payment':
+      case 'pago_proveedores':
+      case 'pago a proveedores':
+        return 'Pago a Proveedores';
+      case 'supplier_payments':
+      case 'pagos a proveedores':
+        return 'Pago a Proveedores';
+      case 'supplier_returns':
+      case 'devoluciones a proveedores':
+        return 'Devoluciones a Proveedores';
+      case 'income':
+      case 'ingresos':
+        return 'Ingresos';
+      case 'expense':
+      case 'gastos':
+      case 'gastos operativos':
+        return 'Gastos Operativos';
+      case 'cash':
+      case 'efectivo':
+        return 'Efectivo';
+      case 'other':
+      case 'otros':
+      case 'sin_categoria':
+      case 'sin categoría':
+        return 'Otros';
+      default:
+        return category; // Si ya está en español, dejarlo igual
+    }
+  }
+
   // Métodos auxiliares para reportes contables
   static List<AccountingEntry> _generateIncomeEntries(List<Sale> sales) {
     return sales.map((sale) {
@@ -679,7 +800,7 @@ class ReportsService {
         type: 'income',
         amount: sale.total,
         description: 'Venta #${sale.id}',
-        category: 'sales',
+        category: 'Ventas', // ✅ Traducido a español
         userName: 'Sistema',
       );
     }).toList();
@@ -692,7 +813,7 @@ class ReportsService {
         type: 'expense',
         amount: payment.amount,
         description: payment.description ?? 'Pago a proveedor',
-        category: 'supplier_payment',
+        category: 'Pago a Proveedores', // ✅ Traducido a español
         userName: 'Sistema',
       );
     }).toList();
@@ -707,12 +828,14 @@ class ReportsService {
 
     for (final entry in incomeEntries) {
       final category = entry.category ?? 'sin_categoria';
-      incomeByCategory[category] = (incomeByCategory[category] ?? 0.0) + entry.amount;
+      final translatedCategory = _translateCategory(category);
+      incomeByCategory[translatedCategory] = (incomeByCategory[translatedCategory] ?? 0.0) + entry.amount;
     }
 
     for (final entry in expenseEntries) {
       final category = entry.category ?? 'sin_categoria';
-      expenseByCategory[category] = (expenseByCategory[category] ?? 0.0) + entry.amount;
+      final translatedCategory = _translateCategory(category);
+      expenseByCategory[translatedCategory] = (expenseByCategory[translatedCategory] ?? 0.0) + entry.amount;
     }
 
     final allCategories = {...incomeByCategory.keys, ...expenseByCategory.keys};
@@ -723,13 +846,124 @@ class ReportsService {
       final net = income - expenses;
 
       return AccountingByCategory(
-        category: category,
+        category: category, // ✅ Ya está traducido
         income: income,
         expenses: expenses,
         net: net,
       );
     }).toList()
       ..sort((a, b) => b.net.compareTo(a.net));
+  }
+
+  // NOTA: La función generateProfessionalSalesReport fue eliminada.
+  // Ahora generateSalesReport ya incluye los datos profesionales automáticamente.
+
+  // Calcular costo total de las transacciones
+  static double _calculateTotalCost(List<SalesTransaction> transactions) {
+    double totalCost = 0.0;
+    for (final transaction in transactions) {
+      for (final item in transaction.items) {
+        // Calcular costo estimado (precio * cantidad * factor de costo)
+        // Nota: Esto sería ideal si tenemos los productos con su costo
+        // Por ahora usamos un cálculo estimado del 60% del precio
+        totalCost += (item.totalPrice * 0.60);
+      }
+    }
+    return totalCost;
+  }
+
+  // Extraer ingresos adicionales (no asociados a venta)
+  static List<AdditionalIncome> _extractAdditionalIncomes(
+    List<accounting_models.AccountingEntry> entries, 
+    double totalSales
+  ) {
+    final List<AdditionalIncome> additionalIncomes = [];
+    
+    for (final entry in entries) {
+      if (entry.type == 'income' && !entry.description.toLowerCase().contains('venta')) {
+        additionalIncomes.add(AdditionalIncome(
+          description: entry.description,
+          amount: entry.amount,
+          category: _translateCategory(entry.category ?? 'Otros'), // ✅ Traducido
+          date: entry.date,
+          paymentMethod: entry.paymentMethod,
+        ));
+      }
+    }
+    
+    return additionalIncomes;
+  }
+
+  // Extraer detalles de egresos
+  static List<ExpenseDetail> _extractExpenseDetails(List<accounting_models.AccountingEntry> entries) {
+    final List<ExpenseDetail> expenses = [];
+    
+    for (final entry in entries) {
+      if (entry.type == 'expense') {
+        expenses.add(ExpenseDetail(
+          description: entry.description,
+          amount: entry.amount,
+          category: _translateCategory(entry.category ?? 'Gastos'), // ✅ Traducido
+          date: entry.date,
+          paymentMethod: entry.paymentMethod,
+        ));
+      }
+    }
+    
+    return expenses;
+  }
+
+  // Calcular balances de caja
+  static Future<Map<String, double>> _calculateCashBalances(DateTime date) async {
+    try {
+      // Obtener última sesión de caja antes de la fecha
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return {'initial': 0.0, 'final': 0.0, 'actual': 0.0};
+
+      // Buscar sesión de caja del día
+      final session = await db.query(
+        'cash_sessions',
+        where: 'DATE(open_date) = DATE(?) AND status = ?',
+        whereArgs: [date.toIso8601String(), 'open'],
+        limit: 1,
+      );
+
+      if (session.isNotEmpty) {
+        final initialAmount = session.first['initial_amount'] as double? ?? 0.0;
+        
+        // Buscar movimientos de la sesión
+        final movements = await db.query(
+          'cash_movements',
+          where: 'cash_session_id = ?',
+          whereArgs: [session.first['id']],
+        );
+
+        double totalIncome = initialAmount;
+        double totalExpense = 0.0;
+
+        for (final movement in movements) {
+          if (movement['type'] == 'income') {
+            totalIncome += movement['amount'] as double? ?? 0.0;
+          } else {
+            totalExpense += movement['amount'] as double? ?? 0.0;
+          }
+        }
+
+        final theoretical = totalIncome - totalExpense;
+        final actual = session.first['final_amount'] as double? ?? 0.0;
+
+        return {
+          'initial': initialAmount,
+          'final': theoretical,
+          'actual': actual,
+        };
+      }
+
+      return {'initial': 0.0, 'final': 0.0, 'actual': 0.0};
+    } catch (e) {
+      print('❌ Error calculando balances de caja: $e');
+      return {'initial': 0.0, 'final': 0.0, 'actual': 0.0};
+    }
   }
 
   static List<DailyCashFlow> _generateDailyCashFlow(

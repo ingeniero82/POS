@@ -144,7 +144,7 @@ class SupplierService {
         type: 'expense',
         amount: payment.amount,
         description: 'Pago a proveedor: ${payment.description ?? 'Sin descripción'}',
-        category: 'supplier_payment',
+        category: 'Pago a Proveedores', // ✅ Traducido a español
         date: payment.paymentDate,
         userId: payment.userId,
         createdAt: DateTime.now(),
