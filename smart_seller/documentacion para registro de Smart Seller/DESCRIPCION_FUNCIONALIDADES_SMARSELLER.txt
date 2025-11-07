@@ -1,0 +1,177 @@
+DESCRIPCIÓN BREVE DE FUNCIONALIDADES - SmartSeller POS v2.0
+
+SISTEMA: SmartSeller POS v2.0
+TIPO: Sistema de Punto de Venta Profesional
+AUTOR: Oscar Mauricio González
+FECHA: Diciembre 2024
+
+─────────────────────────────────────────────────────────────────
+
+FUNCIONALIDADES PRINCIPALES DEL SISTEMA
+
+1. MÓDULO DE PUNTO DE VENTA (POS)
+   - Interfaz táctil y por teclado para procesamiento rápido de ventas
+   - Búsqueda de productos por nombre o código de barras
+   - Carrito de compras dinámico con cálculo automático de totales
+   - Soporte para productos vendidos por unidad y por peso
+   - Integración con balanzas electrónicas para productos pesados
+   - Cálculo automático de subtotales, impuestos (IVA) y totales
+   - Múltiples métodos de pago (efectivo, tarjeta, transferencia, cheque)
+   - Impresión automática de tickets de venta
+   - Gestión de descuentos y modificaciones de precio con autorización
+   - Apertura de caja registradora
+   - Historial completo de transacciones
+
+2. MÓDULO DE GESTIÓN DE INVENTARIO
+   - Control completo de productos con categorías y grupos
+   - Productos vendidos por unidad (botellas, cajas, paquetes)
+   - Productos vendidos por peso (frutas, carnes, granos)
+   - Control automático de stock con alertas de inventario bajo
+   - Precios de costo y de venta con cálculo de margen de ganancia
+   - Movimientos de inventario (entradas, salidas, ajustes)
+   - Códigos de barras personalizables
+   - Búsqueda avanzada de productos
+   - Importación masiva desde archivos Excel/CSV
+   - Reportes de valorización de inventario
+
+3. MÓDULO DE GESTIÓN DE CLIENTES
+   - Base de datos completa de clientes
+   - Validación de documentos según normativa colombiana (Cédula, NIT, RUT)
+   - Información completa: nombres, direcciones, teléfonos, emails
+   - Historial de compras por cliente
+   - Búsqueda rápida por nombre, documento o teléfono
+   - Clientes frecuentes y estadísticas de compra
+   - Gestión de cuentas por cobrar
+   - Exportación de listas de clientes
+
+4. MÓDULO DE FACTURACIÓN ELECTRÓNICA DIAN
+   - Generación de facturas electrónicas según normativa DIAN
+   - Soporte para Facturas Electrónicas (FE) y Notas Crédito (NC)
+   - Validación completa de datos fiscales
+   - Configuración de datos fiscales de la empresa
+   - Cálculo automático de IVA (19%)
+   - Generación de consecutivos automáticos
+   - Simulación de envío a servicios DIAN
+   - Estados de factura: borrador, enviado, autorizado, rechazado
+   - Cola de facturas pendientes de envío
+   - Códigos de respuesta DIAN
+   - Pre-emisión de documentos electrónicos
+
+5. MÓDULO DE REPORTES Y CONTABILIDAD
+   - Reportes de ventas por período (diario, semanal, mensual, anual)
+   - Reportes de inventario (stock actual, movimientos, valorización)
+   - Reportes de rentabilidad por producto
+   - Reportes de clientes (compras, frecuencia, montos)
+   - Reportes de caja y métodos de pago
+   - Análisis de ventas por hora del día
+   - Productos más vendidos
+   - Exportación a PDF profesional
+   - Exportación a Excel
+   - Gráficos y estadísticas visuales
+
+6. MÓDULO DE GESTIÓN DE USUARIOS Y SEGURIDAD
+   - Sistema de autenticación con usuario y contraseña
+   - Encriptación SHA-256 de contraseñas
+   - Tres roles de usuario: Administrador, Vendedor, Mantenimiento
+   - Sistema granular de permisos por módulo
+   - Control de acceso por funcionalidad
+   - Autorización para operaciones sensibles (cambio de precios, descuentos)
+   - Auditoría completa de operaciones del sistema
+   - Registro de actividades de usuarios
+   - Bloqueo de sesiones tras intentos fallidos
+
+7. MÓDULO DE CONTABILIDAD
+   - Gestión de cuentas por cobrar
+   - Gestión de cuentas por pagar
+   - Categorización de ingresos y egresos
+   - Reportes contables avanzados
+   - Integración con módulo de ventas
+   - Historial de pagos a proveedores
+
+8. MÓDULO DE CONFIGURACIÓN
+   - Configuración de datos de la empresa
+   - Configuración fiscal para facturación electrónica
+   - Configuración de impresoras (térmica y láser)
+   - Configuración de textos personalizables
+   - Configuración de categorías y grupos de productos
+   - Configuración de métodos de pago
+   - Sistema de respaldo automático
+   - Restauración desde respaldo
+
+9. MÓDULO DE INTEGRACIONES
+   - Integración con balanzas electrónicas vía puerto serial
+   - Integración con impresoras térmicas (tickets)
+   - Integración con impresoras láser (facturas)
+   - Exportación de datos a Excel y CSV
+   - Generación de archivos PDF
+   - Configuración de puertos de comunicación
+
+10. CARACTERÍSTICAS TÉCNICAS
+    - Base de datos SQLite local con respaldo automático
+    - Arquitectura Model-View-Controller (MVC)
+    - Framework Flutter para interfaces multiplataforma
+    - Material Design 3 para interfaz moderna
+    - Sistema reactivo con GetX
+    - Soporte para Windows, Android y Web
+    - Interfaz responsiva adaptativa
+    - Notificaciones y alertas en tiempo real
+    - Mensajería contextual para el usuario
+    - Validación de datos en tiempo real
+    - Búsqueda en tiempo real (Typeahead)
+    - Gestión de imágenes de productos
+
+─────────────────────────────────────────────────────────────────
+
+TECNOLOGÍAS UTILIZADAS:
+- Flutter 3.16.0+ (Framework de desarrollo)
+- Dart (Lenguaje de programación)
+- SQLite (Base de datos local)
+- GetX (Gestión de estado y navegación)
+- Material Design 3 (Sistema de diseño)
+- PDF (Generación de documentos)
+- Excel (Exportación de datos)
+- libserialport (Comunicación con dispositivos)
+
+PLATAFORMAS SOPORTADAS:
+- Windows 10/11 (64-bit) - Plataforma principal
+- Android 7.0+ (Tablets POS)
+- Web (Navegadores modernos)
+
+CARACTERÍSTICAS DISTINTIVAS:
+- Sistema completamente offline
+- Base de datos local sin necesidad de servidor
+- Interfaz intuitiva y moderna
+- Optimizado para velocidad de procesamiento
+- Respaldo automático de datos
+- Multi-usuario con roles y permisos
+- Soporte para facturación electrónica DIAN
+- Integración con dispositivos hardware (balanzas, impresoras)
+
+─────────────────────────────────────────────────────────────────
+
+PLANO GENERAL DEL SOFTWARE
+
+SmartSeller POS v2.0 es un sistema integral diseñado para optimizar
+el proceso de venta en establecimientos comerciales, proporcionando
+herramientas completas para:
+
+✓ Gestión de ventas en tiempo real
+✓ Control de inventario automático
+✓ Facturación electrónica según normativa DIAN
+✓ Gestión de clientes y proveedores
+✓ Generación de reportes profesionales
+✓ Control de usuarios y seguridad
+✓ Integración con dispositivos hardware
+
+El sistema está diseñado para ser instalado localmente en el
+equipo del establecimiento, sin necesidad de conexión a internet
+para su funcionamiento básico, garantizando disponibilidad
+continua del servicio.
+
+─────────────────────────────────────────────────────────────────
+
+OSCAR MAURICIO GONZÁLEZ
+Desarrollador - SmartSeller POS v2.0
+Diciembre 2024
+Licencia: Propietaria
+

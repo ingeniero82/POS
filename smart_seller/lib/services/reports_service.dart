@@ -32,6 +32,19 @@ class ReportsService {
     double totalReturns = 0.0;
     int returnTransactions = 0;
     
+    // ✅ NUEVO: Acumular desglose de ventas
+    double totalExempt = 0.0;
+    double totalExcluded = 0.0;
+    double totalTaxed = 0.0;
+    double totalVatAt0 = 0.0;
+    double totalVatAt5 = 0.0;
+    double totalVatAt19 = 0.0;
+    double totalVat = 0.0;
+    double totalIpoConsumo = 0.0;
+    double totalPlasticBagTax = 0.0;
+    int totalPlasticBagCount = 0;
+    double totalSubtotal = 0.0;
+    
     for (final sale in sales) {
       if (sale.isReturn) {
         // Es una devolución
@@ -42,6 +55,19 @@ class ReportsService {
         totalSales += sale.total;
         // Sumar descuentos
         totalDiscounts += sale.discount ?? 0.0;
+        
+        // ✅ NUEVO: Acumular desglose de ventas
+        totalExempt += sale.exemptAmount;
+        totalExcluded += sale.excludedAmount;
+        totalTaxed += sale.taxedAmount;
+        totalVatAt0 += sale.vatAt0;
+        totalVatAt5 += sale.vatAt5;
+        totalVatAt19 += sale.vatAt19;
+        totalVat += sale.totalVat;
+        totalIpoConsumo += sale.ipoConsumoAmount;
+        totalPlasticBagTax += sale.plasticBagTaxAmount;
+        totalPlasticBagCount += sale.plasticBagCount;
+        totalSubtotal += sale.subtotal;
       }
     }
     
@@ -120,6 +146,21 @@ class ReportsService {
         totalDiscounts: totalDiscounts > 0 ? totalDiscounts : null,
         totalReturns: totalReturns > 0 ? totalReturns : null,
         returnTransactions: returnTransactions > 0 ? returnTransactions : null,
+        // ✅ NUEVO: Desglose de ventas por tipo de IVA
+        exemptAmount: totalExempt > 0 ? totalExempt : null,
+        excludedAmount: totalExcluded > 0 ? totalExcluded : null,
+        taxedAmount: totalTaxed > 0 ? totalTaxed : null,
+        // ✅ NUEVO: Desglose de IVA por tasas
+        vatAt0: totalVatAt0 > 0 ? totalVatAt0 : null,
+        vatAt5: totalVatAt5 > 0 ? totalVatAt5 : null,
+        vatAt19: totalVatAt19 > 0 ? totalVatAt19 : null,
+        totalVat: totalVat > 0 ? totalVat : null,
+        // ✅ NUEVO: IpoConsumo y bolsas
+        ipoConsumoAmount: totalIpoConsumo > 0 ? totalIpoConsumo : null,
+        plasticBagTaxAmount: totalPlasticBagTax > 0 ? totalPlasticBagTax : null,
+        plasticBagCount: totalPlasticBagCount > 0 ? totalPlasticBagCount : null,
+        // ✅ NUEVO: Subtotal antes de impuestos
+        subtotalBeforeTaxes: totalSubtotal > 0 ? totalSubtotal : null,
       );
     } catch (e) {
       // Si falla, retornar reporte simple (retrocompatible)
@@ -138,6 +179,21 @@ class ReportsService {
         totalDiscounts: totalDiscounts > 0 ? totalDiscounts : null,
         totalReturns: totalReturns > 0 ? totalReturns : null,
         returnTransactions: returnTransactions > 0 ? returnTransactions : null,
+        // ✅ NUEVO: Desglose de ventas por tipo de IVA
+        exemptAmount: totalExempt > 0 ? totalExempt : null,
+        excludedAmount: totalExcluded > 0 ? totalExcluded : null,
+        taxedAmount: totalTaxed > 0 ? totalTaxed : null,
+        // ✅ NUEVO: Desglose de IVA por tasas
+        vatAt0: totalVatAt0 > 0 ? totalVatAt0 : null,
+        vatAt5: totalVatAt5 > 0 ? totalVatAt5 : null,
+        vatAt19: totalVatAt19 > 0 ? totalVatAt19 : null,
+        totalVat: totalVat > 0 ? totalVat : null,
+        // ✅ NUEVO: IpoConsumo y bolsas
+        ipoConsumoAmount: totalIpoConsumo > 0 ? totalIpoConsumo : null,
+        plasticBagTaxAmount: totalPlasticBagTax > 0 ? totalPlasticBagTax : null,
+        plasticBagCount: totalPlasticBagCount > 0 ? totalPlasticBagCount : null,
+        // ✅ NUEVO: Subtotal antes de impuestos
+        subtotalBeforeTaxes: totalSubtotal > 0 ? totalSubtotal : null,
       );
     }
   }

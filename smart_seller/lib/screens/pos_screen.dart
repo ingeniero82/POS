@@ -35,6 +35,7 @@ class _PosScreenState extends State<PosScreen> {
   final FocusNode _quantityFocus = FocusNode();
   
   List<Product> _products = [];
+  List<Product> _frequentProducts = []; // ✅ NUEVO: Productos más frecuentes basados en ventas
   bool _isLoading = true;
   String _currentMode = 'barcode'; // barcode, quantity, payment
   Product? _selectedProduct;
@@ -80,6 +81,37 @@ class _PosScreenState extends State<PosScreen> {
             AccountingModal(),
             barrierDismissible: false,
           );
+        } else {
+          // ✅ NUEVO: Informar si la caja fue abierta por otro usuario
+          final currentUser = AuthService.to.currentUser;
+          if (currentUser != null && session.userId != currentUser.id) {
+            // Obtener información del usuario que abrió la caja
+            try {
+              final allUsers = await SQLiteDatabaseService.getAllUsers();
+              final openerUser = allUsers.firstWhere(
+                (u) => u.id == session.userId,
+                orElse: () => allUsers.first,
+              );
+              
+              Get.snackbar(
+                'ℹ️ Caja abierta por otro usuario',
+                'La caja fue abierta por: ${openerUser.fullName}',
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 4),
+                icon: const Icon(Icons.info_outline, color: Colors.white),
+              );
+            } catch (e) {
+              // Si hay error obteniendo el usuario, mostrar mensaje genérico
+              Get.snackbar(
+                'ℹ️ Caja abierta',
+                'La caja fue abierta por otro usuario',
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 3),
+              );
+            }
+          }
         }
       } catch (_) {}
     });
@@ -113,12 +145,71 @@ class _PosScreenState extends State<PosScreen> {
     setState(() => _isLoading = true);
     try {
       _products = await SQLiteDatabaseService.getAllProducts();
+      
+      // ✅ NUEVO: Cargar productos frecuentes basados en ventas
+      await _loadFrequentProducts();
     } catch (e) {
       Get.snackbar('Error', 'Error cargando productos: $e');
     } finally {
       setState(() => _isLoading = false);
       // ✅ Asegurar focus después de cargar productos
       _ensureBarcodeFocus();
+    }
+  }
+  
+  // ✅ NUEVO: Cargar productos más frecuentes
+  Future<void> _loadFrequentProducts() async {
+    try {
+      // Obtener productos más frecuentes (últimos 30 días) con nombre y unidad
+      final frequentProductsData = await SQLiteDatabaseService.getMostFrequentProductNames(
+        days: 30,
+        limit: 12,
+      );
+      
+      // Buscar los productos correspondientes en la lista completa
+      _frequentProducts = [];
+      for (final productData in frequentProductsData) {
+        final name = productData['name'] ?? '';
+        final unit = productData['unit'] ?? '';
+        
+        // Buscar producto por nombre Y unidad para mayor precisión
+        Product? foundProduct;
+        if (unit.isNotEmpty) {
+          // Buscar por nombre y unidad primero
+          final exactMatch = _products.where((p) => p.name == name && p.unit == unit).toList();
+          if (exactMatch.isNotEmpty) {
+            foundProduct = exactMatch.first;
+          } else {
+            // Si no hay coincidencia exacta, buscar solo por nombre
+            final nameMatch = _products.where((p) => p.name == name).toList();
+            if (nameMatch.isNotEmpty) {
+              foundProduct = nameMatch.first;
+            }
+          }
+        } else {
+          // Solo buscar por nombre
+          final matchingProducts = _products.where((p) => p.name == name).toList();
+          if (matchingProducts.isNotEmpty) {
+            foundProduct = matchingProducts.first;
+          }
+        }
+        
+        if (foundProduct != null && !_frequentProducts.contains(foundProduct)) {
+          _frequentProducts.add(foundProduct);
+        }
+      }
+      
+      // Si no hay productos frecuentes (por ejemplo, no hay ventas aún),
+      // mostrar los primeros 12 productos como fallback
+      if (_frequentProducts.isEmpty && _products.isNotEmpty) {
+        _frequentProducts = _products.take(12).toList();
+      }
+    } catch (e) {
+      print('❌ Error cargando productos frecuentes: $e');
+      // Fallback: usar los primeros 12 productos
+      if (_products.isNotEmpty) {
+        _frequentProducts = _products.take(12).toList();
+      }
     }
   }
   
@@ -320,6 +411,23 @@ class _PosScreenState extends State<PosScreen> {
                 _buildModeButton('payment', '💳 Pago', Icons.payment),
               ],
             ),
+            // Botón de búsqueda de productos solo en modo táctil
+            if (_isTactileMode && _currentMode == 'barcode') ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _showTactileProductSearchDialog,
+                  icon: const Icon(Icons.search),
+                  label: const Text('🔍 Buscar Producto'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -387,7 +495,7 @@ class _PosScreenState extends State<PosScreen> {
                 border: OutlineInputBorder(),
                 suffixIcon: Icon(Icons.keyboard),
               ),
-              onSubmitted: (value) => _addToCart(int.tryParse(value) ?? 1),
+              onSubmitted: (value) async => await _addToCart(int.tryParse(value) ?? 1),
             ),
             const SizedBox(height: 16),
             
@@ -410,7 +518,7 @@ class _PosScreenState extends State<PosScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _addToCart(int.tryParse(_quantityController.text) ?? 1),
+                    onPressed: () async => await _addToCart(int.tryParse(_quantityController.text) ?? 1),
                     icon: const Icon(Icons.add_shopping_cart),
                     label: const Text('Agregar'),
                     style: ElevatedButton.styleFrom(
@@ -469,9 +577,9 @@ class _PosScreenState extends State<PosScreen> {
                         crossAxisSpacing: 8,
                         mainAxisSpacing: 8,
                       ),
-                      itemCount: _products.take(12).length,
+                      itemCount: _frequentProducts.length,
                       itemBuilder: (context, index) {
-                        final product = _products[index];
+                        final product = _frequentProducts[index];
                         
                         return _ProductButton(
                           product: product,
@@ -998,7 +1106,7 @@ class _PosScreenState extends State<PosScreen> {
         case 'Enter':
           // Solo si hay producto seleccionado
           if (_selectedProduct != null) {
-            _addToCart(int.tryParse(_quantityController.text) ?? 1);
+            _addToCart(int.tryParse(_quantityController.text) ?? 1); // ✅ Async - no necesita await aquí
           }
           break;
       }
@@ -1107,10 +1215,10 @@ class _PosScreenState extends State<PosScreen> {
               child: const Text('❌ Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final quantity = int.tryParse(controller.text) ?? 1;
                 if (quantity > 0) {
-                  _addToCart(quantity);
+                  await _addToCart(quantity);
                   Navigator.of(context).pop();
                 }
               },
@@ -1177,10 +1285,10 @@ class _PosScreenState extends State<PosScreen> {
                 }
               })),
               const SizedBox(width: 8),
-              Expanded(child: _buildActionButton('✓', () {
+              Expanded(child: _buildActionButton('✓', () async {
                 final quantity = int.tryParse(controller.text) ?? 1;
                 if (quantity > 0) {
-                  _addToCart(quantity);
+                  await _addToCart(quantity);
                   Navigator.of(context).pop();
                 }
               })),
@@ -1228,6 +1336,286 @@ class _PosScreenState extends State<PosScreen> {
       child: Text(
         text,
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+  
+  // ✅ NUEVO: Diálogo de búsqueda de productos en modo táctil
+  void _showTactileProductSearchDialog() {
+    final searchController = TextEditingController(text: '');
+    List<Product> searchResults = [];
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          // Función para actualizar resultados de búsqueda
+          void updateSearchResults(String query) {
+            if (query.isEmpty) {
+              searchResults = [];
+            } else {
+              // Buscar por código exacto primero
+              final exactMatch = _products.where((p) => 
+                p.code == query || p.shortCode == query
+              ).toList();
+              
+              if (exactMatch.isNotEmpty) {
+                searchResults = exactMatch;
+              } else {
+                // Buscar por nombre (sin tildes)
+                searchResults = _products.where((p) =>
+                  quitarTildes(p.name.toLowerCase()).contains(quitarTildes(query.toLowerCase()))
+                ).take(20).toList(); // Limitar a 20 resultados
+              }
+            }
+            setDialogState(() {});
+          }
+          
+          return AlertDialog(
+            title: const Text('🔍 BUSCAR PRODUCTO'),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Campo de búsqueda
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50,
+                      border: Border.all(color: Colors.purple),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search, color: Colors.purple),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            searchController.text.isEmpty 
+                                ? 'Escriba nombre o código...' 
+                                : searchController.text,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: searchController.text.isEmpty 
+                                  ? Colors.grey 
+                                  : Colors.purple,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Lista de resultados
+                  if (searchResults.isNotEmpty)
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: searchResults.length,
+                        itemBuilder: (context, index) {
+                          final product = searchResults[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.purple[100],
+                              child: const Icon(Icons.inventory, color: Colors.purple),
+                            ),
+                            title: Text(
+                              product.name,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Text(
+                              'Código: ${product.code} | Precio: \$${NumberFormat('#,0').format(product.price)}',
+                            ),
+                            trailing: const Icon(Icons.arrow_forward),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              _selectProduct(product);
+                            },
+                          );
+                        },
+                      ),
+                    )
+                  else if (searchController.text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'No se encontraron productos',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Teclado virtual de texto
+                  _buildVirtualTextKeyboard(searchController, setDialogState, updateSearchResults),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('❌ Cancelar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+  
+  // ✅ NUEVO: Teclado virtual para texto (letras y números)
+  Widget _buildVirtualTextKeyboard(
+    TextEditingController controller, 
+    StateSetter setState,
+    Function(String) onTextChanged,
+  ) {
+    return Container(
+      width: double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Fila 1: Q, W, E, R, T, Y, U, I, O, P
+          Row(
+            children: [
+              Expanded(child: _buildTextButton('Q', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('W', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('E', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('R', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('T', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('Y', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('U', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('I', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('O', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('P', controller, setState, onTextChanged)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // Fila 2: A, S, D, F, G, H, J, K, L
+          Row(
+            children: [
+              Expanded(child: _buildTextButton('A', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('S', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('D', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('F', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('G', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('H', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('J', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('K', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('L', controller, setState, onTextChanged)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // Fila 3: Z, X, C, V, B, N, M, 0-9
+          Row(
+            children: [
+              Expanded(child: _buildTextButton('Z', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('X', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('C', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('V', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('B', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('N', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('M', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('0', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('1', controller, setState, onTextChanged)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // Fila 4: 2-9, Espacio, Borrar, Buscar
+          Row(
+            children: [
+              Expanded(child: _buildTextButton('2', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('3', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('4', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('5', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('6', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('7', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('8', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton('9', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(child: _buildTextButton(' ', controller, setState, onTextChanged)),
+              const SizedBox(width: 4),
+              Expanded(
+                flex: 2,
+                child: _buildActionButton('⌫', () {
+                  if (controller.text.isNotEmpty) {
+                    controller.text = controller.text.substring(0, controller.text.length - 1);
+                    setState(() {});
+                    onTextChanged(controller.text);
+                  }
+                }),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // ✅ NUEVO: Botón de texto para el teclado virtual
+  Widget _buildTextButton(
+    String char, 
+    TextEditingController controller, 
+    StateSetter setState,
+    Function(String) onTextChanged,
+  ) {
+    return ElevatedButton(
+      onPressed: () {
+        controller.text += char;
+        setState(() {});
+        onTextChanged(controller.text);
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.purple,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        elevation: 2,
+      ),
+      child: Text(
+        char == ' ' ? '⎵' : char,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -1287,28 +1675,35 @@ class _PosScreenState extends State<PosScreen> {
     // Solo mostrar mensaje cuando efectivamente se agregue al carrito
   }
   
-  void _addToCart(int quantity) {
+  Future<void> _addToCart(int quantity) async {
     if (_selectedProduct == null) {
       Get.snackbar('Error', 'No hay producto seleccionado');
       return;
     }
     
-
+    // ✅ CORREGIDO: Guardar el nombre del producto antes de que pueda ser null
+    final productName = _selectedProduct!.name;
+    final productPrice = _selectedProduct!.price;
+    final productUnit = _selectedProduct!.unit;
+    final productStock = _selectedProduct!.stock;
+    final product = _selectedProduct!;
     
-    _posController.addToCart(
-      _selectedProduct!.name,
-      _selectedProduct!.price,
-      _selectedProduct!.unit,
+    await _posController.addToCart(
+      productName,
+      productPrice,
+      productUnit,
       quantity: quantity,
-      availableStock: _selectedProduct!.stock,
+      availableStock: productStock,
+      product: product, // ✅ NUEVO: Pasar producto completo para cálculo de impuestos
     );
     
+    // ✅ CORREGIDO: Usar el nombre guardado en lugar de _selectedProduct!.name
     Get.snackbar(
       '✅ Agregado',
-      '${_selectedProduct!.name} x$quantity',
+      '$productName x$quantity',
       backgroundColor: Colors.green,
       colorText: Colors.white,
-      duration: const Duration(seconds: 1), // ⚡ MÁS RÁPIDO
+      duration: const Duration(seconds: 1), // MÁS RÁPIDO
     );
     
     _cancelSelection();

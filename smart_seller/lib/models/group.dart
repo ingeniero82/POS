@@ -9,6 +9,10 @@ class Group {
   late DateTime createdAt;
   late DateTime updatedAt;
   bool isActive = true;
+  
+  // ✅ NUEVO: Tasa de IVA por defecto para la categoría (0%, 5%, 19%)
+  double defaultVatRate = 0.19; // Tasa por defecto 19%
+  String defaultVatType = 'GRAVADO'; // EXENTO, EXCLUIDO, GRAVADO
 
   Group({
     this.id,
@@ -19,6 +23,8 @@ class Group {
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
+    this.defaultVatRate = 0.19,
+    this.defaultVatType = 'GRAVADO',
   });
 
   // Constructor desde Map (para base de datos)
@@ -31,6 +37,9 @@ class Group {
     createdAt = DateTime.parse(map['createdAt']);
     updatedAt = DateTime.parse(map['updatedAt']);
     isActive = map['isActive'] == 1;
+    // ✅ NUEVO: Campos de IVA por defecto
+    defaultVatRate = (map['defaultVatRate'] ?? 0.19).toDouble();
+    defaultVatType = map['defaultVatType'] ?? 'GRAVADO';
   }
 
   // Convertir a Map (para base de datos)
@@ -44,6 +53,9 @@ class Group {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive ? 1 : 0,
+      // ✅ NUEVO: Campos de IVA por defecto
+      'defaultVatRate': defaultVatRate,
+      'defaultVatType': defaultVatType,
     };
   }
 
@@ -57,6 +69,8 @@ class Group {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
+    double? defaultVatRate,
+    String? defaultVatType,
   }) {
     return Group(
       id: id ?? this.id,
@@ -65,8 +79,10 @@ class Group {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
-              color: color ?? this.color,
-        icon: icon ?? this.icon,
+      color: color ?? this.color,
+      icon: icon ?? this.icon,
+      defaultVatRate: defaultVatRate ?? this.defaultVatRate,
+      defaultVatType: defaultVatType ?? this.defaultVatType,
     );
   }
 

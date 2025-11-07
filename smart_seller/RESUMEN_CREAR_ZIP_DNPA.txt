@@ -1,0 +1,75 @@
+═══════════════════════════════════════════════════════════════════
+RESUMEN RÁPIDO: CREAR ZIP PARA DNPA
+═══════════════════════════════════════════════════════════════════
+
+OBJETIVO: Crear un archivo ZIP con la copia de la obra para subir a DNPA
+
+═══════════════════════════════════════════════════════════════════
+LO QUE NECESITAS HACER (PASOS SIMPLES)
+═══════════════════════════════════════════════════════════════════
+
+PASO 1: Crear carpeta temporal
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Nombre: SmartSeller_POS_v1.0_DNPA
+
+PASO 2: Copiar estos archivos a la carpeta temporal
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Carpeta completa: lib/ (todo el código fuente)
+✅ Archivo: pubspec.yaml
+✅ Archivo: TITULO_OFICIAL_OBRA.txt (ya está creado)
+
+PASO 3: Crear el ZIP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Selecciona la carpeta SmartSeller_POS_v1.0_DNPA
+2. Clic derecho → "Enviar a" → "Carpeta comprimida (en ZIP)"
+3. Renombra a: SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+
+PASO 4: Verificar
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Abre el ZIP y verifica que tenga:
+   - Carpeta lib/
+   - Archivo pubspec.yaml
+   - Archivo TITULO_OFICIAL_OBRA.txt
+
+✅ Abre TITULO_OFICIAL_OBRA.txt y verifica que el título sea:
+   "Sistema de Punto de Venta SmartSeller POS v1.0"
+
+═══════════════════════════════════════════════════════════════════
+⚠️ RECORDATORIO IMPORTANTE
+═══════════════════════════════════════════════════════════════════
+
+El título que escribas en el formulario web DEBE ser EXACTAMENTE:
+"Sistema de Punto de Venta SmartSeller POS v1.0"
+
+(El mismo título que está en TITULO_OFICIAL_OBRA.txt)
+
+═══════════════════════════════════════════════════════════════════
+ESTRUCTURA FINAL DEL ZIP
+═══════════════════════════════════════════════════════════════════
+
+SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+│
+├── lib/                          ← Código fuente completo
+│   ├── controllers/
+│   ├── middleware/
+│   ├── models/
+│   ├── modules/
+│   ├── screens/
+│   ├── services/
+│   ├── utils/
+│   ├── widgets/
+│   └── main.dart
+│
+├── pubspec.yaml                  ← Configuración del proyecto
+│
+└── TITULO_OFICIAL_OBRA.txt       ← Título oficial (IMPORTANTE)
+
+═══════════════════════════════════════════════════════════════════
+PARA MÁS DETALLES
+═══════════════════════════════════════════════════════════════════
+
+Lee el archivo: GUIA_CREAR_ZIP_DNPA.txt (instrucciones completas paso a paso)
+
+═══════════════════════════════════════════════════════════════════
+
+

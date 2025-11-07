@@ -10,6 +10,44 @@ class SalesReport {
   final List<SalesByGroup> salesByGroup;
   final List<TopProduct> topProducts;
   final List<SalesTransaction> transactions;
+  
+  // ✅ NUEVOS CAMPOS PARA REPORTE PROFESIONAL
+  final double? otherIncome; // Ingresos adicionales no asociados a venta
+  final double? expenses; // Egresos/gastos operativos
+  final double? netProfit; // Utilidad neta
+  final double? profitMargin; // Margen de ganancia %
+  final double? initialBalance; // Saldo inicial de caja
+  final double? finalBalance; // Saldo final de caja
+  final double? theoreticalBalance; // Saldo teórico calculado
+  final double? actualBalance; // Saldo real en caja
+  final double? cashDifference; // Diferencia de caja
+  final List<AdditionalIncome>? additionalIncomes; // Ingresos adicionales detallados
+  final List<ExpenseDetail>? expenseDetails; // Egresos detallados
+  
+  // ✅ NUEVO: Descuentos y devoluciones para reporte profesional
+  final double? totalDiscounts; // Total de descuentos aplicados
+  final double? totalReturns; // Total de devoluciones
+  final int? returnTransactions; // Número de devoluciones
+  final double netSales; // Ventas netas (bruto - descuentos - devoluciones)
+  
+  // ✅ NUEVO: Desglose de ventas por tipo de IVA
+  final double? exemptAmount; // Ventas exentas
+  final double? excludedAmount; // Ventas excluidas
+  final double? taxedAmount; // Ventas gravadas
+  
+  // ✅ NUEVO: Desglose de IVA por tasas
+  final double? vatAt0; // IVA a tasa 0%
+  final double? vatAt5; // IVA a tasa 5%
+  final double? vatAt19; // IVA a tasa 19%
+  final double? totalVat; // Total IVA
+  
+  // ✅ NUEVO: IpoConsumo y bolsas
+  final double? ipoConsumoAmount; // Total IpoConsumo
+  final double? plasticBagTaxAmount; // Total impuesto bolsas
+  final int? plasticBagCount; // Cantidad de bolsas
+  
+  // ✅ NUEVO: Subtotal antes de impuestos
+  final double? subtotalBeforeTaxes; // Subtotal sin impuestos
 
   SalesReport({
     required this.date,
@@ -21,6 +59,72 @@ class SalesReport {
     required this.salesByGroup,
     required this.topProducts,
     required this.transactions,
+    // ✅ NUEVOS CAMPOS OPCIONALES (retrocompatible)
+    this.otherIncome,
+    this.expenses,
+    this.netProfit,
+    this.profitMargin,
+    this.initialBalance,
+    this.finalBalance,
+    this.theoreticalBalance,
+    this.actualBalance,
+    this.cashDifference,
+    this.additionalIncomes,
+    this.expenseDetails,
+    // ✅ NUEVO: Descuentos y devoluciones
+    this.totalDiscounts,
+    this.totalReturns,
+    this.returnTransactions,
+    required this.netSales,
+    // ✅ NUEVO: Desglose de ventas por tipo de IVA
+    this.exemptAmount,
+    this.excludedAmount,
+    this.taxedAmount,
+    // ✅ NUEVO: Desglose de IVA por tasas
+    this.vatAt0,
+    this.vatAt5,
+    this.vatAt19,
+    this.totalVat,
+    // ✅ NUEVO: IpoConsumo y bolsas
+    this.ipoConsumoAmount,
+    this.plasticBagTaxAmount,
+    this.plasticBagCount,
+    // ✅ NUEVO: Subtotal antes de impuestos
+    this.subtotalBeforeTaxes,
+  });
+}
+
+// ✅ NUEVO: Modelo para ingresos adicionales
+class AdditionalIncome {
+  final String description;
+  final double amount;
+  final String category;
+  final DateTime date;
+  final String? paymentMethod;
+
+  AdditionalIncome({
+    required this.description,
+    required this.amount,
+    required this.category,
+    required this.date,
+    this.paymentMethod,
+  });
+}
+
+// ✅ NUEVO: Modelo para egresos detallados
+class ExpenseDetail {
+  final String description;
+  final double amount;
+  final String category;
+  final DateTime date;
+  final String? paymentMethod;
+
+  ExpenseDetail({
+    required this.description,
+    required this.amount,
+    required this.category,
+    required this.date,
+    this.paymentMethod,
   });
 }
 

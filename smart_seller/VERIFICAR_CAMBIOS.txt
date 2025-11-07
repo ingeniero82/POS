@@ -1,0 +1,130 @@
+═══════════════════════════════════════════════════════════════════
+         GUÍA DE VERIFICACIÓN - REPORTES ÚNICOS CORREGIDOS
+═══════════════════════════════════════════════════════════════════
+
+✅ CAMBIOS APLICADOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. TabController corregido (de 3 a 5 tabs)
+2. Módulo duplicado "Reportes Contables" eliminado del menú
+3. Ahora hay UN SOLO módulo "Reportes"
+4. Botón de descarga PDF presente en el AppBar
+5. PDF automático con extensión .pdf
+
+───────────────────────────────────────────────────────────────────
+
+🔍 QUÉ VERIFICAR AHORA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OPCIÓN 1: PRIMERO HAZ HOT RELOAD EN LA CONSOLA
+   En la terminal donde está corriendo el sistema:
+   Presiona: "r" (para hot reload)
+
+OPCIÓN 2: O REINICIA LA APLICACIÓN
+   Presiona: "R" (para hot restart)
+
+───────────────────────────────────────────────────────────────────
+
+✅ VERIFICACIONES A REALIZAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ MENÚ LATERAL
+   ❌ Ya NO debe aparecer "Reportes Contables"
+   ✅ Solo debe aparecer "Reportes" (con icono bar_chart)
+
+2️⃣ MÓDULO DE REPORTES
+   ✅ Al entrar, NO debe dar error de TabController
+   ✅ Debe mostrar los filtros (Tipo, Periodo, Fecha)
+   ✅ Debe tener botón de descarga en el AppBar (icono download)
+   ✅ Debe tener botón de filtros avanzados
+
+3️⃣ DESCARGAR REPORTE
+   ✅ Click en botón de descarga
+   ✅ Escribir nombre (SIN .pdf)
+   ✅ Guardar
+   ✅ Verificar que se guarde con extensión .pdf
+   ✅ Abrir el PDF y verificar que sea legible
+
+4️⃣ CONTENIDO DEL REPORTE
+   ✅ Debe mostrar ventas, transacciones, ticket promedio
+   ✅ Si hay ingresos adicionales: los muestra
+   ✅ Si hay egresos: los muestra
+   ✅ Si hay arqueo de caja: lo muestra
+   ✅ Si hay utilidad: la calcula
+
+───────────────────────────────────────────────────────────────────
+
+📋 ESTRUCTURA DEL REPORTE PROFESIONAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+El reporte incluye AUTOMÁTICAMENTE:
+
+1. Encabezado
+   - Nombre de empresa
+   - Fecha / Rango de fechas
+   - Cajero responsable (si aplica)
+
+2. Resumen General
+   - Total Ventas (bruto)
+   - Número de transacciones
+   - Ticket promedio
+   - Total Ventas (neto)
+   - Ingresos no venta (si hay)
+   - Egresos (si hay)
+   - Utilidad neta (si hay)
+
+3. Ventas Detalladas
+   - Por categoría
+   - Por producto
+   - Top productos
+
+4. Medios de Pago
+   - Distribución por método
+   - Porcentajes
+
+5. Ingresos/Egresos (si hay)
+   - Lista detallada
+   - Descripción y monto
+
+6. Arqueo de Caja (si hay)
+   - Saldo inicial
+   - Entradas y salidas
+   - Saldo teórico vs real
+   - Diferencia
+
+7. Utilidad y Margen (si hay)
+   - Utilidad neta
+   - Margen de ganancia %
+
+───────────────────────────────────────────────────────────────────
+
+❌ ERRORES QUE YA NO DEBEN APARECER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ NO más: "Controller's length property (4) does not match"
+✅ NO más: "number of tabs (5) present"
+✅ NO más: Dos módulos separados de reportes
+✅ NO más: TabController error
+
+───────────────────────────────────────────────────────────────────
+
+🎯 PASOS PARA VERIFICAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Haz hot reload en la consola (presiona "r")
+2. Inicia sesión (admin / 123456)
+3. Verifica el menú lateral:
+   - Solo debe ver "Reportes" (sin "Reportes Contables")
+4. Click en "Reportes"
+5. Verifica que NO haya errores
+6. Selecciona tipo: "Ventas"
+7. Selecciona período: "Hoy"
+8. Genera el reporte
+9. Click en botón de descarga (AppBar)
+10. Escribe nombre: "reporte_prueba"
+11. Guarda
+12. Verifica que se guardó como "reporte_prueba.pdf"
+13. Abre el PDF y verifica que sea legible
+
+═══════════════════════════════════════════════════════════════════
+

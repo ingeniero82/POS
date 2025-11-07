@@ -1,0 +1,96 @@
+═══════════════════════════════════════════════════════════════════
+ARCHIVOS A ADJUNTAR SEGÚN FORMATO EXIGIDO
+═══════════════════════════════════════════════════════════════════
+
+OPCIÓN 1: MATHEMATERIAL AUXILIAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Formato: PDF
+
+Archivos a adjuntar:
+✅ Manual de Usuario (ya tienes PDF)
+✅ Guía de Configuración (puedes crear PDF)
+✅ Material Auxiliar que ya tienes
+
+Archivos disponibles en tu carpeta:
+- 06_ManualUsuario_SmartSeller_POS (1).pdf
+- corrected_06_ManualUsuario_SmartSeller_POS (1).pdf
+
+✅ VENTAJA: Ya tienes archivos PDF listos
+
+
+OPCIÓN 2: PROGRAMA DE COMPUTADOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Formato: ZIP, RAR, APK o MDB
+
+Archivo a adjuntar:
+✅ Archivo ZIP con el código fuente del proyecto
+
+Pasos:
+1. Comprimir toda la carpeta "lib" (código fuente)
+2. Guardar como ZIP
+3. Adjuntar el ZIP
+
+✅ VENTAJA: Fácil de crear
+
+
+OPCIÓN 3: DESCRIPCIÓN DE PROGRAMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Formato: DOC de Word
+
+Archivo a adjuntar:
+✅ Documento Word con descripción detallada
+
+Archivos disponibles en tu carpeta:
+- 04_Descripcion_Tecnica_SmartSeller_POS (1).docx
+- corrected_04_Descripcion_Tecnica_SmartSeller_POS (1).docx
+
+✅ VENTAJA: Ya tienes archivos DOCX listos
+
+═══════════════════════════════════════════════════════════════════
+
+RECOMENDACIÓN FINAL:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ OPCIÓN MÁS FÁCIL: MATERIAL AUXILIAR
+- Ya tienes manual en PDF
+- Solo adjuntas el PDF existente
+- Menos trabajo
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ OPCIÓN MÁS COMPLETA: DESCRIPCIÓN DE PROGRAMA
+- Ya tienes descripción técnica en DOCX
+- Solo adjuntas el archivo Word existente
+- Documentación completa
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ OPCIÓN TÉCNICA: PROGRAMA DE COMPUTADOR
+- Necesitas comprimir el código fuente en ZIP
+- Más técnico
+- Requiere un paso adicional
+
+═══════════════════════════════════════════════════════════════════
+
+INSTRUCCIONES PASO A PASO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Selecciona "Material Auxiliar" en el campo de elementos
+2. Adjunta el archivo: 06_ManualUsuario_SmartSeller_POS (1).pdf
+3. Listo ✅
+
+O
+
+1. Selecciona "Descripción de Programa" en el campo de elementos
+2. Adjunta el archivo: 04_Descripcion_Tecnica_SmartSeller_POS (1).docx
+3. Listo ✅
+
+O (Si quieres el código fuente)
+
+1. Selecciona "Programa de Computador" en el campo de elementos
+2. Comprime la carpeta "lib" en un archivo ZIP
+3. Adjunta el ZIP
+4. Listo ✅
+
+═══════════════════════════════════════════════════════════════════
+

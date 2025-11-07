@@ -11,6 +11,7 @@ import 'screens/customers_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/company_config_screen.dart';
 import 'screens/groups_screen.dart';
+import 'screens/cash_pickups_screen.dart';
 import 'screens/suppliers_screen.dart';
 import 'modules/accounting/screens/accounts_receivable_payable_screen.dart';
 import 'modules/accounting/screens/accounting_reports_screen.dart';
@@ -155,7 +156,12 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/grupos', 
           page: () => const GroupsScreen(),
-          middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+          middlewares: [AuthMiddleware()],
+        ),
+        GetPage(
+          name: '/recogidas-efectivo',
+          page: () => const CashPickupsScreen(),
+          middlewares: [AuthMiddleware()],
         ),
         GetPage(
           name: '/proveedores', 

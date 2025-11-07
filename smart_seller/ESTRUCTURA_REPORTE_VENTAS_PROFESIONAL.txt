@@ -1,0 +1,165 @@
+═══════════════════════════════════════════════════════════════════
+   ESTRUCTURA DE REPORTE DE VENTAS PROFESIONAL PARA POS
+═══════════════════════════════════════════════════════════════════
+
+📊 REPORTE DE VENTAS - [EMPRESA]
+Periodo: [FECHA] | Generado: [FECHA/HORA] | Usuario: [USUARIO]
+
+═══════════════════════════════════════════════════════════════════
+                        RESUMEN EJECUTIVO
+═══════════════════════════════════════════════════════════════════
+
+📈 VENTAS TOTALES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total de Ventas:                    $XXX,XXX,XXX
+Número de Transacciones:            XXX
+Ticket Promedio:                    $XXX,XXX
+Ventas más Alta:                    $XXX,XXX
+Venta más Baja:                     $XXX,XXX
+
+💰 INGRESOS Y EGRESOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total Ingresos:                     $XXX,XXX,XXX
+  - Ventas:                         $XXX,XXX,XXX
+  - Otros Ingresos:                 $XXX,XXX,XXX
+
+Total Egresos:                      $XXX,XXX,XXX
+  - Gastos Operativos:              $XXX,XXX,XXX
+  - Compras:                        $XXX,XXX,XXX
+  - Otros Egresos:                 $XXX,XXX,XXX
+
+FLUJO DE CAJA NETO:                $XXX,XXX,XXX
+
+═══════════════════════════════════════════════════════════════════
+                    ANÁLISIS POR MÉTODO DE PAGO
+═══════════════════════════════════════════════════════════════════
+
+MÉTODO DE PAGO       CANTIDAD      MONTO        PORCENTAJE
+────────────────────────────────────────────────────────────────
+Efectivo                XXX    $XXX,XXX         XX.X%
+Tarjeta Débito          XXX    $XXX,XXX         XX.X%
+Tarjeta Crédito         XXX    $XXX,XXX         XX.X%
+Transferencia           XXX    $XXX,XXX         XX.X%
+Cheque                   XXX    $XXX,XXX         XX.X%
+────────────────────────────────────────────────────────────────
+TOTAL                   XXX    $XXX,XXX          100%
+
+═══════════════════════════════════════════════════════════════════
+                 VENTAS POR HORA DEL DÍA
+═══════════════════════════════════════════════════════════════════
+
+HORA       CANT. VENTAS    MONTO TOTAL    % DEL TOTAL
+──────────────────────────────────────────────────────────
+06:00-07:00      X         $XXX,XXX        X.X%
+07:00-08:00      X         $XXX,XXX        X.X%
+08:00-09:00      X         $XXX,XXX        X.X%
+...
+19:00-20:00      X         $XXX,XXX        X.X%
+20:00-21:00      X         $XXX,XXX        X.X%
+──────────────────────────────────────────────────────────
+TOTAL           XXX        $XXX,XXX        100%
+
+═══════════════════════════════════════════════════════════════════
+              TOP 20 PRODUCTOS MÁS VENDIDOS
+═══════════════════════════════════════════════════════════════════
+
+#   PRODUCTO                    CANT.    PRECIO UNIT.    TOTAL
+──────────────────────────────────────────────────────────────────
+1   Producto A                     XXX      $XX,XXX     $XXX,XXX
+2   Producto B                     XXX      $XX,XXX     $XXX,XXX
+3   Producto C                     XXX      $XX,XXX     $XXX,XXX
+...
+20  Producto Z                     XXX      $XX,XXX     $XXX,XXX
+──────────────────────────────────────────────────────────────────
+TOTAL                                             $XXX,XXX,XXX
+
+═══════════════════════════════════════════════════════════════════
+              INGRESOS Y EGRESOS DETALLADOS
+═══════════════════════════════════════════════════════════════════
+
+📥 INGRESOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Concepto                          Cantidad      Monto
+────────────────────────────────────────────────────────────────
+Ventas en Efectivo                      XXX     $XXX,XXX
+Ventas con Tarjeta                      XXX     $XXX,XXX
+Otros Ingresos                          XXX     $XXX,XXX
+────────────────────────────────────────────────────────────────
+TOTAL INGRESOS                         XXX     $XXX,XXX,XXX
+
+📤 EGRESOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Concepto                          Cantidad      Monto
+────────────────────────────────────────────────────────────────
+Compras a Proveedores                   XXX     $XXX,XXX
+Gastos Operativos                       XXX     $XXX,XXX
+Pagos a Proveedores                     XXX     $XXX,XXX
+Servicios Públicos                       XXX     $XXX,XXX
+────────────────────────────────────────────────────────────────
+TOTAL EGRESOS                          XXX     $XXX,XXX,XXX
+
+═══════════════════════════════════════════════════════════════════
+              TRANSACCIONES DEL PERÍODO (DETALLE)
+═══════════════════════════════════════════════════════════════════
+
+#   FECHA/HORA      VENDEDOR      MÉTODO     TOTAL      REFERENCIA
+──────────────────────────────────────────────────────────────────
+1   DD/MM/YY HH:MM   Usuario 1     Efectivo   $XXX,XXX   VTA-XXXXX
+2   DD/MM/YY HH:MM   Usuario 2     Tarjeta    $XXX,XXX   VTA-XXXXX
+3   DD/MM/YY HH:MM   Usuario 1     Efectivo   $XXX,XXX   VTA-XXXXX
+...
+──────────────────────────────────────────────────────────────────
+TOTAL                                               $XXX,XXX,XXX
+
+═══════════════════════════════════════════════════════════════════
+              ANÁLISIS DE RENTABILIDAD
+═══════════════════════════════════════════════════════════════════
+
+💰 MARGEN DE GANANCIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ventas Totales:                   $XXX,XXX,XXX
+Costos:                           $XXX,XXX,XXX
+───────────────────────────────────────────────
+Ganancia Bruta:                   $XXX,XXX,XXX
+Margen de Ganancia:                   XX.XX%
+
+📊 MÉTRICAS CLAVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ticket Promedio:                  $XXX,XXX
+Promedio de Items por Venta:          XX.X
+Rotación de Productos:              XXX%
+Índice de Productividad:            X.XX
+
+═══════════════════════════════════════════════════════════════════
+              INVENTARIO (REFERENCIA)
+═══════════════════════════════════════════════════════════════════
+
+Total Productos Vendidos:              XXX
+Productos con Stock Bajo:                XX
+Productos Agotados:                       X
+Valor de Inventario Actual:      $XXX,XXX
+
+═══════════════════════════════════════════════════════════════════
+                      GRÁFICOS Y ESTADÍSTICAS
+═══════════════════════════════════════════════════════════════════
+
+[Incluir gráficos de barras para:
+ - Ventas por hora
+ - Ventas por día de la semana
+ - Distribución de métodos de pago
+ - Top productos vendidos
+ - Ingresos vs Egresos]
+
+═══════════════════════════════════════════════════════════════════
+                    FIRMAS Y NOTAS
+═══════════════════════════════════════════════════════════════════
+
+Generado por: SmartSeller POS v1.0
+Usuario: [USUARIO QUE GENERÓ]
+Fecha de Impresión: [DD/MM/YYYY HH:MM]
+
+Este reporte ha sido generado automáticamente por el sistema
+SmartSeller POS v1.0. Para consultas, contacte al administrador.
+
+═══════════════════════════════════════════════════════════════════
+

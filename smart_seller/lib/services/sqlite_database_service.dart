@@ -11,6 +11,8 @@ import '../models/customer.dart'; // Added for Customer model
 import '../models/client.dart'; // Added for Client model
 import '../models/company_config.dart'; // Added for CompanyConfig model
 import '../models/group.dart'; // Added for Group model
+import '../models/cash_pickup.dart'; // Added for CashPickup model
+import 'security_service.dart'; // Added for password security
 
 class SQLiteDatabaseService {
   static Database? _database;
@@ -29,7 +31,7 @@ class SQLiteDatabaseService {
     
     _database = await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -154,7 +156,9 @@ static Future<void> _cleanupOpenCashSessions() async {
         icon TEXT NOT NULL,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
-        isActive INTEGER NOT NULL DEFAULT 1
+        isActive INTEGER NOT NULL DEFAULT 1,
+        defaultVatRate REAL DEFAULT 0.19,
+        defaultVatType TEXT DEFAULT "GRAVADO"
       )
     ''');
     
@@ -180,7 +184,14 @@ static Future<void> _cleanupOpenCashSessions() async {
         pricePerKg REAL,
         weight REAL,
         minWeight REAL,
-        maxWeight REAL
+        maxWeight REAL,
+        vatType TEXT DEFAULT "GRAVADO",
+        vatRate REAL DEFAULT 0.19,
+        hasIpoConsumo INTEGER DEFAULT 0,
+        ipoConsumoRate REAL,
+        ipoConsumoType TEXT,
+        isPlasticBag INTEGER DEFAULT 0,
+        plasticBagTax REAL
       )
     ''');
     
@@ -208,7 +219,23 @@ static Future<void> _cleanupOpenCashSessions() async {
         total REAL NOT NULL,
         user TEXT NOT NULL,
         paymentMethod TEXT,
-        items TEXT NOT NULL
+        items TEXT NOT NULL,
+        discount REAL DEFAULT 0.0,
+        discountPercentage REAL DEFAULT 0.0,
+        isReturn INTEGER DEFAULT 0,
+        originalSaleId INTEGER,
+        returnedAmount REAL DEFAULT 0.0,
+        exemptAmount REAL DEFAULT 0.0,
+        excludedAmount REAL DEFAULT 0.0,
+        taxedAmount REAL DEFAULT 0.0,
+        vatAt0 REAL DEFAULT 0.0,
+        vatAt5 REAL DEFAULT 0.0,
+        vatAt19 REAL DEFAULT 0.0,
+        totalVat REAL DEFAULT 0.0,
+        ipoConsumoAmount REAL DEFAULT 0.0,
+        plasticBagTaxAmount REAL DEFAULT 0.0,
+        plasticBagCount INTEGER DEFAULT 0,
+        subtotal REAL DEFAULT 0.0
       )
     ''');
     
@@ -272,6 +299,24 @@ static Future<void> _cleanupOpenCashSessions() async {
       )
     ''');
     
+    // Tabla de recogidas de efectivo
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cash_pickups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        amount REAL NOT NULL,
+        reason TEXT NOT NULL,
+        userId INTEGER NOT NULL,
+        cashSessionId INTEGER,
+        notes TEXT,
+        authorizedBy TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (userId) REFERENCES users (id),
+        FOREIGN KEY (cashSessionId) REFERENCES cash_sessions (id)
+      )
+    ''');
+    
     print('✅ Tablas creadas exitosamente');
   }
   
@@ -320,6 +365,136 @@ static Future<void> _cleanupOpenCashSessions() async {
         await _migrateCompanyConfigTable(db);
       }
     }
+    
+    // Migración de versión 2 a 3: Agregar campos de descuentos y devoluciones a tabla sales
+    if (oldVersion < 3) {
+      print('🔧 Agregando campos de descuentos y devoluciones a tabla sales...');
+      await migrateAddDiscountsAndReturns(db);
+    }
+    
+    // Migración de versión 3 a 4: Agregar campos de IVA, IpoConsumo, bolsas y recogidas
+    if (oldVersion < 4) {
+      print('🔧 Agregando campos de IVA, IpoConsumo, bolsas y recogidas de efectivo...');
+      await migrateAddTaxAndPickupFields(db);
+    }
+  }
+  
+  // ✅ NUEVO: Migración para agregar campos de descuentos y devoluciones
+  static Future<void> migrateAddDiscountsAndReturns(Database db) async {
+    try {
+      final newColumns = [
+        {'name': 'discount', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'discountPercentage', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'isReturn', 'type': 'INTEGER DEFAULT 0'},
+        {'name': 'originalSaleId', 'type': 'INTEGER'},
+        {'name': 'returnedAmount', 'type': 'REAL DEFAULT 0.0'},
+      ];
+      
+      for (final column in newColumns) {
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN ${column['name']} ${column['type']}');
+          print('✅ Columna ${column['name']} agregada a tabla sales');
+        } catch (e) {
+          print('ℹ️ Columna ${column['name']} ya existe en tabla sales');
+        }
+      }
+      
+      print('✅ Migración de sales completada');
+    } catch (e) {
+      print('❌ Error en migración de sales: $e');
+    }
+  }
+  
+  // ✅ NUEVO: Migración para agregar campos de IVA, IpoConsumo, bolsas y recogidas
+  static Future<void> migrateAddTaxAndPickupFields(Database db) async {
+    try {
+      print('🔧 Migrando campos de IVA, IpoConsumo y bolsas a productos...');
+      
+      // Agregar campos a tabla products
+      final productColumns = [
+        {'name': 'vatType', 'type': 'TEXT DEFAULT "GRAVADO"'},
+        {'name': 'vatRate', 'type': 'REAL DEFAULT 0.19'},
+        {'name': 'hasIpoConsumo', 'type': 'INTEGER DEFAULT 0'},
+        {'name': 'ipoConsumoRate', 'type': 'REAL'},
+        {'name': 'ipoConsumoType', 'type': 'TEXT'},
+        {'name': 'isPlasticBag', 'type': 'INTEGER DEFAULT 0'},
+        {'name': 'plasticBagTax', 'type': 'REAL'},
+      ];
+      
+      for (final column in productColumns) {
+        try {
+          await db.execute('ALTER TABLE products ADD COLUMN ${column['name']} ${column['type']}');
+          print('✅ Columna ${column['name']} agregada a tabla products');
+        } catch (e) {
+          print('ℹ️ Columna ${column['name']} ya existe en tabla products');
+        }
+      }
+      
+      // Agregar campos a tabla groups
+      print('🔧 Agregando campos de IVA por defecto a grupos...');
+      final groupColumns = [
+        {'name': 'defaultVatRate', 'type': 'REAL DEFAULT 0.19'},
+        {'name': 'defaultVatType', 'type': 'TEXT DEFAULT "GRAVADO"'},
+      ];
+      
+      for (final column in groupColumns) {
+        try {
+          await db.execute('ALTER TABLE groups ADD COLUMN ${column['name']} ${column['type']}');
+          print('✅ Columna ${column['name']} agregada a tabla groups');
+        } catch (e) {
+          print('ℹ️ Columna ${column['name']} ya existe en tabla groups');
+        }
+      }
+      
+      // Agregar campos a tabla sales para desglose
+      print('🔧 Agregando campos de desglose a tabla sales...');
+      final salesColumns = [
+        {'name': 'exemptAmount', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'excludedAmount', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'taxedAmount', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'vatAt0', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'vatAt5', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'vatAt19', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'totalVat', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'ipoConsumoAmount', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'plasticBagTaxAmount', 'type': 'REAL DEFAULT 0.0'},
+        {'name': 'plasticBagCount', 'type': 'INTEGER DEFAULT 0'},
+        {'name': 'subtotal', 'type': 'REAL DEFAULT 0.0'},
+      ];
+      
+      for (final column in salesColumns) {
+        try {
+          await db.execute('ALTER TABLE sales ADD COLUMN ${column['name']} ${column['type']}');
+          print('✅ Columna ${column['name']} agregada a tabla sales');
+        } catch (e) {
+          print('ℹ️ Columna ${column['name']} ya existe en tabla sales');
+        }
+      }
+      
+      // Crear tabla de recogidas de efectivo
+      print('🔧 Creando tabla cash_pickups...');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cash_pickups (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          amount REAL NOT NULL,
+          reason TEXT NOT NULL,
+          userId INTEGER NOT NULL,
+          cashSessionId INTEGER,
+          notes TEXT,
+          authorizedBy TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          FOREIGN KEY (userId) REFERENCES users (id),
+          FOREIGN KEY (cashSessionId) REFERENCES cash_sessions (id)
+        )
+      ''');
+      print('✅ Tabla cash_pickups creada');
+      
+      print('✅ Migración de IVA, IpoConsumo y bolsas completada');
+    } catch (e) {
+      print('❌ Error en migración de IVA/IpoConsumo/Bolsas: $e');
+    }
   }
   
   // Migrar tabla company_config para agregar campos de facturación electrónica
@@ -366,16 +541,18 @@ static Future<void> _cleanupOpenCashSessions() async {
     
     if (adminExists.isEmpty) {
     print('🔧 Creando usuario admin por defecto...');
+    // Hash de la contraseña por defecto
+    final hashedPassword = SecurityService.hashPassword('123456');
     await _database!.insert('users', {
       'username': 'admin',
-      'password': '123456',
+      'password': hashedPassword, // Ahora se guarda hasheada
       'fullName': 'Administrador',
       'role': 'admin',
       'createdAt': DateTime.now().toIso8601String(),
       'isActive': 1,
         'userCode': 'ADM-1001',
     });
-    print('✅ Usuario admin creado: admin / 123456');
+    print('✅ Usuario admin creado con contraseña segura: admin / 123456');
     }
     
     // Crear usuario supervisor si no existe
@@ -387,16 +564,18 @@ static Future<void> _cleanupOpenCashSessions() async {
     
     if (supervisorExists.isEmpty) {
       print('🔧 Creando usuario supervisor por defecto...');
+      // Hash de la contraseña por defecto
+      final hashedPassword = SecurityService.hashPassword('123456');
       await _database!.insert('users', {
         'username': 'supervisor',
-        'password': '123456',
+        'password': hashedPassword, // Ahora se guarda hasheada
         'fullName': 'Supervisor General',
         'role': 'supervisor',
         'createdAt': DateTime.now().toIso8601String(),
         'isActive': 1,
         'userCode': 'SUP-2001',
       });
-      print('✅ Usuario supervisor creado: supervisor / 123456');
+      print('✅ Usuario supervisor creado con contraseña segura: supervisor / 123456');
     }
   }
   
@@ -404,42 +583,79 @@ static Future<void> _cleanupOpenCashSessions() async {
   
   // Buscar usuario por username y password
   static Future<User?> findUser(String username, String password) async {
-    print('🔍 Buscando usuario: username="$username", password="$password"');
+    print('🔍 Buscando usuario: username="$username"');
     
     try {
+      // Buscar usuario por username
       final results = await _database!.query(
         'users',
-        where: 'username = ? AND password = ? AND isActive = ?',
-        whereArgs: [username, password, 1],
+        where: 'username = ? AND isActive = ?',
+        whereArgs: [username, 1],
       );
       
-      if (results.isNotEmpty) {
-        final userData = results.first;
-        final user = User()
-          ..id = userData['id'] as int
-          ..username = userData['username'] as String
-          ..password = userData['password'] as String
-          ..fullName = userData['fullName'] as String
-          ..role = UserRole.values.firstWhere(
-            (e) => e.toString().split('.').last == userData['role'],
-            orElse: () => UserRole.cashier,
-          )
-          ..createdAt = DateTime.parse(userData['createdAt'] as String)
-          ..isActive = userData['isActive'] == 1
-          ..userCode = (userData['userCode'] == null || userData['userCode'] == '' || userData['userCode'] == 'null')
-            ? null
-            : userData['userCode'] as String;
-        
-        print('✅ Usuario encontrado: ${user.fullName} (${user.username})');
-        return user;
-      } else {
-        print('❌ Usuario no encontrado o credenciales incorrectas');
+      if (results.isEmpty) {
+        print('❌ Usuario no encontrado');
         return null;
       }
+      
+      final userData = results.first;
+      final storedPassword = userData['password'] as String;
+      
+      // Verificar contraseña con soporte retrocompatible
+      bool isValid;
+      if (SecurityService.isHashed(storedPassword)) {
+        // Contraseña está hasheada (sistema nuevo)
+        final hashedPassword = SecurityService.hashPassword(password);
+        isValid = (storedPassword == hashedPassword);
+      } else {
+        // Contraseña en texto plano (sistema antiguo - retrocompatibilidad)
+        isValid = (password == storedPassword);
+        // Si es válida y está en texto plano, migrar a hash
+        if (isValid) {
+          print('⚠️ Migrando contraseña a formato seguro...');
+          await updateUserPassword(userData['id'] as int, password);
+        }
+      }
+      
+      if (!isValid) {
+        print('❌ Contraseña incorrecta');
+        return null;
+      }
+      
+      // Crear objeto User
+      final user = User()
+        ..id = userData['id'] as int
+        ..username = userData['username'] as String
+        ..password = userData['password'] as String
+        ..fullName = userData['fullName'] as String
+        ..role = UserRole.values.firstWhere(
+          (e) => e.toString().split('.').last == userData['role'],
+          orElse: () => UserRole.cashier,
+        )
+        ..createdAt = DateTime.parse(userData['createdAt'] as String)
+        ..isActive = userData['isActive'] == 1
+        ..userCode = (userData['userCode'] == null || userData['userCode'] == '' || userData['userCode'] == 'null')
+          ? null
+          : userData['userCode'] as String;
+      
+      print('✅ Usuario encontrado: ${user.fullName} (${user.username})');
+      return user;
     } catch (e) {
       print('❌ Error en findUser: $e');
       return null;
     }
+  }
+  
+  // Actualizar contraseña de un usuario
+  static Future<void> updateUserPassword(int userId, String newPlainPassword) async {
+    final hashedPassword = SecurityService.hashPassword(newPlainPassword);
+    await _database!.update(
+      'users',
+      {'password': hashedPassword},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    print('✅ Contraseña actualizada a formato seguro para usuario $userId');
   }
   
   // Verificar si un usuario existe por username
@@ -489,15 +705,19 @@ static Future<void> _cleanupOpenCashSessions() async {
   
   // Crear usuario
   static Future<void> createUser(User user) async {
+    // Hash de la contraseña antes de guardar
+    final hashedPassword = SecurityService.hashPassword(user.password);
+    
     await _database!.insert('users', {
       'username': user.username,
-      'password': user.password,
+      'password': hashedPassword, // Ahora se guarda hasheada
       'fullName': user.fullName,
       'role': user.role.toString().split('.').last,
       'createdAt': user.createdAt.toIso8601String(),
       'isActive': user.isActive ? 1 : 0,
       'userCode': user.userCode,
     });
+    print('✅ Usuario creado con contraseña segura');
   }
   
   // Actualizar usuario
@@ -655,6 +875,52 @@ static Future<void> _cleanupOpenCashSessions() async {
   // ================== PRODUCTOS ==================
   
   // Obtener todos los productos
+  // ✅ NUEVO: Obtener productos más frecuentes basado en ventas recientes
+  // Retorna una lista de mapas con 'name' y 'unit' para búsqueda precisa
+  static Future<List<Map<String, String>>> getMostFrequentProductNames({int days = 30, int limit = 12}) async {
+    try {
+      // Obtener ventas de los últimos N días
+      final cutoffDate = DateTime.now().subtract(Duration(days: days));
+      final sales = await getSales(
+        date: cutoffDate,
+        endDate: DateTime.now(),
+      );
+      
+      // Contar frecuencia de cada producto (por nombre + unidad)
+      final Map<String, int> productFrequency = {};
+      
+      for (final sale in sales) {
+        // Solo contar ventas normales, no devoluciones
+        if (!sale.isReturn) {
+          for (final item in sale.items) {
+            // Usar nombre + unidad como clave única
+            final key = '${item.name}|${item.unit}';
+            productFrequency[key] = (productFrequency[key] ?? 0) + item.quantity;
+          }
+        }
+      }
+      
+      // Ordenar por frecuencia descendente
+      final sortedProducts = productFrequency.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      
+      // Retornar lista de mapas con nombre y unidad
+      return sortedProducts
+          .take(limit)
+          .map((entry) {
+            final parts = entry.key.split('|');
+            return {
+              'name': parts[0],
+              'unit': parts.length > 1 ? parts[1] : '',
+            };
+          })
+          .toList();
+    } catch (e) {
+      print('❌ Error obteniendo productos frecuentes: $e');
+      return [];
+    }
+  }
+  
   static Future<List<Product>> getAllProducts() async {
     final results = await _database!.query('products', where: 'isActive = ?', whereArgs: [1]);
     return results.map((productData) {
@@ -757,7 +1023,39 @@ static Future<void> _cleanupOpenCashSessions() async {
         'price': item.price,
         'quantity': item.quantity,
         'unit': item.unit,
+        'discount': item.discount,
+        'discountPercentage': item.discountPercentage,
+        // ✅ NUEVO: Campos de IVA, IpoConsumo y bolsas del item
+        'vatType': item.vatType,
+        'vatRate': item.vatRate,
+        'itemVat': item.itemVat,
+        'hasIpoConsumo': item.hasIpoConsumo,
+        'ipoConsumoRate': item.ipoConsumoRate,
+        'ipoConsumoType': item.ipoConsumoType,
+        'itemIpoConsumo': item.itemIpoConsumo,
+        'isPlasticBag': item.isPlasticBag,
+        'plasticBagTax': item.plasticBagTax,
+        'bagQuantity': item.bagQuantity,
+        'itemSubtotal': item.itemSubtotal,
       }).toList()), // Guardar como JSON string
+      // ✅ NUEVO: Campos de descuentos y devoluciones
+      'discount': sale.discount ?? 0.0,
+      'discountPercentage': sale.discountPercentage ?? 0.0,
+      'isReturn': sale.isReturn ? 1 : 0,
+      'originalSaleId': sale.originalSaleId,
+      'returnedAmount': sale.returnedAmount ?? 0.0,
+      // ✅ NUEVO: Campos de desglose de ventas
+      'exemptAmount': sale.exemptAmount,
+      'excludedAmount': sale.excludedAmount,
+      'taxedAmount': sale.taxedAmount,
+      'vatAt0': sale.vatAt0,
+      'vatAt5': sale.vatAt5,
+      'vatAt19': sale.vatAt19,
+      'totalVat': sale.totalVat,
+      'ipoConsumoAmount': sale.ipoConsumoAmount,
+      'plasticBagTaxAmount': sale.plasticBagTaxAmount,
+      'plasticBagCount': sale.plasticBagCount,
+      'subtotal': sale.subtotal,
     });
 
     // Descontar stock de cada producto vendido
@@ -817,24 +1115,57 @@ static Future<void> _cleanupOpenCashSessions() async {
     );
     
     return results.map((saleData) {
-      final sale = Sale()
-        ..id = saleData['id'] as int
-        ..date = DateTime.parse(saleData['date'] as String)
-        ..total = saleData['total'] as double
-        ..user = saleData['user'] as String
-        ..paymentMethod = saleData['paymentMethod'] as String?
-      ;
+      final sale = Sale(
+        id: saleData['id'] as int,
+        date: DateTime.parse(saleData['date'] as String),
+        total: saleData['total'] as double,
+        user: saleData['user'] as String,
+        paymentMethod: saleData['paymentMethod'] as String?,
+        items: [],
+        // ✅ NUEVO: Leer campos de descuentos y devoluciones
+        discount: saleData['discount'] as double?,
+        discountPercentage: saleData['discountPercentage'] as double?,
+        isReturn: (saleData['isReturn'] as int? ?? 0) == 1,
+        originalSaleId: saleData['originalSaleId'] as int?,
+        returnedAmount: saleData['returnedAmount'] as double?,
+        // ✅ NUEVO: Leer campos de desglose de ventas
+        exemptAmount: (saleData['exemptAmount'] as num?)?.toDouble() ?? 0.0,
+        excludedAmount: (saleData['excludedAmount'] as num?)?.toDouble() ?? 0.0,
+        taxedAmount: (saleData['taxedAmount'] as num?)?.toDouble() ?? 0.0,
+        vatAt0: (saleData['vatAt0'] as num?)?.toDouble() ?? 0.0,
+        vatAt5: (saleData['vatAt5'] as num?)?.toDouble() ?? 0.0,
+        vatAt19: (saleData['vatAt19'] as num?)?.toDouble() ?? 0.0,
+        totalVat: (saleData['totalVat'] as num?)?.toDouble() ?? 0.0,
+        ipoConsumoAmount: (saleData['ipoConsumoAmount'] as num?)?.toDouble() ?? 0.0,
+        plasticBagTaxAmount: (saleData['plasticBagTaxAmount'] as num?)?.toDouble() ?? 0.0,
+        plasticBagCount: saleData['plasticBagCount'] as int? ?? 0,
+        subtotal: (saleData['subtotal'] as num?)?.toDouble() ?? 0.0,
+      );
       // Parsear items desde JSON string
       try {
         final itemsString = saleData['items'] as String?;
         if (itemsString != null && itemsString.isNotEmpty) {
           final List<dynamic> itemsList = itemsString.contains('[') ? jsonDecode(itemsString) : [];
-          sale.items = itemsList.map((item) => SaleItem()
-            ..name = item['name']
-            ..price = item['price']
-            ..quantity = item['quantity']
-            ..unit = item['unit']
-          ).toList();
+          sale.items = itemsList.map((item) => SaleItem(
+            name: item['name'],
+            price: item['price'] is int ? (item['price'] as int).toDouble() : item['price'],
+            quantity: item['quantity'] is int ? item['quantity'] : (item['quantity'] as double).toInt(),
+            unit: item['unit'],
+            discount: item['discount'] as double?,
+            discountPercentage: item['discountPercentage'] as double?,
+            // ✅ NUEVO: Leer campos de IVA, IpoConsumo y bolsas del item
+            vatType: item['vatType'] ?? 'GRAVADO',
+            vatRate: (item['vatRate'] ?? 0.19).toDouble(),
+            itemVat: (item['itemVat'] ?? 0.0).toDouble(),
+            hasIpoConsumo: item['hasIpoConsumo'] == true,
+            ipoConsumoRate: item['ipoConsumoRate'] != null ? (item['ipoConsumoRate'] as num).toDouble() : null,
+            ipoConsumoType: item['ipoConsumoType'],
+            itemIpoConsumo: (item['itemIpoConsumo'] ?? 0.0).toDouble(),
+            isPlasticBag: item['isPlasticBag'] == true,
+            plasticBagTax: item['plasticBagTax'] != null ? (item['plasticBagTax'] as num).toDouble() : null,
+            bagQuantity: item['bagQuantity'] as int?,
+            itemSubtotal: (item['itemSubtotal'] ?? 0.0).toDouble(),
+          )).toList();
         } else {
           sale.items = [];
         }
@@ -843,6 +1174,80 @@ static Future<void> _cleanupOpenCashSessions() async {
       }
       return sale;
     }).toList();
+  }
+  
+  // ================== RECOGIDAS DE EFECTIVO ==================
+  
+  // ✅ NUEVO: Guardar recogida de efectivo
+  static Future<void> saveCashPickup(CashPickup pickup) async {
+    await _database!.insert('cash_pickups', pickup.toMap());
+  }
+  
+  // ✅ NUEVO: Obtener todas las recogidas de efectivo
+  static Future<List<CashPickup>> getCashPickups({
+    DateTime? startDate,
+    DateTime? endDate,
+    int? cashSessionId,
+    int? userId,
+  }) async {
+    String whereClause = '';
+    List<dynamic> whereArgs = [];
+    
+    if (startDate != null && endDate != null) {
+      whereClause = 'date >= ? AND date <= ?';
+      whereArgs = [startDate.toIso8601String(), endDate.toIso8601String()];
+    } else if (startDate != null) {
+      whereClause = 'date >= ?';
+      whereArgs = [startDate.toIso8601String()];
+    }
+    
+    if (cashSessionId != null) {
+      if (whereClause.isNotEmpty) whereClause += ' AND ';
+      whereClause += 'cashSessionId = ?';
+      whereArgs.add(cashSessionId);
+    }
+    
+    if (userId != null) {
+      if (whereClause.isNotEmpty) whereClause += ' AND ';
+      whereClause += 'userId = ?';
+      whereArgs.add(userId);
+    }
+    
+    final results = await _database!.query(
+      'cash_pickups',
+      where: whereClause.isEmpty ? null : whereClause,
+      whereArgs: whereArgs.isEmpty ? null : whereArgs,
+      orderBy: 'date DESC',
+    );
+    
+    return results.map((row) => CashPickup.fromMap(row)).toList();
+  }
+  
+  // ✅ NUEVO: Obtener recogidas de efectivo por sesión de caja
+  static Future<List<CashPickup>> getCashPickupsBySession(int cashSessionId) async {
+    final results = await _database!.query(
+      'cash_pickups',
+      where: 'cashSessionId = ?',
+      whereArgs: [cashSessionId],
+      orderBy: 'date DESC',
+    );
+    
+    return results.map((row) => CashPickup.fromMap(row)).toList();
+  }
+  
+  // ✅ NUEVO: Eliminar recogida de efectivo
+  static Future<bool> deleteCashPickup(int id) async {
+    try {
+      final result = await _database!.delete(
+        'cash_pickups',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return result > 0;
+    } catch (e) {
+      print('Error al eliminar recogida de efectivo: $e');
+      return false;
+    }
   }
   
   // ================== MOVIMIENTOS DE INVENTARIO ==================

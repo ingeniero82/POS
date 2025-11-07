@@ -2,15 +2,15 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/sale.dart';
-import '../models/product.dart';
 import '../models/customer.dart';
 import '../models/client.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/auth_service.dart';
-import '../services/client_validation_service.dart';
 import '../modules/accounting/services/accounting_service.dart';
 
 import '../services/print_service.dart';
+import '../services/tax_calculation_service.dart';
+import '../models/product.dart';
 import 'package:intl/intl.dart';
 
 class CartItem {
@@ -18,16 +18,27 @@ class CartItem {
   double price; // Cambiado de final para permitir modificaciones temporales
   final String unit;
   int quantity;
-
+  
+  // ✅ NUEVO: Campos para cálculo de impuestos
+  Product? product; // Producto asociado
+  SaleItem? saleItem; // Item de venta con impuestos calculados
 
   CartItem({
     required this.name,
     required this.price,
     required this.unit,
     this.quantity = 1,
+    this.product,
+    this.saleItem,
   });
 
-  double get total => price * quantity;
+  double get total {
+    // Si hay saleItem calculado, usar su total
+    if (saleItem != null) {
+      return saleItem!.total;
+    }
+    return price * quantity;
+  }
   
   String get displayInfo => '$quantity ${unit}';
 }
@@ -331,11 +342,12 @@ class PosController extends GetxController {
     }
   }
 
-  // Agregar producto al carrito
-  void addToCart(String name, double price, String unit, {
+  // ✅ ACTUALIZADO: Agregar producto al carrito con cálculo de impuestos
+  Future<void> addToCart(String name, double price, String unit, {
     int quantity = 1,
     int? availableStock,
-  }) {
+    Product? product,
+  }) async {
     // Buscar si el producto ya existe en el carrito
     final existingIndex = cartItems.indexWhere((item) => item.name == name);
     
@@ -353,6 +365,16 @@ class PosController extends GetxController {
         return;
       }
       cartItems[existingIndex].quantity += quantity;
+      
+      // ✅ NUEVO: Recalcular impuestos del item
+      if (cartItems[existingIndex].product != null) {
+        final saleItem = await TaxCalculationService.calculateItemTaxes(
+          product: cartItems[existingIndex].product!,
+          quantity: cartItems[existingIndex].quantity,
+        );
+        cartItems[existingIndex].saleItem = saleItem;
+      }
+      
       cartItems.refresh(); // Notificar cambios
     } else {
       // Si no existe, verificar stock antes de agregar
@@ -366,12 +388,34 @@ class PosController extends GetxController {
         );
         return;
       }
+      
+      // ✅ NUEVO: Obtener producto completo si no se proporciona
+      Product? productToUse = product;
+      if (productToUse == null) {
+        final products = await SQLiteDatabaseService.getAllProducts();
+        try {
+          productToUse = products.firstWhere((p) => p.name == name && p.isActive);
+        } catch (e) {
+          productToUse = null; // Producto no encontrado
+        }
+      }
+      
+      // ✅ NUEVO: Calcular impuestos del item
+      SaleItem? saleItem;
+      if (productToUse != null) {
+        saleItem = await TaxCalculationService.calculateItemTaxes(
+          product: productToUse,
+          quantity: quantity,
+        );
+      }
+      
       cartItems.add(CartItem(
         name: name,
         price: price,
         unit: unit,
         quantity: quantity,
-
+        product: productToUse,
+        saleItem: saleItem,
       ));
     }
   }
@@ -449,17 +493,94 @@ class PosController extends GetxController {
   
 
   
-  // Calcular subtotal
+  // ✅ ACTUALIZADO: Calcular subtotal (sin impuestos)
   double get subtotal {
-    return cartItems.fold(0.0, (sum, item) => sum + item.total);
+    return cartItems.fold(0.0, (sum, item) {
+      if (item.saleItem != null) {
+        return sum + item.saleItem!.itemSubtotal;
+      }
+      return sum + (item.price * item.quantity);
+    });
   }
   
-  // Calcular impuestos (19%)
+  // ✅ ACTUALIZADO: Calcular impuestos (IVA + IpoConsumo + Bolsas)
   double get taxes {
-    return subtotal * 0.19;
+    double totalTaxes = 0.0;
+    for (final item in cartItems) {
+      if (item.saleItem != null) {
+        totalTaxes += item.saleItem!.itemVat;
+        totalTaxes += item.saleItem!.itemIpoConsumo;
+        if (item.saleItem!.isPlasticBag && 
+            item.saleItem!.plasticBagTax != null && 
+            item.saleItem!.bagQuantity != null) {
+          totalTaxes += (item.saleItem!.plasticBagTax! * item.saleItem!.bagQuantity!);
+        }
+      }
+    }
+    return totalTaxes;
   }
   
-  // Calcular total
+  // ✅ ACTUALIZADO: Calcular IVA por tasas
+  double get vatAt0 {
+    return cartItems.fold(0.0, (sum, item) {
+      if (item.saleItem != null && item.saleItem!.vatRate == 0.0) {
+        return sum + item.saleItem!.itemVat;
+      }
+      return sum;
+    });
+  }
+  
+  double get vatAt5 {
+    return cartItems.fold(0.0, (sum, item) {
+      if (item.saleItem != null && item.saleItem!.vatRate == 0.05) {
+        return sum + item.saleItem!.itemVat;
+      }
+      return sum;
+    });
+  }
+  
+  double get vatAt19 {
+    return cartItems.fold(0.0, (sum, item) {
+      if (item.saleItem != null && item.saleItem!.vatRate == 0.19) {
+        return sum + item.saleItem!.itemVat;
+      }
+      return sum;
+    });
+  }
+  
+  // ✅ NUEVO: Calcular IpoConsumo
+  double get ipoConsumoAmount {
+    return cartItems.fold(0.0, (sum, item) {
+      if (item.saleItem != null) {
+        return sum + item.saleItem!.itemIpoConsumo;
+      }
+      return sum;
+    });
+  }
+  
+  // ✅ NUEVO: Calcular impuesto bolsas
+  double get plasticBagTaxAmount {
+    return cartItems.fold(0.0, (sum, item) {
+      if (item.saleItem != null && 
+          item.saleItem!.isPlasticBag && 
+          item.saleItem!.plasticBagTax != null && 
+          item.saleItem!.bagQuantity != null) {
+        return sum + (item.saleItem!.plasticBagTax! * item.saleItem!.bagQuantity!);
+      }
+      return sum;
+    });
+  }
+  
+  int get plasticBagCount {
+    return cartItems.fold(0, (sum, item) {
+      if (item.saleItem != null && item.saleItem!.bagQuantity != null) {
+        return sum + item.saleItem!.bagQuantity!;
+      }
+      return sum;
+    });
+  }
+  
+  // ✅ ACTUALIZADO: Calcular total
   double get total {
     return subtotal + taxes;
   }
@@ -569,18 +690,29 @@ class PosController extends GetxController {
     Get.back(); // Cierra el diálogo de métodos de pago
     
     try {
-      // Crear la venta
-                      final sale = Sale()
-                        ..date = DateTime.now()
-                        ..total = total
-                        ..user = AuthService.to.currentUser?.username ?? 'usuario'
-        ..paymentMethod = method
-                        ..items = cartItems.map((item) => SaleItem()
-                          ..name = item.name
-                          ..price = item.price
-                          ..quantity = item.quantity
-                          ..unit = item.unit
-                        ).toList();
+      // ✅ ACTUALIZADO: Convertir cartItems a SaleItems con impuestos calculados
+      List<SaleItem> saleItems = [];
+      for (final cartItem in cartItems) {
+        if (cartItem.saleItem != null) {
+          saleItems.add(cartItem.saleItem!);
+        } else {
+          // Si no hay saleItem calculado, crear uno básico
+          saleItems.add(SaleItem(
+            name: cartItem.name,
+            price: cartItem.price,
+            quantity: cartItem.quantity,
+            unit: cartItem.unit,
+          ));
+        }
+      }
+      
+      // ✅ ACTUALIZADO: Calcular desglose completo de la venta
+      final sale = await TaxCalculationService.calculateSaleBreakdown(
+        items: saleItems,
+        date: DateTime.now(),
+        user: AuthService.to.currentUser?.username ?? 'usuario',
+        paymentMethod: method,
+      );
       
       // Guardar la venta
       await SQLiteDatabaseService.saveSale(sale);

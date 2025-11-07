@@ -1,0 +1,38 @@
+═══════════════════════════════════════════════════════════════════
+TÍTULO OFICIAL DE LA OBRA
+═══════════════════════════════════════════════════════════════════
+
+Sistema de Punto de Venta SmartSeller POS v1.0
+
+═══════════════════════════════════════════════════════════════════
+INFORMACIÓN DE LA OBRA
+═══════════════════════════════════════════════════════════════════
+
+AUTOR: Oscar Mauricio González
+
+AÑO DE CREACIÓN: 2025
+
+PAÍS DE ORIGEN: Colombia
+
+VERSIÓN: 1.0
+
+CARÁCTER: Obra Individual - Originaria
+
+═══════════════════════════════════════════════════════════════════
+DESCRIPCIÓN
+═══════════════════════════════════════════════════════════════════
+
+Sistema de punto de venta profesional desarrollado con Flutter y Dart 
+que permite la gestión completa de ventas, inventario, clientes y 
+facturación electrónica según normativa DIAN (Colombia).
+
+═══════════════════════════════════════════════════════════════════
+ELEMENTOS INCLUIDOS EN ESTE ARCHIVO ZIP
+═══════════════════════════════════════════════════════════════════
+
+1. Código fuente completo del software (carpeta lib/)
+2. Archivo de configuración del proyecto (pubspec.yaml)
+3. Este documento con el título oficial de la obra
+
+═══════════════════════════════════════════════════════════════════
+

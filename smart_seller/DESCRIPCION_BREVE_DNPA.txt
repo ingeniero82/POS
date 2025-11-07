@@ -1,0 +1,70 @@
+DESCRIPCIÓN BREVE PARA REGISTRO DNPA
+
+───────────────────────────────────────────────────────────────────
+
+TÍTULO:
+Sistema de Punto de Venta SmartSeller POS v1.0
+
+AUTOR:
+Oscar Mauricio González
+
+FECHA:
+Septiembre 2025
+
+───────────────────────────────────────────────────────────────────
+
+DESCRIPCIÓN (Versión Corta):
+
+El software SmartSeller POS v1.0 es un sistema de punto de venta 
+profesional desarrollado con Flutter y Dart, que permite la gestión 
+completa de ventas, inventario, clientes y facturación electrónica 
+según normativa DIAN (Colombia).
+
+El sistema procesa transacciones de venta en tiempo real, almacena 
+datos en base de datos SQLite local, calcula automáticamente totales 
+e impuestos, actualiza el inventario al realizar ventas, genera 
+reportes en PDF y Excel, gestiona usuarios con autenticación segura 
+(SHA-256), valida datos fiscales, registra operaciones, permite 
+búsqueda de productos y clientes, compila datos para reportes, 
+controla accesos mediante roles, gestiona permisos granulares, 
+encripta contraseñas y migra seguridad automáticamente.
+
+Incluye módulos de punto de venta, gestión de inventario, clientes, 
+facturación electrónica DIAN, reportes contables, gestión de usuarios 
+y configuración. Utiliza arquitectura MVC con GetX para gestión de 
+estado, Material Design 3 para interfaz y SQLite para persistencia 
+local. Soporta Windows, Android y Web. Cumple estándares de seguridad 
+profesional con encriptación SHA-256 y sistema de permisos granular.
+
+───────────────────────────────────────────────────────────────────
+
+CARACTERÍSTICAS PRINCIPALES:
+
+✓ Procesamiento de ventas en tiempo real
+✓ Control automático de inventario
+✓ Facturación electrónica DIAN
+✓ Reportes profesionales (PDF/Excel)
+✓ Sistema de seguridad SHA-256
+✓ Múltiples usuarios con roles
+✓ Integración con balanzas electrónicas
+✓ Interfaz moderna e intuitiva
+
+───────────────────────────────────────────────────────────────────
+
+TECNOLOGÍAS:
+
+- Flutter 3.16.0+ (Framework)
+- Dart 3.0+ (Lenguaje)
+- SQLite (Base de datos)
+- GetX (Gestión de estado)
+- Material Design 3 (Interfaz)
+- SHA-256 (Seguridad)
+
+───────────────────────────────────────────────────────────────────
+
+Palabras clave: Software, Pos, Punto Venta, Facturación Electrónica, 
+Inventario, Reportes, DIAN, Seguridad, SQLite, Flutter, Comercial, 
+Gestión, Colombia
+
+═══════════════════════════════════════════════════════════════════
+

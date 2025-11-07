@@ -50,6 +50,23 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
   // ✅ NUEVO: Modo de cálculo de precios (por defecto mantiene comportamiento actual)
   PriceCalculationMode _priceMode = PriceCalculationMode.fixedPrice;
   
+  // ✅ NUEVO: Variables para gestión de IVA
+  String _vatType = 'GRAVADO'; // EXENTO, EXCLUIDO, GRAVADO
+  double _vatRate = 0.19; // 0.0, 0.05, 0.19
+  
+  // ✅ NUEVO: Variables para IpoConsumo
+  bool _hasIpoConsumo = false;
+  double? _ipoConsumoRate;
+  String? _ipoConsumoType; // LICOR, CIGARRILLOS, BOLSAS, OTRO
+  
+  // ✅ NUEVO: Variables para bolsas plásticas
+  bool _isPlasticBag = false;
+  double? _plasticBagTax;
+  
+  // ✅ NUEVO: Controladores para campos de impuestos
+  final _ipoConsumoRateController = TextEditingController();
+  final _plasticBagTaxController = TextEditingController();
+  
   // Controlador para las pestañas
   late TabController _tabController;
 
@@ -77,6 +94,25 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
       
       // ✅ NUEVO: Calcular % de utilidad inicial
       _calculateProfitMargin();
+      
+      // ✅ NUEVO: Inicializar campos de IVA
+      _vatType = widget.product!.vatType;
+      _vatRate = widget.product!.vatRate;
+      
+      // ✅ NUEVO: Inicializar campos de IpoConsumo
+      _hasIpoConsumo = widget.product!.hasIpoConsumo;
+      _ipoConsumoRate = widget.product!.ipoConsumoRate;
+      _ipoConsumoType = widget.product!.ipoConsumoType;
+      if (_ipoConsumoRate != null) {
+        _ipoConsumoRateController.text = (_ipoConsumoRate! * 100).toString(); // Mostrar como porcentaje
+      }
+      
+      // ✅ NUEVO: Inicializar campos de bolsas plásticas
+      _isPlasticBag = widget.product!.isPlasticBag;
+      _plasticBagTax = widget.product!.plasticBagTax;
+      if (_plasticBagTax != null) {
+        _plasticBagTaxController.text = _plasticBagTax!.toString();
+      }
 
     }
     
@@ -91,6 +127,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
     _tabController.dispose();
     // ✅ NUEVO: Dispose de los nuevos controladores
     _profitMarginController.dispose();
+    _ipoConsumoRateController.dispose();
+    _plasticBagTaxController.dispose();
     super.dispose();
   }
   
@@ -259,6 +297,16 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
         updatedAt: DateTime.now(),
         isActive: _isActive,
         imageUrl: _currentImagePath, // ✅ NUEVO: Incluir imagen
+        // ✅ NUEVO: Campos de IVA
+        vatType: _vatType,
+        vatRate: _vatRate,
+        // ✅ NUEVO: Campos de IpoConsumo
+        hasIpoConsumo: _hasIpoConsumo,
+        ipoConsumoRate: _ipoConsumoRate,
+        ipoConsumoType: _ipoConsumoType,
+        // ✅ NUEVO: Campos de bolsas plásticas
+        isPlasticBag: _isPlasticBag,
+        plasticBagTax: _plasticBagTax,
       );
 
       if (widget.product == null) {
@@ -901,13 +949,22 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
                     border: OutlineInputBorder(),
                     helperText: 'Según normativa DIAN',
                   ),
+                  value: _vatType,
                   items: const [
                     DropdownMenuItem(value: 'GRAVADO', child: Text('Gravado')),
                     DropdownMenuItem(value: 'EXENTO', child: Text('Exento')),
                     DropdownMenuItem(value: 'EXCLUIDO', child: Text('Excluido')),
                   ],
                   onChanged: (value) {
-                    // TODO: Implementar lógica
+                    if (value != null) {
+                      setState(() {
+                        _vatType = value;
+                        // Si es EXENTO o EXCLUIDO, la tasa debe ser 0
+                        if (value == 'EXENTO' || value == 'EXCLUIDO') {
+                          _vatRate = 0.0;
+                        }
+                      });
+                    }
                   },
                 ),
               ),
@@ -915,17 +972,25 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
               Expanded(
                 child: DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
-                    labelText: 'IVA *',
+                    labelText: 'Tasa de IVA *',
                     border: OutlineInputBorder(),
                   ),
+                  value: _vatRate == 0.0 ? '0' : (_vatRate == 0.05 ? '5' : '19'),
                   items: const [
                     DropdownMenuItem(value: '19', child: Text('19%')),
                     DropdownMenuItem(value: '5', child: Text('5%')),
-                    DropdownMenuItem(value: '0', child: Text('0% (Exento)')),
-                    DropdownMenuItem(value: 'EXCLUIDO', child: Text('Excluido')),
+                    DropdownMenuItem(value: '0', child: Text('0%')),
                   ],
                   onChanged: (value) {
-                    // TODO: Implementar lógica
+                    if (value != null) {
+                      setState(() {
+                        _vatRate = value == '19' ? 0.19 : (value == '5' ? 0.05 : 0.0);
+                        // Si la tasa es 0, debe ser EXENTO o EXCLUIDO
+                        if (_vatRate == 0.0 && _vatType == 'GRAVADO') {
+                          _vatType = 'EXENTO';
+                        }
+                      });
+                    }
                   },
                 ),
               ),
@@ -981,28 +1046,140 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           ),
           const SizedBox(height: 16),
           
-          // Tercera fila - Impuestos Adicionales y Marca
+          // ✅ ACTUALIZADO: Tercera fila - IpoConsumo
+          const Text(
+            'Impuesto al Consumo (IpoConsumo)',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Impuestos Adicionales',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'NINGUNO', child: Text('Sin impuestos adicionales')),
-                    DropdownMenuItem(value: 'IMPUESTO_BOLSA', child: Text('Impuesto Bolsa')),
-                    DropdownMenuItem(value: 'RETEFUENTE_2_5', child: Text('Retefuente 2.5%')),
-                    DropdownMenuItem(value: 'RETEIVA_15', child: Text('ReteIVA 15%')),
-                    DropdownMenuItem(value: 'IMPUESTO_CONSUMO', child: Text('Impuesto al Consumo')),
-                  ],
-                  onChanged: (value) {
-                    // TODO: Implementar lógica
-                  },
-                ),
+              Checkbox(
+                value: _hasIpoConsumo,
+                onChanged: (value) {
+                  setState(() {
+                    _hasIpoConsumo = value ?? false;
+                    if (!_hasIpoConsumo) {
+                      _ipoConsumoRate = null;
+                      _ipoConsumoType = null;
+                      _ipoConsumoRateController.clear();
+                    }
+                  });
+                },
               ),
-              const SizedBox(width: 16),
+              const Expanded(
+                child: Text('Producto con Impuesto al Consumo'),
+              ),
+            ],
+          ),
+          if (_hasIpoConsumo) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de IpoConsumo *',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: _ipoConsumoType,
+                    items: const [
+                      DropdownMenuItem(value: 'LICOR', child: Text('Licor')),
+                      DropdownMenuItem(value: 'CIGARRILLOS', child: Text('Cigarrillos')),
+                      DropdownMenuItem(value: 'BOLSAS', child: Text('Bolsas')),
+                      DropdownMenuItem(value: 'OTRO', child: Text('Otro')),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _ipoConsumoType = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: _ipoConsumoRateController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tasa IpoConsumo (%)',
+                      border: OutlineInputBorder(),
+                      hintText: 'Ej: 8',
+                      suffixText: '%',
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      if (value.isNotEmpty) {
+                        final rate = double.tryParse(value);
+                        if (rate != null) {
+                          _ipoConsumoRate = rate / 100; // Convertir a decimal
+                        }
+                      } else {
+                        _ipoConsumoRate = null;
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          
+          // ✅ NUEVO: Cuarta fila - Control de Bolsas Plásticas
+          const Text(
+            'Control de Bolsas Plásticas',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Checkbox(
+                value: _isPlasticBag,
+                onChanged: (value) {
+                  setState(() {
+                    _isPlasticBag = value ?? false;
+                    if (!_isPlasticBag) {
+                      _plasticBagTax = null;
+                      _plasticBagTaxController.clear();
+                    }
+                  });
+                },
+              ),
+              const Expanded(
+                child: Text('Es una bolsa plástica'),
+              ),
+            ],
+          ),
+          if (_isPlasticBag) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _plasticBagTaxController,
+                    decoration: const InputDecoration(
+                      labelText: 'Impuesto por Bolsa (COP) *',
+                      border: OutlineInputBorder(),
+                      hintText: 'Ej: 50',
+                      prefixText: '\$ ',
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      if (value.isNotEmpty) {
+                        _plasticBagTax = double.tryParse(value);
+                      } else {
+                        _plasticBagTax = null;
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          
+          // Quinta fila - Marca (mover aquí)
+          Row(
+            children: [
               Expanded(
                 child: TextFormField(
                   decoration: const InputDecoration(
@@ -1012,11 +1189,15 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
                   ),
                 ),
               ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Container(), // Espaciador
+              ),
             ],
           ),
           const SizedBox(height: 16),
           
-          // Cuarta fila - Modelo y Código EAN/UPC
+          // Sexta fila - Modelo y Código EAN/UPC
           Row(
             children: [
               Expanded(
@@ -1042,7 +1223,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           ),
           const SizedBox(height: 16),
           
-          // Quinta fila - Fabricante y País de origen
+          // Séptima fila - Fabricante y País de origen
           Row(
             children: [
               Expanded(
@@ -1068,7 +1249,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           ),
           const SizedBox(height: 16),
           
-          // Sexta fila - Código arancelario y Peso neto
+          // Octava fila - Código arancelario y Peso neto
           Row(
             children: [
               Expanded(
@@ -1096,7 +1277,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           ),
           const SizedBox(height: 16),
           
-          // Séptima fila - Peso bruto y Dimensiones
+          // Novena fila - Peso bruto y Dimensiones
           Row(
             children: [
               Expanded(
@@ -1124,7 +1305,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           ),
           const SizedBox(height: 16),
           
-          // Octava fila - Material y Garantía
+          // Décima fila - Material y Garantía
           Row(
             children: [
               Expanded(
@@ -1150,7 +1331,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> with SingleTicker
           ),
           const SizedBox(height: 16),
           
-          // Novena fila - Fecha de vencimiento y SKU
+          // Undécima fila - Fecha de vencimiento y SKU
           Row(
             children: [
               Expanded(

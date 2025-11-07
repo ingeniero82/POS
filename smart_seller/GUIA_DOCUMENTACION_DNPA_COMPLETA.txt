@@ -1,0 +1,348 @@
+═══════════════════════════════════════════════════════════════════
+GUÍA COMPLETA DE DOCUMENTACIÓN PARA REGISTRO DNPA
+SmartSeller POS - Sistema de Punto de Venta
+═══════════════════════════════════════════════════════════════════
+
+Esta guía lista TODOS los documentos que debes tener listos ANTES de 
+subir a la plataforma www.registroenlinea.com.co
+
+───────────────────────────────────────────────────────────────────
+INFORMACIÓN IMPORTANTE PREVIA
+───────────────────────────────────────────────────────────────────
+
+✅ El registro es GRATUITO (no requiere intermediarios)
+✅ Duración máxima: 15 días hábiles (sin contar sábados, domingos ni festivos)
+✅ Solo ciudadanos colombianos pueden registrar vía web
+✅ Si eres extranjero: debes hacerlo físico o mediante autorización de colombiano
+
+═══════════════════════════════════════════════════════════════════
+LISTA COMPLETA DE DOCUMENTOS A ALISTAR
+═══════════════════════════════════════════════════════════════════
+
+───────────────────────────────────────────────────────────────────
+1. DOCUMENTOS DEL SOLICITANTE (Según calidad de representación)
+───────────────────────────────────────────────────────────────────
+
+OPCIÓN A: EN NOMBRE PROPIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ No requiere documento adicional
+✅ Solo necesitas tu cédula de ciudadanía para ingresar datos
+
+OPCIÓN B: EN REPRESENTACIÓN DE MENOR DE EDAD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Certificado de representación legal (Registro Civil o documento similar)
+✅ Cédula del representante legal
+
+OPCIÓN C: EN REPRESENTACIÓN DE PERSONA JURÍDICA (Empresa)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Certificado de Existencia y Representación Legal (reciente, no mayor a 3 meses)
+✅ Cédula del representante legal de la empresa
+
+OPCIÓN D: EN REPRESENTACIÓN DE PERSONA NATURAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Poder o Autorización firmada del titular de los derechos
+⚠️ IMPORTANTE: Debe estar AUTENTICADA EN NOTARÍA
+✅ Cédula del titular y del apoderado
+
+───────────────────────────────────────────────────────────────────
+2. DOCUMENTOS DE LOS AUTORES Y PRODUCTORES
+───────────────────────────────────────────────────────────────────
+
+✅ Lista de AUTORES (todos los que participaron en la creación):
+   - Nombres completos
+   - Números de cédula
+   - Información de contacto
+
+✅ Información de PRODUCTORES (coordinadores responsables):
+   - Tipo: Natural o Jurídica
+   - Número de identificación (cédula o NIT)
+   - Formación o experiencia relacionada con la creación del software
+
+───────────────────────────────────────────────────────────────────
+3. INFORMACIÓN DE LA OBRA (Preparar antes de ingresar)
+───────────────────────────────────────────────────────────────────
+
+✅ TÍTULO DE LA OBRA:
+   - Debe ser EXACTAMENTE igual al título escrito en la copia que adjuntarás
+   - Ejemplo: "Sistema de Punto de Venta SmartSeller POS v1.0"
+   ⚠️ Si no coinciden → motivo de devolución
+
+✅ DESCRIPCIÓN DE FUNCIONES DEL SOFTWARE (máximo 500 caracteres):
+   - Ya tienes esto preparado en: DESCRIPCION_500_CARACTERES.txt
+   - Versión recomendada (494 caracteres):
+     "SmartSeller POS v1.0 es un sistema de punto de venta profesional 
+     que gestiona ventas, inventario, clientes y facturación electrónica 
+     DIAN. Procesa transacciones en tiempo real, almacena datos en SQLite, 
+     calcula totales e impuestos automáticamente, actualiza inventario, 
+     genera reportes PDF/Excel, y gestiona usuarios con encriptación 
+     SHA-256. Incluye módulos de POS, inventario, facturación, reportes 
+     y usuarios."
+
+✅ AÑO DE CREACIÓN:
+   - Seleccionar año en que FINALIZÓ el software
+   - Ejemplo: 2025
+
+✅ PAÍS DE ORIGEN:
+   - Seleccionar: Colombia
+
+✅ CONDICIÓN DE LA OBRA:
+   - Obra INÉDITA (si no ha salido a la luz pública)
+   - Obra EDITADA (si ya es conocida masivamente)
+
+───────────────────────────────────────────────────────────────────
+4. CARÁCTER DE LA OBRA - Documentos Adicionales (si aplican)
+───────────────────────────────────────────────────────────────────
+
+OPCIÓN 4.1: POR PARTICIPACIÓN DE AUTORES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Obra INDIVIDUAL: No requiere documento adicional
+- Obra en COLABORACIÓN: No requiere documento adicional
+- Obra COLECTIVA: Necesitas especificar en paso 4 quién coordina
+
+OPCIÓN 4.2: POR ORIGEN DE LA OBRA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Obra ORIGINARIA: No requiere documento adicional
+- Obra DERIVADA (basada en otra existente): 
+  ✅ Documentación que acredite la relación con obra preexistente
+  ✅ Autorización si aplica
+
+OPCIÓN 4.3: POR FORMA DE DAR A CONOCER EL AUTOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- NINGUNA DE LAS ANTERIORES: No requiere documento adicional
+- OBRA ANÓNIMA: No requiere documento adicional
+- OBRA PÓSTUMA (después de la muerte):
+  ✅ Certificado de defunción del autor
+  ✅ Registro Civil de nacimiento de quien registra (demostrando parentesco)
+- OBRA SEUDÓNIMO:
+  ✅ Declaración de seudónimo ante NOTARÍA (según Decreto 1260 de 1970)
+
+───────────────────────────────────────────────────────────────────
+5. FORMA DE ELABORACIÓN - Documentos Adicionales (si aplican)
+───────────────────────────────────────────────────────────────────
+
+OPCIÓN A: OBRA POR ENCARGO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Contrato de TRABAJO O
+✅ Contrato de PRESTACIÓN DE SERVICIOS
+⚠️ Debe mostrar la transferencia de derechos patrimoniales
+
+OPCIÓN B: FUNCIONARIO PÚBLICO EN EJERCICIO DE FUNCIONES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Manual de funciones del servidor público
+✅ Documento que acredite vinculación:
+   - Acta de posesión O
+   - Resolución de nombramiento
+
+OPCIÓN C: NINGUNA DE LAS ANTERIORES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ No requiere documento adicional
+
+───────────────────────────────────────────────────────────────────
+6. TRANSFERENCIA DE DERECHOS PATRIMONIALES (Paso 4)
+───────────────────────────────────────────────────────────────────
+
+SI HAY TRANSFERENCIA DE DERECHOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Contrato de CESION DE DERECHOS
+⚠️ Debe estar firmado y acreditar la transferencia
+
+SI NO HAY TRANSFERENCIA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Solo seleccionar "NO"
+✅ No requiere documento adicional
+
+───────────────────────────────────────────────────────────────────
+7. ELEMENTOS DEL SOPORTE LÓGICO (ELEMENTOS OBLIGATORIOS)
+───────────────────────────────────────────────────────────────────
+
+Debes seleccionar AL MENOS UNO de estos elementos:
+
+OPCIÓN A: MATERIAL AUXILIAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Formato: PDF
+✅ Archivos disponibles en tu carpeta:
+   - 06_ManualUsuario_SmartSeller_POS (1).pdf
+   - corrected_06_ManualUsuario_SmartSeller_POS (1).pdf
+✅ Contenido: Guías, manuales, explicaciones que ayudan a entender el programa
+✅ VENTAJA: Ya lo tienes listo
+
+OPCIÓN B: PROGRAMA DE COMPUTADOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Formato: ZIP, RAR, APK o MDB
+✅ Contenido: Código fuente o ejecutable del programa
+✅ Pasos para crear:
+   1. Comprimir la carpeta "lib" (código fuente) o
+   2. Comprimir archivos ejecutables
+   3. Guardar como ZIP
+✅ VENTAJA: Más técnico, muestra el código
+
+OPCIÓN C: DESCRIPCIÓN DE PROGRAMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Formato: DOC o DOCX (Word)
+✅ Archivos disponibles en tu carpeta:
+   - 04_Descripcion_Tecnica_SmartSeller_POS (1).docx
+   - corrected_04_Descripcion_Tecnica_SmartSeller_POS (1).docx
+✅ Contenido: Explicación detallada de pasos y procedimientos para crear el programa
+✅ VENTAJA: Ya lo tienes listo
+
+RECOMENDACIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Puedes seleccionar MÁS DE UNO si lo deseas
+✅ Lo más fácil: MATERIAL AUXILIAR (PDF) - ya está listo
+✅ Lo más completo: DESCRIPCIÓN DE PROGRAMA (DOCX) - ya está listo
+
+───────────────────────────────────────────────────────────────────
+8. COPIA DE LA OBRA (DOCUMENTO OBLIGATORIO FINAL)
+───────────────────────────────────────────────────────────────────
+
+✅ DEBE SER UN SOLO ARCHIVO compilado con la copia de la obra
+✅ El TÍTULO en este archivo DEBE COINCIDIR con el título ingresado en paso 3
+⚠️ Si no coinciden → motivo de devolución
+
+OPCIONES PARA LA COPIA DE LA OBRA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+A) Código fuente en ZIP:
+   - Comprimir carpeta "lib" completa
+   - Incluir README con título de la obra
+   
+B) Ejecutable + manual en ZIP:
+   - smart_seller.exe
+   - Manual de usuario PDF
+   - Documento con título oficial
+   
+C) Documentación completa en ZIP:
+   - Manual de usuario
+   - Descripción técnica
+   - Documento con título oficial
+
+═══════════════════════════════════════════════════════════════════
+CHECKLIST COMPLETO ANTES DE SUBIR A LA PLATAFORMA
+═══════════════════════════════════════════════════════════════════
+
+PARTE 1: DATOS PERSONALES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Tienes tu cédula de ciudadanía a mano
+☐ Decidiste en qué calidad vas a registrar (propio, representación, etc.)
+☐ Si es representación: tienes el documento correspondiente listo
+
+PARTE 2: AUTORES Y PRODUCTORES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Lista de todos los autores con sus cédulas
+☐ Información de productores (si aplica)
+☐ Cédulas/NITs de productores
+
+PARTE 3: INFORMACIÓN DE LA OBRA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Título de la obra definido (y escrito EXACTAMENTE igual en copia)
+☐ Descripción de funciones preparada (500 caracteres máx.)
+☐ Año de creación definido
+☐ País de origen: Colombia
+☐ Condición: Inédita o Editada
+
+PARTE 4: CARÁCTER DE LA OBRA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Decidiste: Individual / Colaboración / Colectiva
+☐ Decidiste: Originaria / Derivada
+☐ Decidiste: Ninguna / Anónima / Póstuma / Seudónimo
+☐ Si aplica: Tienes certificado de defunción + registro civil (póstuma)
+☐ Si aplica: Tienes declaración de seudónimo notariada
+
+PARTE 5: FORMA DE ELABORACIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Decidiste: Ninguna / Por encargo / Funcionario público
+☐ Si es por encargo: Tienes contrato de trabajo o prestación de servicios
+☐ Si es funcionario público: Tienes manual de funciones + acta/resolución
+
+PARTE 6: TRANSFERENCIA DE DERECHOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Decidiste: SÍ hay transferencia / NO hay transferencia
+☐ Si SÍ: Tienes contrato de cesión de derechos listo
+
+PARTE 7: ELEMENTOS DEL SOPORTE LÓGICO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Decidiste cuál(es) vas a adjuntar:
+   ☐ Material Auxiliar (PDF manual) - YA TIENES
+   ☐ Programa de Computador (ZIP código) - CREAR SI NECESITAS
+   ☐ Descripción de Programa (DOCX descripción) - YA TIENES
+☐ Archivo(s) preparado(s) y listo(s) para adjuntar
+
+PARTE 8: COPIA DE LA OBRA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+☐ Tienes UN SOLO archivo (ZIP) con la copia de la obra
+☐ El TÍTULO dentro del archivo coincide EXACTAMENTE con el título del paso 3
+☐ El archivo está listo para adjuntar
+
+═══════════════════════════════════════════════════════════════════
+ARCHIVOS QUE YA TIENES DISPONIBLES
+═══════════════════════════════════════════════════════════════════
+
+✅ DESCRIPCION_500_CARACTERES.txt
+   → Descripción lista para copiar y pegar
+
+✅ DESCRIPCION_BREVE_DNPA.txt
+   → Información adicional de la obra
+
+✅ DOCUMENTACION_COMPLETA_DNPA.txt
+   → Documentación técnica completa
+
+✅ DOCUMENTOS_ADJUNTAR_DNPA.txt
+   → Guía de qué archivos adjuntar
+
+EN LA CARPETA: "documentacion para registro de Smart Seller"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Manuales de usuario en PDF (Material Auxiliar)
+✅ Descripciones técnicas en DOCX (Descripción de Programa)
+
+═══════════════════════════════════════════════════════════════════
+PASOS RESUMIDOS EN LA PLATAFORMA
+═══════════════════════════════════════════════════════════════════
+
+1. Crear cuenta en www.registroenlinea.com.co (si es primera vez)
+2. Ingresar con usuario y contraseña
+3. Seleccionar categoría: SOFTWARE
+4. Paso 1: Diligenciar datos del solicitante
+5. Paso 2: Agregar datos de autores y productores
+6. Paso 3: Adjuntar datos de la obra
+7. Paso 4: Transferencia de derechos (si aplica)
+8. Finalizar registro
+9. Revisar información
+10. Aceptar datos
+11. Recibir número de radicado
+12. Esperar 15 días hábiles
+13. Verificar estado: Aprobado / En trámite / Solicitud de vuelta / Rechazado
+
+═══════════════════════════════════════════════════════════════════
+POSIBLES RESULTADOS DEL TRÁMITE
+═══════════════════════════════════════════════════════════════════
+
+✅ REGISTRADO: Solicitud aprobada
+   → Puedes descargar certificación cuantas veces quieras
+
+⏳ EN TRÁMITE: Aún en análisis
+   → Esperar más tiempo
+
+📋 SOLICITUD DE VUELTA: Faltan requisitos
+   → Correo con explicación de qué corregir
+   → Presentar nueva solicitud con correcciones
+
+❌ RECHAZADO: No puede ser inscrito
+   → Correo con acto administrativo explicando motivo
+
+═══════════════════════════════════════════════════════════════════
+RECOMENDACIONES FINALES
+═══════════════════════════════════════════════════════════════════
+
+1. ✅ Prepara TODA la documentación ANTES de iniciar el registro
+2. ✅ Verifica que los títulos coincidan EXACTAMENTE
+3. ✅ Revisa que los documentos estén completos y legibles
+4. ✅ Si tienes dudas sobre algún caso especial, prepara el documento
+5. ✅ Guarda el número de radicado para seguimiento
+6. ✅ Revisa tu correo electrónico para notificaciones
+7. ✅ Puedes hacer seguimiento en www.derechodeautor.gov.co
+
+═══════════════════════════════════════════════════════════════════
+Fin del Documento
+═══════════════════════════════════════════════════════════════════
+
+

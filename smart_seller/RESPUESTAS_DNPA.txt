@@ -1,0 +1,53 @@
+═══════════════════════════════════════════════════════════════════
+RESPUESTAS PARA CAMPOS DE FORMULARIO DNPA
+═══════════════════════════════════════════════════════════════════
+
+1️⃣ NACIONALIDAD DE ORIGEN DEL SOFTWARE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ RESPUESTA: Colombia
+
+Seleccionar: Colombia
+
+
+2️⃣ TIPO DE OBRA (ORIGINARIA O DERIVADA):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ RESPUESTA: Originaria
+
+Especificar: Originaria
+
+Motivo: SmartSeller POS v1.0 fue desarrollado desde cero por 
+Oscar Mauricio González, no se basó en ningún software existente 
+o protegido por derechos de autor.
+
+
+3️⃣ ELEMENTOS DE SOPORTE LÓGICO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ RESPUESTA PRINCIPAL: SQLite
+
+Ingresar: SQLite
+
+Descripción: Base de datos local que almacena toda la información 
+del sistema (productos, ventas, clientes, usuarios, configuración).
+
+Si el formulario permite múltiples elementos, también agregar:
+- Flutter (Framework de desarrollo)
+- Dart (Lenguaje de programación)
+- GetX (Gestión de estado)
+- Material Design 3 (Sistema de interfaz)
+
+
+═══════════════════════════════════════════════════════════════════
+RESUMEN PARA COPIAR Y PEGAR:
+═══════════════════════════════════════════════════════════════════
+
+Campo 1 (Nacionalidad):
+→ Colombia
+
+Campo 2 (Tipo de Obra):
+→ Originaria
+
+Campo 3 (Soporte Lógico):
+→ SQLite
+
+═══════════════════════════════════════════════════════════════════
+

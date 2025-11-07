@@ -1,0 +1,93 @@
+FUNCIONES TÉCNICAS VERIFICADAS DEL SOPORTE LÓGICO
+SmartSeller POS v2.0
+
+(Verificadas mediante análisis del código fuente)
+
+─────────────────────────────────────────────────────────────────
+
+✓ 1. PROCESA TRANSACCIONES
+   Función: Registra y procesa ventas en tiempo real
+   Evidencia: lib/screens/pos_controller.dart líneas 567-606
+   Descripción: Procesa pagos, crea registros de venta y actualiza inventario
+
+✓ 2. ALMACENA DATOS
+   Función: Mantiene información en base de datos SQLite
+   Evidencia: lib/services/sqlite_database_service.dart
+   Descripción: Almacena productos, clientes, ventas, usuarios, configuración
+
+✓ 3. CALCULA TOTALES AUTOMÁTICAMENTE
+   Función: Calcula subtotales, impuestos y totales de venta
+   Evidencia: lib/screens/pos_controller.dart líneas 453-465
+   Descripción: 
+   - Calcula subtotal: suma de precios × cantidades
+   - Calcula IVA (19%): subtotal × 0.19
+   - Calcula total: subtotal + impuestos
+
+✓ 4. ACTUALIZA INVENTARIO
+   Función: Descuenta stock automáticamente al realizar ventas
+   Evidencia: Actualización de stock tras cada venta procesada
+   Descripción: Reduce cantidad de productos en inventario tras venta
+
+✓ 5. GENERA REPORTES
+   Función: Produce reportes en formatos PDF y datos estructurados
+   Evidencia: lib/services/reports_service.dart, lib/services/pdf_reports_service.dart
+   Descripción: Genera reportes de ventas, inventario, rentabilidad, clientes
+
+✓ 6. GESTIONA USUARIOS
+   Función: Crea, actualiza y controla acceso de usuarios
+   Evidencia: lib/services/sqlite_database_service.dart líneas 405-444
+   Descripción: Maneja autenticación, roles y permisos
+
+✓ 7. VALIDA DATOS
+   Función: Verifica integridad de información ingresada
+   Evidencia: Validaciones en formularios y transacciones
+   Descripción: Valida datos de productos, clientes y ventas
+
+✓ 8. REGISTRA OPERACIONES
+   Función: Guarda histórico de todas las operaciones
+   Evidencia: Tablas sales, sales_items en base de datos
+   Descripción: Registra ventas, items, métodos de pago, usuarios
+
+✓ 9. BUSCA Y CONSULTA
+   Función: Permite búsqueda de productos y clientes
+   Evidencia: Funciones de búsqueda en tiempo real
+   Descripción: Busca por nombre, código, documento, etc.
+
+✓ 10. COMPILA DATOS
+    Función: Consolida información para reportes
+    Evidencia: lib/services/reports_service.dart líneas 13-58
+    Descripción: Compila ventas, calcula totales y estadísticas
+
+✓ 11. CONTROL DE ACCESO
+    Función: Controla qué usuarios pueden acceder a cada módulo
+    Evidencia: Sistema de permisos y roles
+    Descripción: Restringe funcionalidades según rol (admin, vendedor, etc.)
+
+✓ 12. GESTIONA PERMISOS
+    Función: Administra permisos granulares por módulo
+    Evidencia: lib/services/permissions_service.dart
+    Descripción: Asigna permisos específicos a cada rol de usuario
+
+✓ 13. ENCRIPTA CONTRASEÑAS
+    Función: Protege contraseñas con algoritmo SHA-256
+    Evidencia: lib/services/security_service.dart
+    Descripción: Convierte contraseñas a hash SHA-256 antes de almacenar
+
+✓ 14. MIGRA SEGURIDAD AUTOMÁTICAMENTE
+    Función: Migra contraseñas antiguas a formato seguro
+    Evidencia: Migración automática en login
+    Descripción: Convierte contraseñas en texto plano a hash automáticamente
+
+─────────────────────────────────────────────────────────────────
+
+SEGURIDAD IMPLEMENTADA:
+✅ Las contraseñas están encriptadas con SHA-256
+✅ Sistema retrocompatible con bases de datos antiguas
+✅ Migración automática de seguridad
+
+─────────────────────────────────────────────────────────────────
+
+AUTOR: Oscar Mauricio González
+FECHA: Septiembre 2025
+SISTEMA: SmartSeller POS v1.0
+

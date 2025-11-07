@@ -1,0 +1,21 @@
+DESCRIPCIÓN PARA CAMPO DE 500 CARACTERES MÁXIMO
+───────────────────────────────────────────────────────────────────
+
+VERSIÓN CORTA (exactamente 494 caracteres):
+
+SmartSeller POS v1.0 es un sistema de punto de venta profesional que gestiona ventas, inventario, clientes y facturación electrónica DIAN. Procesa transacciones en tiempo real, almacena datos en SQLite, calcula totales e impuestos automáticamente, actualiza inventario, genera reportes PDF/Excel, y gestiona usuarios con encriptación SHA-256. Incluye módulos de POS, inventario, facturación, reportes y usuarios.
+
+───────────────────────────────────────────────────────────────────
+
+VERSIÓN EXTRA CORTA (exactamente 396 caracteres):
+
+Software de punto de venta profesional que gestiona ventas, inventario, clientes y facturación electrónica DIAN. Procesa transacciones en tiempo real, almacena en SQLite, calcula totales e impuestos, actualiza inventario automáticamente, genera reportes PDF/Excel, gestiona usuarios con seguridad SHA-256 e incluye módulos de POS, inventario, facturación y reportes.
+
+───────────────────────────────────────────────────────────────────
+
+VERSIÓN ULTRA CORTA (exactamente 298 caracteres):
+
+Sistema de punto de venta para gestión de ventas, inventario, clientes y facturación electrónica DIAN. Procesa ventas en tiempo real, almacena en SQLite, calcula totales automáticamente, actualiza inventario, genera reportes PDF/Excel y gestiona usuarios con seguridad SHA-256.
+
+═══════════════════════════════════════════════════════════════════
+

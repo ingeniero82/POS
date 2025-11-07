@@ -103,24 +103,25 @@ class DashboardScreen extends StatelessWidget {
                             Get.toNamed('/cuentas-cobrar-pagar');
                           },
                         ),
-                      // Reportes Contables - Solo si tiene permisos
+                      // ✅ MÓDULO COMPLETO DE REPORTES CONTABLES
                       if (authService.hasPermission(Permission.viewReports))
                         _SidebarButton(
                           icon: Icons.analytics,
-                          label: 'Reportes Contables',
+                          label: 'Reportes',
                           selected: false,
                           onTap: () {
                             Get.toNamed('/reportes-contables');
                           },
                         ),
-                      // Reportes - Solo si tiene permisos
-                      if (authService.hasPermission(Permission.viewReports))
+                      // ✅ NUEVO: Recogidas de Efectivo
+                      if (authService.hasPermission(Permission.accessPOS) || 
+                          authService.hasPermission(Permission.viewMovements))
                         _SidebarButton(
-                          icon: Icons.bar_chart,
-                          label: 'Reportes',
-                          selected: controller.selectedMenu.value == DashboardMenu.reportes,
+                          icon: Icons.money_off,
+                          label: 'Recogidas de Efectivo',
+                          selected: false,
                           onTap: () {
-                            Get.toNamed('/reportes');
+                            Get.toNamed('/recogidas-efectivo');
                           },
                         ),
                       // Configuración - Solo si tiene permisos

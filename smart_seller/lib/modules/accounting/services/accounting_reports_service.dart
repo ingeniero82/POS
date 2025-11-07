@@ -1,6 +1,7 @@
 // Servicio para generar reportes contables
 
 import '../../../services/sqlite_database_service.dart';
+import '../../../models/product.dart';
 import '../models/accounting_reports.dart';
 
 class AccountingReportsService {
@@ -197,11 +198,12 @@ class AccountingReportsService {
           userName: userName,
           openDate: DateTime.parse(row['open_date'] as String),
           closeDate: row['close_date'] != null ? DateTime.parse(row['close_date'] as String) : null,
-          initialAmount: (row['initial_amount'] as num).toDouble(),
-          finalAmount: (row['final_amount'] as num).toDouble(),
-          totalIncome: (row['total_income'] as num).toDouble(),
-          totalExpenses: (row['total_expense'] as num).toDouble(),
-          difference: (row['difference'] as num).toDouble(),
+          // ✅ CORREGIDO: Manejar valores null de forma segura
+          initialAmount: (row['initial_amount'] as num?)?.toDouble() ?? 0.0,
+          finalAmount: (row['final_amount'] as num?)?.toDouble() ?? 0.0,
+          totalIncome: (row['total_income'] as num?)?.toDouble() ?? 0.0,
+          totalExpenses: (row['total_expense'] as num?)?.toDouble() ?? 0.0,
+          difference: (row['difference'] as num?)?.toDouble() ?? 0.0,
           status: row['status'] as String,
           transactionCount: transactionCount,
         ));
@@ -444,6 +446,159 @@ class AccountingReportsService {
       };
     } catch (e) {
       print('❌ Error al generar resumen rápido: $e');
+      return {};
+    }
+  }
+
+  // ✅ NUEVO: Obtener desglose de impuestos, descuentos y devoluciones
+  static Future<Map<String, dynamic>> getTaxAndDiscountsBreakdown(DateTime fromDate, DateTime toDate) async {
+    try {
+      final sales = await SQLiteDatabaseService.getSales(date: fromDate, endDate: toDate);
+      
+      double totalDiscounts = 0.0;
+      double totalReturns = 0.0;
+      int returnTransactions = 0;
+      double totalExempt = 0.0;
+      double totalExcluded = 0.0;
+      double totalTaxed = 0.0;
+      double totalVatAt0 = 0.0;
+      double totalVatAt5 = 0.0;
+      double totalVatAt19 = 0.0;
+      double totalVat = 0.0;
+      double totalIpoConsumo = 0.0;
+      double totalPlasticBagTax = 0.0;
+      int totalPlasticBagCount = 0;
+      double totalSubtotal = 0.0;
+      
+      for (final sale in sales) {
+        if (sale.isReturn) {
+          totalReturns += sale.returnedAmount ?? sale.total;
+          returnTransactions++;
+        } else {
+          totalDiscounts += sale.discount ?? 0.0;
+          totalExempt += sale.exemptAmount;
+          totalExcluded += sale.excludedAmount;
+          totalTaxed += sale.taxedAmount;
+          totalVatAt0 += sale.vatAt0;
+          totalVatAt5 += sale.vatAt5;
+          totalVatAt19 += sale.vatAt19;
+          totalVat += sale.totalVat;
+          totalIpoConsumo += sale.ipoConsumoAmount;
+          totalPlasticBagTax += sale.plasticBagTaxAmount;
+          totalPlasticBagCount += sale.plasticBagCount;
+          totalSubtotal += sale.subtotal;
+        }
+      }
+      
+      return {
+        'totalDiscounts': totalDiscounts,
+        'totalReturns': totalReturns,
+        'returnTransactions': returnTransactions,
+        'exemptAmount': totalExempt,
+        'excludedAmount': totalExcluded,
+        'taxedAmount': totalTaxed,
+        'vatAt0': totalVatAt0,
+        'vatAt5': totalVatAt5,
+        'vatAt19': totalVatAt19,
+        'totalVat': totalVat,
+        'ipoConsumoAmount': totalIpoConsumo,
+        'plasticBagTaxAmount': totalPlasticBagTax,
+        'plasticBagCount': totalPlasticBagCount,
+        'subtotalBeforeTaxes': totalSubtotal,
+      };
+    } catch (e) {
+      print('❌ Error al obtener desglose de impuestos: $e');
+      return {};
+    }
+  }
+
+  // ✅ NUEVO: Obtener análisis por método de pago
+  static Future<Map<String, double>> getPaymentMethodBreakdown(DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+      
+      final sales = await SQLiteDatabaseService.getSales(date: fromDate, endDate: toDate);
+      
+      final Map<String, double> paymentMethods = {};
+      final Map<String, int> paymentCounts = {};
+      
+      for (final sale in sales) {
+        if (!sale.isReturn) {
+          final method = sale.paymentMethod ?? 'Efectivo';
+          paymentMethods[method] = (paymentMethods[method] ?? 0.0) + sale.total;
+          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
+        }
+      }
+      
+      return paymentMethods;
+    } catch (e) {
+      print('❌ Error al obtener análisis por método de pago: $e');
+      return {};
+    }
+  }
+
+  // ✅ NUEVO: Obtener top productos y grupos
+  static Future<Map<String, dynamic>> getTopProductsAndGroups(DateTime fromDate, DateTime toDate, {int limit = 10}) async {
+    try {
+      final sales = await SQLiteDatabaseService.getSales(date: fromDate, endDate: toDate);
+      final products = await SQLiteDatabaseService.getAllProducts();
+      
+      final Map<String, double> productSales = {};
+      final Map<String, int> productQuantities = {};
+      final Map<String, double> groupSales = {};
+      final Map<String, int> groupQuantities = {};
+      
+      for (final sale in sales) {
+        if (!sale.isReturn) {
+          for (final item in sale.items) {
+            // Productos
+            productSales[item.name] = (productSales[item.name] ?? 0.0) + item.total;
+            productQuantities[item.name] = (productQuantities[item.name] ?? 0) + item.quantity;
+            
+            // Grupos
+            Product? product;
+            try {
+              product = products.firstWhere((p) => p.name == item.name);
+            } catch (_) {
+              try {
+                product = products.firstWhere((p) => p.code == item.name);
+              } catch (_) {
+                product = products.isNotEmpty ? products.first : null;
+              }
+            }
+            
+            if (product != null) {
+              final groupName = product.category;
+              groupSales[groupName] = (groupSales[groupName] ?? 0.0) + item.total;
+              groupQuantities[groupName] = (groupQuantities[groupName] ?? 0) + item.quantity;
+            }
+          }
+        }
+      }
+      
+      // Ordenar productos
+      final sortedProducts = productSales.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      
+      // Ordenar grupos
+      final sortedGroups = groupSales.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      
+      return {
+        'topProducts': sortedProducts.take(limit).map((e) => {
+          'name': e.key,
+          'amount': e.value,
+          'quantity': productQuantities[e.key] ?? 0,
+        }).toList(),
+        'topGroups': sortedGroups.take(limit).map((e) => {
+          'name': e.key,
+          'amount': e.value,
+          'quantity': groupQuantities[e.key] ?? 0,
+        }).toList(),
+      };
+    } catch (e) {
+      print('❌ Error al obtener top productos: $e');
       return {};
     }
   }
