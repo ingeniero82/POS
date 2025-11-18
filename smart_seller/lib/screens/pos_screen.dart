@@ -18,8 +18,7 @@ import '../services/client_validation_service.dart';
 import '../models/client.dart';
 import '../modules/electronic_invoicing/services/system_configuration_service.dart';
 import '../modules/electronic_invoicing/models/system_configuration.dart';
-
-import 'package:intl/intl.dart';
+import '../utils/currency_formatter.dart';
 
 class PosScreen extends StatefulWidget {
   const PosScreen({super.key});
@@ -479,7 +478,7 @@ class _PosScreenState extends State<PosScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text('Código: ${_selectedProduct!.code}'),
-            Text('Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
+            Text('Precio: ${CurrencyFormatter.formatCurrency(_selectedProduct!.price)}'),
             Text('Stock: ${_selectedProduct!.stock}'),
             const SizedBox(height: 16),
             
@@ -855,7 +854,7 @@ class _PosScreenState extends State<PosScreen> {
                   style: TextStyle(fontSize: 16),
                 ),
                 Obx(() => Text(
-                  '\$${_posController.subtotal.toStringAsFixed(0)}',
+                  CurrencyFormatter.formatCurrency(_posController.subtotal),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 )),
               ],
@@ -870,7 +869,7 @@ class _PosScreenState extends State<PosScreen> {
                   style: TextStyle(fontSize: 16),
                 ),
                 Obx(() => Text(
-                  '\$${_posController.taxes.toStringAsFixed(0)}',
+                  CurrencyFormatter.formatCurrency(_posController.taxes),
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 )),
               ],
@@ -889,7 +888,7 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                 ),
                 Obx(() => Text(
-                  '\$${_posController.total.toStringAsFixed(0)}',
+                  CurrencyFormatter.formatCurrency(_posController.total),
                   textAlign: TextAlign.right,
                   style: const TextStyle(
                     fontSize: 28,
@@ -953,9 +952,9 @@ class _PosScreenState extends State<PosScreen> {
                         item.name,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text('${item.unit} x \$${item.price.toStringAsFixed(0)}'),
+                      subtitle: Text('${item.unit} x ${CurrencyFormatter.formatCurrency(item.price)}'),
                       trailing: Text(
-                        '\$${(item.quantity * item.price).toStringAsFixed(0)}',
+                        CurrencyFormatter.formatCurrency(item.quantity * item.price),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       onTap: () => _showItemOptions(item, index),
@@ -1104,8 +1103,9 @@ class _PosScreenState extends State<PosScreen> {
           _cancelSelection();
           break;
         case 'Enter':
-          // Solo si hay producto seleccionado
-          if (_selectedProduct != null) {
+          // ✅ CORREGIDO: No procesar Enter si el focus está en el campo de cantidad
+          // El TextField ya maneja Enter con onSubmitted, evitar duplicación
+          if (_selectedProduct != null && !_quantityFocus.hasFocus) {
             _addToCart(int.tryParse(_quantityController.text) ?? 1); // ✅ Async - no necesita await aquí
           }
           break;
@@ -1432,7 +1432,7 @@ class _PosScreenState extends State<PosScreen> {
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              'Código: ${product.code} | Precio: \$${NumberFormat('#,0').format(product.price)}',
+                              'Código: ${product.code} | Precio: ${CurrencyFormatter.formatCurrency(product.price)}',
                             ),
                             trailing: const Icon(Icons.arrow_forward),
                             onTap: () {
@@ -1755,7 +1755,7 @@ class _PosScreenState extends State<PosScreen> {
                   children: [
                     Text('Código: ${product.code}'),
                     Text(
-                      'Precio: \$${NumberFormat('#,0').format(product.price)}',
+                      'Precio: ${CurrencyFormatter.formatCurrency(product.price)}',
                     ),
                   ],
                 ),
@@ -2524,7 +2524,7 @@ class _PosScreenState extends State<PosScreen> {
           // Callback cuando se procesa una transacción
           Get.snackbar(
             'Transacción Registrada',
-            '${entry.type == 'income' ? 'Ingreso' : 'Egreso'} de \$${entry.amount.toStringAsFixed(2)} registrado',
+            '${entry.type == 'income' ? 'Ingreso' : 'Egreso'} de ${CurrencyFormatter.formatCurrency(entry.amount)} registrado',
             backgroundColor: Colors.green.shade100,
             colorText: Colors.green.shade800,
             duration: const Duration(seconds: 3),
@@ -2625,7 +2625,7 @@ class _PosScreenState extends State<PosScreen> {
                 _posController.updateItemPrice(index, newPrice);
                 Get.snackbar(
                   '💰 Precio modificado',
-                  '${item.name}: \$${item.price.toStringAsFixed(0)} → \$${newPrice.toStringAsFixed(0)}',
+                  '${item.name}: ${CurrencyFormatter.formatCurrency(item.price)} → ${CurrencyFormatter.formatCurrency(newPrice)}',
                   backgroundColor: Colors.orange,
                   colorText: Colors.white,
                   duration: const Duration(seconds: 2),
@@ -2802,7 +2802,7 @@ class _ProductButton extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '\$${NumberFormat('#,###').format(product.price)}',
+                      CurrencyFormatter.formatCurrency(product.price),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -3036,7 +3036,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Total a facturar: \$${NumberFormat('#,###').format(widget.cartTotal)} - ${widget.cartProducts.length} productos',
+                      'Total a facturar: ${CurrencyFormatter.formatCurrency(widget.cartTotal)} - ${widget.cartProducts.length} productos',
                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -3373,9 +3373,9 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                         child: Icon(Icons.inventory_2, color: Colors.white),
                       ),
                       title: Text(product['name']),
-                      subtitle: Text('Cantidad: ${product['quantity']} x \$${NumberFormat('#,###').format(product['price'])}'),
+                      subtitle: Text('Cantidad: ${product['quantity']} x ${CurrencyFormatter.formatCurrency(product['price'])}'),
                       trailing: Text(
-                        '\$${NumberFormat('#,###').format(product['total'])}',
+                        CurrencyFormatter.formatCurrency(product['total']),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -3400,7 +3400,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Subtotal:'),
-                        Text('\$${NumberFormat('#,###').format(subtotal)}'),
+                        Text(CurrencyFormatter.formatCurrency(subtotal)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -3408,7 +3408,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('IVA (19%):'),
-                        Text('\$${NumberFormat('#,###').format(iva)}'),
+                        Text(CurrencyFormatter.formatCurrency(iva)),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -3421,7 +3421,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Text(
-                          '\$${NumberFormat('#,###').format(total)}',
+                          CurrencyFormatter.formatCurrency(total),
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                       ],

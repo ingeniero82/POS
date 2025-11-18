@@ -11,6 +11,7 @@ import '../models/transaction_category.dart';
 import '../services/accounting_service.dart';
 import '../../../services/auth_service.dart';
 import 'electronic_invoice_payment_modal.dart';
+import '../../../utils/currency_formatter.dart';
 
 class AccountingModal extends StatefulWidget {
   final Function(AccountingEntry)? onTransactionProcessed;
@@ -168,7 +169,8 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
   }
 
   Future<void> _openCashSessionDialog() async {
-    final TextEditingController initialAmountController = TextEditingController(text: '0');
+    // ✅ CORREGIDO: Campo vacío por defecto (sin el "0" incómodo)
+    final TextEditingController initialAmountController = TextEditingController(text: '');
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
         title: const Text('Abrir caja'),
@@ -180,10 +182,12 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             const SizedBox(height: 12),
             TextField(
               controller: initialAmountController,
+              autofocus: true, // ✅ NUEVO: Enfocar automáticamente el campo
               decoration: const InputDecoration(
-                labelText: 'Monto inicial',
-                prefixIcon: Icon(Icons.attach_money),
+                labelText: 'Monto inicial (Pesos colombianos)',
+                prefixText: '\$ ',
                 border: OutlineInputBorder(),
+                hintText: 'Ej: 100000',
               ),
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
@@ -215,7 +219,12 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
         await AccountingService.openCashSession(amount, user.id!);
         _currentSession = await AccountingService.getOpenCashSession();
         setState(() {});
-        Get.snackbar('Éxito', 'Caja abierta con \$${amount.toStringAsFixed(2)}');
+        // ✅ CORREGIDO: Formato para pesos colombianos (sin decimales)
+        Get.snackbar('Éxito', 'Caja abierta con ${CurrencyFormatter.formatCurrency(amount)}');
+        // ✅ CORREGIDO: Cerrar el modal principal automáticamente después de abrir la caja
+        // Esperar un momento para que el snackbar se muestre y luego cerrar el modal
+        await Future.delayed(const Duration(milliseconds: 300));
+        Get.back(closeOverlays: true);
       } catch (e) {
         Get.snackbar('Error', 'No se pudo abrir la caja: $e');
       }
@@ -348,7 +357,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 );
                 
                 Get.back();
-                Get.snackbar('Éxito', 'Pago a proveedor registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito', 'Pago a proveedor registrado: ${CurrencyFormatter.formatCurrency(amount)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar el pago: $e');
               }
@@ -436,7 +445,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 );
                 
                 Get.back();
-                Get.snackbar('Éxito', 'Gasto operativo registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito', 'Gasto operativo registrado: ${CurrencyFormatter.formatCurrency(amount)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar el gasto: $e');
               }
@@ -524,7 +533,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 );
                 
                 Get.back();
-                Get.snackbar('Éxito', 'Servicio público registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito', 'Servicio público registrado: ${CurrencyFormatter.formatCurrency(amount)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar el servicio: $e');
               }
@@ -612,7 +621,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 );
                 
                 Get.back();
-                Get.snackbar('Éxito', 'Mantenimiento registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito', 'Mantenimiento registrado: ${CurrencyFormatter.formatCurrency(amount)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar el mantenimiento: $e');
               }
@@ -709,7 +718,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 );
                 
                 Get.back();
-                Get.snackbar('Éxito', 'Devolución a proveedor registrada: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito', 'Devolución a proveedor registrada: ${CurrencyFormatter.formatCurrency(amount)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar la devolución: $e');
               }
@@ -790,7 +799,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                             ),
                           ),
                           Text(
-                            'Saldo inicial: \$${_currentSession!.initialAmount.toStringAsFixed(2)}',
+                            'Saldo inicial: ${CurrencyFormatter.formatCurrency(_currentSession!.initialAmount)}',
                             style: TextStyle(color: Colors.green.shade600),
                           ),
                         ],

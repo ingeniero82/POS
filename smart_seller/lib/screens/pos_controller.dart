@@ -11,7 +11,7 @@ import '../modules/accounting/services/accounting_service.dart';
 import '../services/print_service.dart';
 import '../services/tax_calculation_service.dart';
 import '../models/product.dart';
-import 'package:intl/intl.dart';
+import '../utils/currency_formatter.dart';
 
 class CartItem {
   final String name;
@@ -437,7 +437,7 @@ class PosController extends GetxController {
       
       Get.snackbar(
         'Precio actualizado',
-        'Precio cambiado a \$${newPrice.toStringAsFixed(0)}',
+        'Precio cambiado a ${CurrencyFormatter.formatCurrency(newPrice)}',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 2),
@@ -598,7 +598,6 @@ class PosController extends GetxController {
   
   // Procesar pago
   void processPayment() async {
-    final NumberFormat copFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0');
     if (cartItems.isEmpty) {
       Get.snackbar(
         'Carrito vacío',
@@ -624,7 +623,7 @@ class PosController extends GetxController {
               ),
               const SizedBox(height: 16),
               Text(
-                'Total a pagar: ${copFormat.format(total)}',
+                'Total a pagar: ${CurrencyFormatter.formatCurrency(total)}',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50)),
               ),
               const SizedBox(height: 24),
@@ -686,7 +685,6 @@ class PosController extends GetxController {
   }
   
   void _processPaymentWithMethod(String method) async {
-    final NumberFormat copFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0');
     Get.back(); // Cierra el diálogo de métodos de pago
     
     try {
@@ -741,7 +739,7 @@ class PosController extends GetxController {
       // El stock se actualiza automáticamente en saveSale
       
       // Mostrar confirmación con opción de imprimir
-      _showPrintConfirmationDialog(sale, method, copFormat);
+      _showPrintConfirmationDialog(sale, method);
     } catch (e) {
       Get.snackbar(
         'Error',
@@ -754,7 +752,7 @@ class PosController extends GetxController {
   }
   
   // Mostrar diálogo de confirmación con opción de imprimir
-  void _showPrintConfirmationDialog(Sale sale, String method, NumberFormat copFormat) {
+  void _showPrintConfirmationDialog(Sale sale, String method) {
     // Nodos de foco para los botones
     final FocusNode yesButtonFocus = FocusNode();
     final FocusNode noButtonFocus = FocusNode();
@@ -788,7 +786,7 @@ class PosController extends GetxController {
       
       // ✅ MEJORADO: Ejecutar impresión después de cerrar modal
       Future.delayed(const Duration(milliseconds: 100), () {
-        _printReceipt(sale, method, copFormat);
+        _printReceipt(sale, method);
         // ✅ NUEVO: Notificar que se debe restaurar el foco
         Get.snackbar(
           '✅ Listo para siguiente cliente',
@@ -902,7 +900,7 @@ class PosController extends GetxController {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Total: ${copFormat.format(total)}',
+                  'Total: ${CurrencyFormatter.formatCurrency(total)}',
                   style: const TextStyle(fontSize: 18, color: Color(0xFF4CAF50)),
                 ),
                 const SizedBox(height: 8),
@@ -986,7 +984,7 @@ class PosController extends GetxController {
   }
   
   // Imprimir recibo
-  void _printReceipt(Sale sale, String method, NumberFormat copFormat) async {
+  void _printReceipt(Sale sale, String method) async {
     try {
       print('🖨️ Iniciando proceso de impresión...');
       
