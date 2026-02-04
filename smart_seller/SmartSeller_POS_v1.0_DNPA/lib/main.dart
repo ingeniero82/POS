@@ -10,11 +10,11 @@ import 'screens/debug_screen.dart';
 import 'screens/customers_screen.dart';
 import 'screens/reports_screen.dart';
 import 'screens/company_config_screen.dart';
+import 'screens/printer_config_screen.dart';
 import 'screens/groups_screen.dart';
 import 'screens/suppliers_screen.dart';
 import 'modules/accounting/screens/accounts_receivable_payable_screen.dart';
 import 'modules/accounting/screens/accounting_reports_screen.dart';
-
 
 import 'modules/electronic_invoicing/screens/electronic_invoice_screen.dart';
 import 'modules/electronic_invoicing/screens/system_configuration_screen.dart';
@@ -31,24 +31,18 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Inicializar la base de datos SQLite
   await SQLiteDatabaseService.initialize();
-  // Registrar AuthService en GetX
   Get.put(AuthService());
   Get.put(PermissionsService());
-  // Restaurar permisos por defecto
   await PermissionsService.to.restoreDefaultPermissions();
-  // Inicializar servicio de impresión
-  await PrintService.instance.initialize();
-
-  // Inicializar configuración de empresa
-  await CompanyConfigService.initializeCompanyConfig();
-  
+  try {
+    await PrintService.instance.initialize();
+  } catch (_) {}
+  try {
+    await CompanyConfigService.initializeCompanyConfig();
+  } catch (_) {}
   runApp(const MyApp());
 }
-
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -86,7 +80,8 @@ class MyApp extends StatelessWidget {
           filled: true,
           fillColor: Colors.grey.shade50,
           floatingLabelBehavior: FloatingLabelBehavior.always,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         appBarTheme: const AppBarTheme(
           elevation: 0,
@@ -107,95 +102,99 @@ class MyApp extends StatelessWidget {
       initialRoute: '/login',
       getPages: [
         GetPage(
-          name: '/login', 
+          name: '/login',
           page: () => const LoginScreen(),
           middlewares: [GuestMiddleware()], // Solo usuarios no autenticados
         ),
         GetPage(
-          name: '/dashboard', 
+          name: '/dashboard',
           page: () => const DashboardScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/pos', 
+          name: '/pos',
           page: () => const PosScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
 
         GetPage(
-          name: '/productos', 
+          name: '/productos',
           page: () => const ProductsScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/usuarios', 
+          name: '/usuarios',
           page: () => const UsersScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/debug', 
+          name: '/debug',
           page: () => const DebugScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/clientes', 
+          name: '/clientes',
           page: () => const CustomersScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/reportes', 
+          name: '/reportes',
           page: () => const ReportsScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/configuracion-empresa', 
+          name: '/configuracion-empresa',
           page: () => const CompanyConfigScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/grupos', 
+          name: '/configuracion-impresora',
+          page: () => const PrinterConfigScreen(),
+          middlewares: [AuthMiddleware()],
+        ),
+        GetPage(
+          name: '/grupos',
           page: () => const GroupsScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/proveedores', 
+          name: '/proveedores',
           page: () => const SuppliersScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/cuentas-cobrar-pagar', 
+          name: '/cuentas-cobrar-pagar',
           page: () => const AccountsReceivablePayableScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/reportes-contables', 
+          name: '/reportes-contables',
           page: () => const AccountingReportsScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
 
         GetPage(
-          name: '/facturacion-electronica', 
+          name: '/facturacion-electronica',
           page: () => const ElectronicInvoiceScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
-        
+
         // Rutas del módulo de facturación electrónica
         GetPage(
-          name: '/electronic-invoicing/system-config', 
+          name: '/electronic-invoicing/system-config',
           page: () => const SystemConfigurationScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/electronic-invoicing/status', 
+          name: '/electronic-invoicing/status',
           page: () => const InvoiceStatusScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
         GetPage(
-          name: '/electronic-invoicing/queue', 
+          name: '/electronic-invoicing/queue',
           page: () => const PendingInvoiceQueueScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
         ),
-
       ],
     );
   }

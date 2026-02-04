@@ -15,10 +15,10 @@ import 'security_service.dart'; // Added for password security
 
 class SQLiteDatabaseService {
   static Database? _database;
-  
+
   // Getter público para acceder a la base de datos
   static Database? get database => _database;
-  
+
   // Inicializar la base de datos
   static Future<void> initialize() async {
     print('🚀 Inicializando base de datos SQLite...');
@@ -27,110 +27,114 @@ class SQLiteDatabaseService {
     databaseFactory = databaseFactoryFfi;
     final dir = await getApplicationDocumentsDirectory();
     final path = join(dir.path, 'smart_seller.db');
-    
+
     _database = await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
-    
+
     print('✅ Base de datos SQLite abierta en: $path');
-    
+
     // Crear usuario admin por defecto
     await migrateAddIsWeighted();
     await _createDefaultUser();
-    
+    await _migratePasswordsTo1234();
+
     // Ejecutar migración para agregar userCode si es necesario
     await migrateAddUserCode();
-    
+
     // Asignar códigos a usuarios existentes que no los tienen
     await assignCodesToExistingUsers();
-    
+
     // Listar todos los usuarios para depuración
     await debugListAllUsers();
     // Llama a la migración después de abrir la base de datos
     await migrateAddPricePerKg();
     await migrateAddWeightColumns();
-    
+
     // Crear grupos por defecto si no existen
     await migrateAddGroupsTable();
     // await createDefaultGroups(); // Comentado para evitar recrear grupos automáticamente
-    
+
     // ✅ NUEVO: Migración para agregar columna category
     await migrateAddCategoryColumn();
-    
+
     // ✅ FORZAR MIGRACIÓN: Asegurar que category existe
     await forceAddCategoryColumn();
-    
+
     // ✅ NUEVO: Asegurar que la tabla customers existe (SOLO CLIENTES)
     await ensureCustomersTableExists();
-    
+
     // ✅ NUEVO: Migración para tablas de proveedores y contabilidad
     await migrateAddSuppliersTables();
-    
+
     // ✅ NUEVO: Migración para tablas de contabilidad
     await migrateAddAccountingTables();
-    
+
     // ✅ NUEVO: Limpiar sesiones de caja abiertas al iniciar
     await _cleanupOpenCashSessions();
-    
+
     // ✅ NUEVO: Migración para cuentas por cobrar y pagar
     await migrateAddAccountsReceivablePayableTables();
-}
+
+    // ✅ Migrar company_config para agregar columnas de facturación (document_type, etc.)
+    await _migrateCompanyConfigTable(_database!);
+  }
 
 // ✅ NUEVO: Limpiar sesiones de caja abiertas al iniciar la aplicación
-static Future<void> _cleanupOpenCashSessions() async {
-  try {
-    print('🧹 Limpiando sesiones de caja abiertas...');
-    
-    // Obtener todas las sesiones abiertas
-    final List<Map<String, dynamic>> openSessions = await _database!.query(
-      'cash_sessions',
-      where: 'status = ? AND is_active = ?',
-      whereArgs: ['open', 1],
-    );
+  static Future<void> _cleanupOpenCashSessions() async {
+    try {
+      print('🧹 Limpiando sesiones de caja abiertas...');
 
-    if (openSessions.isEmpty) {
-      print('ℹ️ No hay sesiones de caja abiertas');
-      return;
-    }
-
-    // Cerrar cada sesión abierta
-    for (var sessionMap in openSessions) {
-      final sessionId = sessionMap['id'] as int;
-      final userId = sessionMap['user_id'] as int;
-      
-      await _database!.update(
+      // Obtener todas las sesiones abiertas
+      final List<Map<String, dynamic>> openSessions = await _database!.query(
         'cash_sessions',
-        {
-          'status': 'closed',
-          'close_date': DateTime.now().toIso8601String(),
-          'final_amount': 0.0,
-          'total_income': 0.0,
-          'total_expense': 0.0,
-          'difference': 0.0,
-          'closed_by_user_id': userId,
-          'updated_at': DateTime.now().toIso8601String(),
-          'notes': 'Cerrada automáticamente al iniciar aplicación',
-        },
-        where: 'id = ?',
-        whereArgs: [sessionId],
+        where: 'status = ? AND is_active = ?',
+        whereArgs: ['open', 1],
       );
-      
-      print('✅ Sesión de caja cerrada automáticamente: $sessionId');
+
+      if (openSessions.isEmpty) {
+        print('ℹ️ No hay sesiones de caja abiertas');
+        return;
+      }
+
+      // Cerrar cada sesión abierta
+      for (var sessionMap in openSessions) {
+        final sessionId = sessionMap['id'] as int;
+        final userId = sessionMap['user_id'] as int;
+
+        await _database!.update(
+          'cash_sessions',
+          {
+            'status': 'closed',
+            'close_date': DateTime.now().toIso8601String(),
+            'final_amount': 0.0,
+            'total_income': 0.0,
+            'total_expense': 0.0,
+            'difference': 0.0,
+            'closed_by_user_id': userId,
+            'updated_at': DateTime.now().toIso8601String(),
+            'notes': 'Cerrada automáticamente al iniciar aplicación',
+          },
+          where: 'id = ?',
+          whereArgs: [sessionId],
+        );
+
+        print('✅ Sesión de caja cerrada automáticamente: $sessionId');
+      }
+
+      print('✅ Todas las sesiones de caja abiertas han sido cerradas');
+    } catch (e) {
+      print('❌ Error limpiando sesiones de caja: $e');
     }
-    
-    print('✅ Todas las sesiones de caja abiertas han sido cerradas');
-  } catch (e) {
-    print('❌ Error limpiando sesiones de caja: $e');
   }
-}
 
 // Crear las tablas
   static Future<void> _onCreate(Database db, int version) async {
     print('🔧 Creando tablas de la base de datos...');
-    
+
     // Tabla de usuarios
     await db.execute('''
       CREATE TABLE IF NOT EXISTS users (
@@ -144,7 +148,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         userCode TEXT
       )
     ''');
-    
+
     // Tabla de grupos
     await db.execute('''
       CREATE TABLE IF NOT EXISTS groups (
@@ -158,7 +162,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         isActive INTEGER NOT NULL DEFAULT 1
       )
     ''');
-    
+
     // Tabla de productos
     await db.execute('''
       CREATE TABLE IF NOT EXISTS products (
@@ -184,7 +188,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         maxWeight REAL
       )
     ''');
-    
+
     // Tabla de movimientos de inventario
     await db.execute('''
       CREATE TABLE IF NOT EXISTS inventory_movements (
@@ -200,7 +204,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         FOREIGN KEY (userId) REFERENCES users (id)
       )
     ''');
-    
+
     // Tabla de ventas
     await db.execute('''
       CREATE TABLE IF NOT EXISTS sales (
@@ -217,7 +221,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         returnedAmount REAL DEFAULT 0.0
       )
     ''');
-    
+
     // Tabla de clientes
     await db.execute('''
       CREATE TABLE IF NOT EXISTS customers (
@@ -277,23 +281,23 @@ static Future<void> _cleanupOpenCashSessions() async {
         notes TEXT
       )
     ''');
-    
+
     print('✅ Tablas creadas exitosamente');
   }
-  
+
   // Actualizar base de datos
-  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _onUpgrade(
+      Database db, int oldVersion, int newVersion) async {
     print('🔄 Actualizando base de datos de v$oldVersion a v$newVersion');
-    
+
     // Migración de versión 1 a 2: Agregar tabla de configuración de empresa
     if (oldVersion < 2) {
       print('🔧 Verificando tabla company_config...');
-      
+
       // Verificar si la tabla ya existe antes de crearla
       final result = await db.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='company_config'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='company_config'");
+
       if (result.isEmpty) {
         print('🔧 Creando tabla company_config...');
         await db.execute('''
@@ -326,14 +330,29 @@ static Future<void> _cleanupOpenCashSessions() async {
         await _migrateCompanyConfigTable(db);
       }
     }
-    
+
     // Migración de versión 2 a 3: Agregar campos de descuentos y devoluciones a tabla sales
     if (oldVersion < 3) {
-      print('🔧 Agregando campos de descuentos y devoluciones a tabla sales...');
+      print(
+          '🔧 Agregando campos de descuentos y devoluciones a tabla sales...');
       await migrateAddDiscountsAndReturns(db);
     }
+
+    if (oldVersion < 4) {
+      print('🔧 Agregando columna payment_breakdown para pago mixto...');
+      await _migratePaymentBreakdown(db);
+    }
   }
-  
+
+  static Future<void> _migratePaymentBreakdown(Database db) async {
+    try {
+      await db.execute('ALTER TABLE sales ADD COLUMN payment_breakdown TEXT');
+      print('✅ Columna payment_breakdown agregada');
+    } catch (e) {
+      print('ℹ️ Columna payment_breakdown ya existe');
+    }
+  }
+
   // ✅ NUEVO: Migración para agregar campos de descuentos y devoluciones
   static Future<void> migrateAddDiscountsAndReturns(Database db) async {
     try {
@@ -344,29 +363,30 @@ static Future<void> _cleanupOpenCashSessions() async {
         {'name': 'originalSaleId', 'type': 'INTEGER'},
         {'name': 'returnedAmount', 'type': 'REAL DEFAULT 0.0'},
       ];
-      
+
       for (final column in newColumns) {
         try {
-          await db.execute('ALTER TABLE sales ADD COLUMN ${column['name']} ${column['type']}');
+          await db.execute(
+              'ALTER TABLE sales ADD COLUMN ${column['name']} ${column['type']}');
           print('✅ Columna ${column['name']} agregada a tabla sales');
         } catch (e) {
           print('ℹ️ Columna ${column['name']} ya existe en tabla sales');
         }
       }
-      
+
       print('✅ Migración de sales completada');
     } catch (e) {
       print('❌ Error en migración de sales: $e');
     }
   }
-  
+
   // Migrar tabla company_config para agregar campos de facturación electrónica
   static Future<void> _migrateCompanyConfigTable(Database db) async {
     try {
       // Lista de nuevas columnas a agregar
       final newColumns = [
         'document_type',
-        'nit_number', 
+        'nit_number',
         'verification_digit',
         'city',
         'department',
@@ -374,11 +394,12 @@ static Future<void> _cleanupOpenCashSessions() async {
         'fiscal_regime',
         'fiscal_responsibilities'
       ];
-      
+
       // Verificar cada columna y agregarla si no existe
       for (final column in newColumns) {
         try {
-          await db.execute('ALTER TABLE company_config ADD COLUMN $column TEXT');
+          await db
+              .execute('ALTER TABLE company_config ADD COLUMN $column TEXT');
           print('✅ Columna $column agregada a company_config');
         } catch (e) {
           // La columna ya existe, continuar
@@ -390,45 +411,45 @@ static Future<void> _cleanupOpenCashSessions() async {
       print('❌ Error en migración de company_config: $e');
     }
   }
-  
+
   // Crear usuarios por defecto
   static Future<void> _createDefaultUser() async {
     print('🔧 Verificando si existen usuarios por defecto...');
-    
+
     // Crear usuario admin si no existe
     final adminExists = await _database!.query(
       'users',
       where: 'username = ?',
       whereArgs: ['admin'],
     );
-    
+
     if (adminExists.isEmpty) {
-    print('🔧 Creando usuario admin por defecto...');
-    // Hash de la contraseña por defecto
-    final hashedPassword = SecurityService.hashPassword('123456');
-    await _database!.insert('users', {
-      'username': 'admin',
-      'password': hashedPassword, // Ahora se guarda hasheada
-      'fullName': 'Administrador',
-      'role': 'admin',
-      'createdAt': DateTime.now().toIso8601String(),
-      'isActive': 1,
+      print('🔧 Creando usuario admin por defecto...');
+      // Hash de la contraseña por defecto
+      final hashedPassword = SecurityService.hashPassword('1234');
+      await _database!.insert('users', {
+        'username': 'admin',
+        'password': hashedPassword, // Ahora se guarda hasheada
+        'fullName': 'Administrador',
+        'role': 'admin',
+        'createdAt': DateTime.now().toIso8601String(),
+        'isActive': 1,
         'userCode': 'ADM-1001',
-    });
-    print('✅ Usuario admin creado con contraseña segura: admin / 123456');
+      });
+      print('✅ Usuario admin creado con contraseña segura: admin / 1234');
     }
-    
+
     // Crear usuario supervisor si no existe
     final supervisorExists = await _database!.query(
       'users',
       where: 'username = ?',
       whereArgs: ['supervisor'],
     );
-    
+
     if (supervisorExists.isEmpty) {
       print('🔧 Creando usuario supervisor por defecto...');
       // Hash de la contraseña por defecto
-      final hashedPassword = SecurityService.hashPassword('123456');
+      final hashedPassword = SecurityService.hashPassword('1234');
       await _database!.insert('users', {
         'username': 'supervisor',
         'password': hashedPassword, // Ahora se guarda hasheada
@@ -438,16 +459,39 @@ static Future<void> _cleanupOpenCashSessions() async {
         'isActive': 1,
         'userCode': 'SUP-2001',
       });
-      print('✅ Usuario supervisor creado con contraseña segura: supervisor / 123456');
+      print(
+          '✅ Usuario supervisor creado con contraseña segura: supervisor / 1234');
     }
   }
-  
+
+  /// Actualiza contraseña de admin y supervisor a 1234 (por compatibilidad).
+  static Future<void> _migratePasswordsTo1234() async {
+    try {
+      final hash1234 = SecurityService.hashPassword('1234');
+      await _database!.update(
+        'users',
+        {'password': hash1234},
+        where: 'username = ?',
+        whereArgs: ['admin'],
+      );
+      await _database!.update(
+        'users',
+        {'password': hash1234},
+        where: 'username = ?',
+        whereArgs: ['supervisor'],
+      );
+      print('✅ Contraseñas admin/supervisor actualizadas a 1234');
+    } catch (e) {
+      print('⚠️ Migración contraseñas: $e');
+    }
+  }
+
   // ================== USUARIOS ==================
-  
+
   // Buscar usuario por username y password
   static Future<User?> findUser(String username, String password) async {
     print('🔍 Buscando usuario: username="$username"');
-    
+
     try {
       // Buscar usuario por username
       final results = await _database!.query(
@@ -455,15 +499,15 @@ static Future<void> _cleanupOpenCashSessions() async {
         where: 'username = ? AND isActive = ?',
         whereArgs: [username, 1],
       );
-      
+
       if (results.isEmpty) {
         print('❌ Usuario no encontrado');
         return null;
       }
-      
+
       final userData = results.first;
       final storedPassword = userData['password'] as String;
-      
+
       // Verificar contraseña con soporte retrocompatible
       bool isValid;
       if (SecurityService.isHashed(storedPassword)) {
@@ -479,12 +523,12 @@ static Future<void> _cleanupOpenCashSessions() async {
           await updateUserPassword(userData['id'] as int, password);
         }
       }
-      
+
       if (!isValid) {
         print('❌ Contraseña incorrecta');
         return null;
       }
-      
+
       // Crear objeto User
       final user = User()
         ..id = userData['id'] as int
@@ -497,10 +541,12 @@ static Future<void> _cleanupOpenCashSessions() async {
         )
         ..createdAt = DateTime.parse(userData['createdAt'] as String)
         ..isActive = userData['isActive'] == 1
-        ..userCode = (userData['userCode'] == null || userData['userCode'] == '' || userData['userCode'] == 'null')
-          ? null
-          : userData['userCode'] as String;
-      
+        ..userCode = (userData['userCode'] == null ||
+                userData['userCode'] == '' ||
+                userData['userCode'] == 'null')
+            ? null
+            : userData['userCode'] as String;
+
       print('✅ Usuario encontrado: ${user.fullName} (${user.username})');
       return user;
     } catch (e) {
@@ -508,9 +554,10 @@ static Future<void> _cleanupOpenCashSessions() async {
       return null;
     }
   }
-  
+
   // Actualizar contraseña de un usuario
-  static Future<void> updateUserPassword(int userId, String newPlainPassword) async {
+  static Future<void> updateUserPassword(
+      int userId, String newPlainPassword) async {
     final hashedPassword = SecurityService.hashPassword(newPlainPassword);
     await _database!.update(
       'users',
@@ -520,7 +567,7 @@ static Future<void> _cleanupOpenCashSessions() async {
     );
     print('✅ Contraseña actualizada a formato seguro para usuario $userId');
   }
-  
+
   // Verificar si un usuario existe por username
   static Future<bool> userExists(String username) async {
     final results = await _database!.query(
@@ -530,20 +577,22 @@ static Future<void> _cleanupOpenCashSessions() async {
     );
     return results.isNotEmpty;
   }
-  
+
   // Verificar si un código de usuario ya existe
   static Future<bool> userCodeExists(String code) async {
-    final result = await _database!.rawQuery('SELECT COUNT(*) as count FROM users WHERE userCode = ?', [code]);
+    final result = await _database!.rawQuery(
+        'SELECT COUNT(*) as count FROM users WHERE userCode = ?', [code]);
     return (result.first['count'] as int) > 0;
   }
 
   // Obtener el siguiente ID para generar código automático
   static Future<int> getNextUserId() async {
-    final result = await _database!.rawQuery('SELECT MAX(id) as maxId FROM users');
+    final result =
+        await _database!.rawQuery('SELECT MAX(id) as maxId FROM users');
     final maxId = result.first['maxId'] as int?;
     return (maxId ?? 0) + 1;
   }
-  
+
   // Obtener todos los usuarios
   static Future<List<User>> getAllUsers() async {
     final results = await _database!.query('users');
@@ -559,18 +608,20 @@ static Future<void> _cleanupOpenCashSessions() async {
         )
         ..createdAt = DateTime.parse(userData['createdAt'] as String)
         ..isActive = userData['isActive'] == 1
-        ..userCode = (userData['userCode'] == null || userData['userCode'] == '' || userData['userCode'] == 'null')
+        ..userCode = (userData['userCode'] == null ||
+                userData['userCode'] == '' ||
+                userData['userCode'] == 'null')
             ? null
             : userData['userCode'] as String;
       return user;
     }).toList();
   }
-  
+
   // Crear usuario
   static Future<void> createUser(User user) async {
     // Hash de la contraseña antes de guardar
     final hashedPassword = SecurityService.hashPassword(user.password);
-    
+
     await _database!.insert('users', {
       'username': user.username,
       'password': hashedPassword, // Ahora se guarda hasheada
@@ -582,7 +633,7 @@ static Future<void> _cleanupOpenCashSessions() async {
     });
     print('✅ Usuario creado con contraseña segura');
   }
-  
+
   // Actualizar usuario
   static Future<void> updateUser(User user) async {
     await _database!.update(
@@ -599,7 +650,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [user.id],
     );
   }
-  
+
   // Activar/Desactivar usuario
   static Future<bool> toggleUserStatus(int userId) async {
     try {
@@ -608,32 +659,32 @@ static Future<void> _cleanupOpenCashSessions() async {
         where: 'id = ?',
         whereArgs: [userId],
       );
-      
+
       if (results.isEmpty) return false;
-      
+
       final userData = results.first;
       final isAdmin = userData['username'] == 'admin';
       final isActive = userData['isActive'] == 1;
-      
+
       // No permitir desactivar al admin
       if (isAdmin && isActive) {
         return false;
       }
-      
+
       await _database!.update(
         'users',
         {'isActive': isActive ? 0 : 1},
         where: 'id = ?',
         whereArgs: [userId],
       );
-      
+
       return true;
     } catch (e) {
       print('Error al cambiar estado del usuario: $e');
       return false;
     }
   }
-  
+
   // Eliminar usuario
   static Future<bool> deleteUser(int userId) async {
     try {
@@ -642,34 +693,34 @@ static Future<void> _cleanupOpenCashSessions() async {
         where: 'id = ?',
         whereArgs: [userId],
       );
-      
+
       if (results.isEmpty) return false;
-      
+
       final userData = results.first;
       if (userData['username'] == 'admin') {
         return false;
       }
-      
+
       await _database!.delete(
         'users',
         where: 'id = ?',
         whereArgs: [userId],
       );
-      
+
       return true;
     } catch (e) {
       print('Error al eliminar usuario: $e');
       return false;
     }
   }
-  
+
   // Función temporal para depuración - listar todos los usuarios
   static Future<void> debugListAllUsers() async {
     print('🔍 === LISTANDO TODOS LOS USUARIOS ===');
     try {
       final results = await _database!.query('users');
       print('Total de usuarios en la base de datos: ${results.length}');
-      
+
       for (final userData in results) {
         print('   ID: ${userData['id']}');
         print('   Username: "${userData['username']}"');
@@ -691,76 +742,78 @@ static Future<void> _cleanupOpenCashSessions() async {
   static Future<void> assignCodesToExistingUsers() async {
     print('🔧 Asignando códigos a usuarios existentes...');
     try {
-      final results = await _database!.query('users', where: 'userCode IS NULL OR userCode = ""');
+      final results = await _database!
+          .query('users', where: "userCode IS NULL OR userCode = ''");
       print('Usuarios sin código encontrados: ${results.length}');
-      
+
       for (final userData in results) {
         final userId = userData['id'] as int;
         final role = userData['role'] as String;
-        
+
         // Solo asignar códigos a administradores y gerentes
         if (role == 'admin' || role == 'manager') {
           String userCode;
           int attempts = 0;
           const maxAttempts = 10;
-          
+
           do {
             final timestamp = DateTime.now().millisecondsSinceEpoch;
             final random = (timestamp % 9000) + 1000;
             userCode = 'USR-$random';
             attempts++;
-            
+
             if (attempts > maxAttempts) {
-              userCode = 'USR-${timestamp.toString().substring(timestamp.toString().length - 4)}';
+              userCode =
+                  'USR-${timestamp.toString().substring(timestamp.toString().length - 4)}';
               break;
             }
           } while (await userCodeExists(userCode));
-          
+
           await _database!.update(
             'users',
             {'userCode': userCode},
             where: 'id = ?',
             whereArgs: [userId],
           );
-          
+
           print('✅ Código asignado a ${userData['username']}: $userCode');
         } else {
-          print('ℹ️ Usuario ${userData['username']} es cajero, no se asigna código');
+          print(
+              'ℹ️ Usuario ${userData['username']} es cajero, no se asigna código');
         }
       }
-      
+
       print('✅ Proceso de asignación de códigos completado');
     } catch (e) {
       print('❌ Error al asignar códigos: $e');
     }
   }
-  
+
   // ================== PRODUCTOS ==================
-  
+
   // Obtener todos los productos
   static Future<List<Product>> getAllProducts() async {
-    final results = await _database!.query('products', where: 'isActive = ?', whereArgs: [1]);
+    final results = await _database!
+        .query('products', where: 'isActive = ?', whereArgs: [1]);
     return results.map((productData) {
       final product = Product.fromMap(productData);
       return product;
     }).toList();
   }
-  
+
   // ✅ NUEVO: Obtener productos por grupo
   static Future<List<Product>> getProductsByGroup(String groupName) async {
-    final results = await _database!.query(
-      'products', 
-      where: 'groupName = ? AND isActive = ?', 
-      whereArgs: [groupName, 1]
-    );
+    final results = await _database!.query('products',
+        where: 'groupName = ? AND isActive = ?', whereArgs: [groupName, 1]);
     return results.map((productData) {
       final product = Product.fromMap(productData);
       return product;
     }).toList();
   }
-  
+
   // ✅ NUEVO: Actualizar grupo de productos
-  static Future<void> updateProductsGroup(String oldGroupName, String newGroupName) async {
+  static Future<void> updateProductsGroup(
+      String oldGroupName, String newGroupName) async {
     await _database!.update(
       'products',
       {
@@ -771,17 +824,17 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [oldGroupName, 1],
     );
   }
-  
+
   // Crear producto
   static Future<void> createProduct(Product product) async {
     await _database!.insert('products', product.toMap());
   }
-  
+
   // Actualizar producto
   static Future<void> updateProduct(Product product) async {
     final updateData = product.toMap();
     updateData['updatedAt'] = DateTime.now().toIso8601String();
-    
+
     await _database!.update(
       'products',
       updateData,
@@ -789,7 +842,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [product.id],
     );
   }
-  
+
   // Actualizar precio de producto
   static Future<void> updateProductPrice(int id, double newPrice) async {
     await _database!.update(
@@ -802,7 +855,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [id],
     );
   }
-  
+
   // Eliminar producto
   static Future<void> deleteProduct(int id) async {
     await _database!.delete(
@@ -811,23 +864,24 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [id],
     );
   }
-  
+
   // Verificar si existe código de producto
   static Future<bool> existsProductCode(String code, {int? excludeId}) async {
     String whereClause = 'code = ? AND isActive = ?';
     List<dynamic> whereArgs = [code.trim(), 1];
-    
+
     if (excludeId != null) {
       whereClause += ' AND id != ?';
       whereArgs.add(excludeId);
     }
-    
-    final results = await _database!.query('products', where: whereClause, whereArgs: whereArgs);
+
+    final results = await _database!
+        .query('products', where: whereClause, whereArgs: whereArgs);
     return results.isNotEmpty;
   }
-  
+
   // ================== VENTAS ==================
-  
+
   // Guardar venta
   static Future<void> saveSale(Sale sale) async {
     await _database!.insert('sales', {
@@ -835,14 +889,19 @@ static Future<void> _cleanupOpenCashSessions() async {
       'total': sale.total,
       'user': sale.user,
       'paymentMethod': sale.paymentMethod,
-      'items': jsonEncode(sale.items.map((item) => {
-        'name': item.name,
-        'price': item.price,
-        'quantity': item.quantity,
-        'unit': item.unit,
-        'discount': item.discount,
-        'discountPercentage': item.discountPercentage,
-      }).toList()), // Guardar como JSON string
+      'payment_breakdown': sale.paymentBreakdown != null
+          ? jsonEncode(sale.paymentBreakdown!.map((p) => p.toMap()).toList())
+          : null,
+      'items': jsonEncode(sale.items
+          .map((item) => {
+                'name': item.name,
+                'price': item.price,
+                'quantity': item.quantity,
+                'unit': item.unit,
+                'discount': item.discount,
+                'discountPercentage': item.discountPercentage,
+              })
+          .toList()), // Guardar como JSON string
       // ✅ NUEVO: Campos de descuentos y devoluciones
       'discount': sale.discount ?? 0.0,
       'discountPercentage': sale.discountPercentage ?? 0.0,
@@ -873,24 +932,26 @@ static Future<void> _cleanupOpenCashSessions() async {
       }
     }
   }
-  
+
   // Obtener historial de ventas
-  static Future<List<Sale>> getSales({DateTime? date, DateTime? endDate, String? user}) async {
+  static Future<List<Sale>> getSales(
+      {DateTime? date, DateTime? endDate, String? user}) async {
     String whereClause = '';
     List<dynamic> whereArgs = [];
-    
+
     if (date != null) {
       final start = DateTime(date.year, date.month, date.day);
       DateTime end;
-      
+
       if (endDate != null) {
         // Rango de fechas (para reportes de semana, mes, etc.)
-        end = DateTime(endDate.year, endDate.month, endDate.day).add(const Duration(days: 1));
+        end = DateTime(endDate.year, endDate.month, endDate.day)
+            .add(const Duration(days: 1));
       } else {
         // Solo un día
         end = start.add(const Duration(days: 1));
       }
-      
+
       whereClause = 'date >= ? AND date < ?';
       whereArgs = [start.toIso8601String(), end.toIso8601String()];
     }
@@ -899,15 +960,25 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereClause += 'user = ?';
       whereArgs.add(user);
     }
-    
+
     final results = await _database!.query(
       'sales',
       where: whereClause.isEmpty ? null : whereClause,
       whereArgs: whereArgs.isEmpty ? null : whereArgs,
       orderBy: 'date DESC',
     );
-    
+
     return results.map((saleData) {
+      List<PaymentPart>? paymentBreakdown;
+      final pbStr = saleData['payment_breakdown'] as String?;
+      if (pbStr != null && pbStr.isNotEmpty) {
+        try {
+          final list = jsonDecode(pbStr) as List<dynamic>?;
+          paymentBreakdown = list
+              ?.map((e) => PaymentPart.fromMap(e as Map<String, dynamic>))
+              .toList();
+        } catch (_) {}
+      }
       final sale = Sale(
         id: saleData['id'] as int,
         date: DateTime.parse(saleData['date'] as String),
@@ -915,6 +986,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         user: saleData['user'] as String,
         paymentMethod: saleData['paymentMethod'] as String?,
         items: [],
+        paymentBreakdown: paymentBreakdown,
         // ✅ NUEVO: Leer campos de descuentos y devoluciones
         discount: saleData['discount'] as double?,
         discountPercentage: saleData['discountPercentage'] as double?,
@@ -926,15 +998,22 @@ static Future<void> _cleanupOpenCashSessions() async {
       try {
         final itemsString = saleData['items'] as String?;
         if (itemsString != null && itemsString.isNotEmpty) {
-          final List<dynamic> itemsList = itemsString.contains('[') ? jsonDecode(itemsString) : [];
-          sale.items = itemsList.map((item) => SaleItem(
-            name: item['name'],
-            price: item['price'] is int ? (item['price'] as int).toDouble() : item['price'],
-            quantity: item['quantity'] is int ? item['quantity'] : (item['quantity'] as double).toInt(),
-            unit: item['unit'],
-            discount: item['discount'] as double?,
-            discountPercentage: item['discountPercentage'] as double?,
-          )).toList();
+          final List<dynamic> itemsList =
+              itemsString.contains('[') ? jsonDecode(itemsString) : [];
+          sale.items = itemsList
+              .map((item) => SaleItem(
+                    name: item['name'],
+                    price: item['price'] is int
+                        ? (item['price'] as int).toDouble()
+                        : item['price'],
+                    quantity: item['quantity'] is int
+                        ? item['quantity']
+                        : (item['quantity'] as double).toInt(),
+                    unit: item['unit'],
+                    discount: item['discount'] as double?,
+                    discountPercentage: item['discountPercentage'] as double?,
+                  ))
+              .toList();
         } else {
           sale.items = [];
         }
@@ -944,9 +1023,9 @@ static Future<void> _cleanupOpenCashSessions() async {
       return sale;
     }).toList();
   }
-  
+
   // ================== MOVIMIENTOS DE INVENTARIO ==================
-  
+
   // Guardar movimiento de inventario
   static Future<void> saveInventoryMovement(InventoryMovement movement) async {
     await _database!.insert('inventory_movements', {
@@ -959,7 +1038,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       'userId': movement.userId,
     });
   }
-  
+
   // Obtener movimientos de inventario
   static Future<List<InventoryMovement>> getAllInventoryMovements({
     int? productId,
@@ -968,31 +1047,31 @@ static Future<void> _cleanupOpenCashSessions() async {
   }) async {
     String whereClause = '';
     List<dynamic> whereArgs = [];
-    
+
     if (productId != null) {
       whereClause += 'productId = ?';
       whereArgs.add(productId);
     }
-    
+
     if (type != null) {
       if (whereClause.isNotEmpty) whereClause += ' AND ';
       whereClause += 'type = ?';
       whereArgs.add(type.toString().split('.').last);
     }
-    
+
     if (reason != null) {
       if (whereClause.isNotEmpty) whereClause += ' AND ';
       whereClause += 'reason = ?';
       whereArgs.add(reason.toString().split('.').last);
     }
-    
+
     final results = await _database!.query(
       'inventory_movements',
       where: whereClause.isEmpty ? null : whereClause,
       whereArgs: whereArgs.isEmpty ? null : whereArgs,
       orderBy: 'date DESC',
     );
-    
+
     return results.map((movementData) {
       final movement = InventoryMovement(
         productId: movementData['productId'] as int,
@@ -1013,7 +1092,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       return movement;
     }).toList();
   }
-  
+
   // Migración: agregar campo userCode si no existe
   static Future<void> migrateAddUserCode() async {
     final result = await _database!.rawQuery("PRAGMA table_info(users)");
@@ -1033,7 +1112,8 @@ static Future<void> _cleanupOpenCashSessions() async {
     final exists = res.any((col) => col['name'] == 'isWeighted');
     if (!exists) {
       print('🛠️ Migrando tabla products: agregando columna isWeighted...');
-      await _database!.execute("ALTER TABLE products ADD COLUMN isWeighted INTEGER NOT NULL DEFAULT 0");
+      await _database!.execute(
+          "ALTER TABLE products ADD COLUMN isWeighted INTEGER NOT NULL DEFAULT 0");
       print('✅ Columna isWeighted agregada');
     } else {
       print('✅ Columna isWeighted ya existe, no se requiere migración');
@@ -1045,7 +1125,8 @@ static Future<void> _cleanupOpenCashSessions() async {
     final result = await _database!.rawQuery("PRAGMA table_info(products)");
     final hasPricePerKg = result.any((col) => col['name'] == 'pricePerKg');
     if (!hasPricePerKg) {
-      await _database!.execute('ALTER TABLE products ADD COLUMN pricePerKg REAL');
+      await _database!
+          .execute('ALTER TABLE products ADD COLUMN pricePerKg REAL');
       print('✅ Migración: Campo pricePerKg agregado a la tabla products');
     } else {
       print('ℹ️ La tabla products ya tiene el campo pricePerKg');
@@ -1063,22 +1144,24 @@ static Future<void> _cleanupOpenCashSessions() async {
       print('✅ Migración: Campo weight agregado a la tabla products');
     }
     if (!hasMinWeight) {
-      await _database!.execute('ALTER TABLE products ADD COLUMN minWeight REAL');
+      await _database!
+          .execute('ALTER TABLE products ADD COLUMN minWeight REAL');
       print('✅ Migración: Campo minWeight agregado a la tabla products');
     }
     if (!hasMaxWeight) {
-      await _database!.execute('ALTER TABLE products ADD COLUMN maxWeight REAL');
+      await _database!
+          .execute('ALTER TABLE products ADD COLUMN maxWeight REAL');
       print('✅ Migración: Campo maxWeight agregado a la tabla products');
     }
   }
-  
+
   // ================== CLIENTES ==================
-  
+
   // Crear cliente
   static Future<void> createCustomer(Customer customer) async {
     await _database!.insert('customers', customer.toMap());
   }
-  
+
   // Obtener todos los clientes
   static Future<List<Customer>> getAllCustomers() async {
     final results = await _database!.query(
@@ -1087,10 +1170,12 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [1],
       orderBy: 'name ASC',
     );
-    
-    return results.map((customerData) => Customer.fromMap(customerData)).toList();
+
+    return results
+        .map((customerData) => Customer.fromMap(customerData))
+        .toList();
   }
-  
+
   // Buscar cliente por ID
   static Future<Customer?> getCustomerById(int id) async {
     final results = await _database!.query(
@@ -1098,13 +1183,13 @@ static Future<void> _cleanupOpenCashSessions() async {
       where: 'id = ? AND isActive = ?',
       whereArgs: [id, 1],
     );
-    
+
     if (results.isNotEmpty) {
       return Customer.fromMap(results.first);
     }
     return null;
   }
-  
+
   // Buscar cliente por email
   static Future<Customer?> getCustomerByEmail(String email) async {
     final results = await _database!.query(
@@ -1112,13 +1197,13 @@ static Future<void> _cleanupOpenCashSessions() async {
       where: 'email = ? AND isActive = ?',
       whereArgs: [email, 1],
     );
-    
+
     if (results.isNotEmpty) {
       return Customer.fromMap(results.first);
     }
     return null;
   }
-  
+
   // Actualizar cliente
   static Future<void> updateCustomer(Customer customer) async {
     await _database!.update(
@@ -1128,7 +1213,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [customer.id],
     );
   }
-  
+
   // Eliminar cliente (marcar como inactivo)
   static Future<void> deleteCustomer(int id) async {
     await _database!.update(
@@ -1138,9 +1223,10 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [id],
     );
   }
-  
+
   // Actualizar puntos del cliente
-  static Future<void> updateCustomerPoints(int customerId, int accumulatedPoints) async {
+  static Future<void> updateCustomerPoints(
+      int customerId, int accumulatedPoints) async {
     await _database!.update(
       'customers',
       {
@@ -1151,9 +1237,10 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [customerId],
     );
   }
-  
+
   // Actualizar total de compras del cliente
-  static Future<void> updateCustomerTotalPurchases(int customerId, double total) async {
+  static Future<void> updateCustomerTotalPurchases(
+      int customerId, double total) async {
     await _database!.update(
       'customers',
       {
@@ -1165,7 +1252,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [customerId],
     );
   }
-  
+
   // Cerrar base de datos
   static Future<void> close() async {
     await _database?.close();
@@ -1175,14 +1262,17 @@ static Future<void> _cleanupOpenCashSessions() async {
 
   // Obtener configuración de empresa
   static Future<List<CompanyConfig>> getCompanyConfig() async {
-    final List<Map<String, dynamic>> results = await _database!.query('company_config');
-    return results.map((configData) => CompanyConfig.fromMap(configData)).toList();
+    final List<Map<String, dynamic>> results =
+        await _database!.query('company_config');
+    return results
+        .map((configData) => CompanyConfig.fromMap(configData))
+        .toList();
   }
 
   // Crear o actualizar configuración de empresa (siempre hay una sola)
   static Future<void> createOrUpdateCompanyConfig(CompanyConfig config) async {
     final existing = await _database!.query('company_config');
-    
+
     if (existing.isEmpty) {
       // Crear nueva configuración
       await _database!.insert('company_config', config.toMap());
@@ -1198,12 +1288,12 @@ static Future<void> _cleanupOpenCashSessions() async {
   }
 
   // ================== CLIENTES FACTURACIÓN ELECTRÓNICA DIAN ==================
-  
+
   // Crear cliente para facturación electrónica
   static Future<void> createClient(Client client) async {
     await _database!.insert('clients', client.toMap());
   }
-  
+
   // Obtener todos los clientes para facturación electrónica
   static Future<List<Client>> getAllClients() async {
     final results = await _database!.query(
@@ -1212,10 +1302,10 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [1],
       orderBy: 'businessName ASC',
     );
-    
+
     return results.map((clientData) => Client.fromMap(clientData)).toList();
   }
-  
+
   // Buscar cliente por ID
   static Future<Client?> getClientById(int id) async {
     final results = await _database!.query(
@@ -1223,13 +1313,13 @@ static Future<void> _cleanupOpenCashSessions() async {
       where: 'id = ? AND isActive = ?',
       whereArgs: [id, 1],
     );
-    
+
     if (results.isNotEmpty) {
       return Client.fromMap(results.first);
     }
     return null;
   }
-  
+
   // Buscar cliente por número de documento
   static Future<Client?> getClientByDocument(String documentNumber) async {
     final results = await _database!.query(
@@ -1237,13 +1327,13 @@ static Future<void> _cleanupOpenCashSessions() async {
       where: 'documentNumber = ? AND isActive = ?',
       whereArgs: [documentNumber, 1],
     );
-    
+
     if (results.isNotEmpty) {
       return Client.fromMap(results.first);
     }
     return null;
   }
-  
+
   // Actualizar cliente
   static Future<void> updateClient(Client client) async {
     await _database!.update(
@@ -1253,7 +1343,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [client.id],
     );
   }
-  
+
   // Eliminar cliente (marcar como inactivo)
   static Future<void> deleteClient(int id) async {
     await _database!.update(
@@ -1263,40 +1353,43 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [id],
     );
   }
-  
+
   // Buscar clientes por nombre de negocio
-  static Future<List<Client>> searchClientsByBusinessName(String businessName) async {
+  static Future<List<Client>> searchClientsByBusinessName(
+      String businessName) async {
     final results = await _database!.query(
       'clients',
       where: 'businessName LIKE ? AND isActive = ?',
       whereArgs: ['%$businessName%', 1],
       orderBy: 'businessName ASC',
     );
-    
+
     return results.map((clientData) => Client.fromMap(clientData)).toList();
   }
-  
+
   // Verificar si existe un cliente con el documento dado
-  static Future<bool> clientDocumentExists(String documentNumber, {int? excludeId}) async {
+  static Future<bool> clientDocumentExists(String documentNumber,
+      {int? excludeId}) async {
     String whereClause = 'documentNumber = ? AND isActive = ?';
     List<dynamic> whereArgs = [documentNumber.trim(), 1];
-    
+
     if (excludeId != null) {
       whereClause += ' AND id != ?';
       whereArgs.add(excludeId);
     }
-    
-    final results = await _database!.query('clients', where: whereClause, whereArgs: whereArgs);
+
+    final results = await _database!
+        .query('clients', where: whereClause, whereArgs: whereArgs);
     return results.isNotEmpty;
   }
-  
+
   // ================== GRUPOS ==================
-  
+
   // Crear grupo
   static Future<void> createGroup(Group group) async {
     await _database!.insert('groups', group.toMap());
   }
-  
+
   // Obtener todos los grupos
   static Future<List<Group>> getAllGroups() async {
     final results = await _database!.query(
@@ -1305,10 +1398,10 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [1],
       orderBy: 'name ASC',
     );
-    
+
     return results.map((groupData) => Group.fromMap(groupData)).toList();
   }
-  
+
   // Buscar grupo por ID
   static Future<Group?> getGroupById(int id) async {
     final results = await _database!.query(
@@ -1316,13 +1409,13 @@ static Future<void> _cleanupOpenCashSessions() async {
       where: 'id = ? AND isActive = ?',
       whereArgs: [id, 1],
     );
-    
+
     if (results.isNotEmpty) {
       return Group.fromMap(results.first);
     }
     return null;
   }
-  
+
   // Actualizar grupo
   static Future<void> updateGroup(Group group) async {
     await _database!.update(
@@ -1332,7 +1425,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [group.id],
     );
   }
-  
+
   // Eliminar grupo (marcar como inactivo)
   static Future<void> deleteGroup(int id) async {
     await _database!.update(
@@ -1342,28 +1435,27 @@ static Future<void> _cleanupOpenCashSessions() async {
       whereArgs: [id],
     );
   }
-  
 
-  
   // Verificar si existe un grupo con el nombre dado
   static Future<bool> groupNameExists(String name, {int? excludeId}) async {
     String whereClause = 'name = ? AND isActive = ?';
     List<dynamic> whereArgs = [name.trim(), 1];
-    
+
     if (excludeId != null) {
       whereClause += ' AND id != ?';
       whereArgs.add(excludeId);
     }
-    
-    final results = await _database!.query('groups', where: whereClause, whereArgs: whereArgs);
+
+    final results = await _database!
+        .query('groups', where: whereClause, whereArgs: whereArgs);
     return results.isNotEmpty;
   }
-  
+
   // Migración: agregar tabla de grupos si no existe
   static Future<void> migrateAddGroupsTable() async {
     print('🔄 Verificando tabla groups...');
     final result = await _database!.rawQuery("PRAGMA table_info(groups)");
-    
+
     if (result.isEmpty) {
       print('🔧 Creando tabla groups...');
       await _database!.execute('''
@@ -1383,7 +1475,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       print('ℹ️ La tabla groups ya existe');
     }
   }
-  
+
   // Crear grupos por defecto
   static Future<void> createDefaultGroups() async {
     final defaultGroups = [
@@ -1468,41 +1560,41 @@ static Future<void> _cleanupOpenCashSessions() async {
         updatedAt: DateTime.now(),
       ),
     ];
-    
+
     for (final group in defaultGroups) {
       await createGroup(group);
     }
-    
+
     print('✅ Grupos por defecto creados');
   }
-  
+
   // ✅ NUEVO: Migración para agregar columna category
   static Future<void> migrateAddCategoryColumn() async {
     try {
       print('🔧 Migrando: Agregando columna category a tabla products...');
-      
+
       // Verificar si la columna category ya existe usando pragma
       final result = await _database!.rawQuery('PRAGMA table_info(products)');
       final hasCategory = result.any((column) => column['name'] == 'category');
-      
+
       if (hasCategory) {
         print('ℹ️ La columna category ya existe');
         return;
       }
-      
+
       // Agregar columna category
       await _database!.execute('''
         ALTER TABLE products 
         ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
       ''');
-      
+
       // Migrar datos existentes de groupName a category
       await _database!.execute('''
         UPDATE products 
         SET category = groupName 
         WHERE category IS NULL OR category = 'Sin Categoría'
       ''');
-      
+
       print('✅ Columna category agregada exitosamente');
     } catch (e) {
       print('❌ Error en migración category: $e');
@@ -1518,48 +1610,47 @@ static Future<void> _cleanupOpenCashSessions() async {
       }
     }
   }
-  
+
   // ✅ FORZAR MIGRACIÓN: Asegurar que category existe
   static Future<void> forceAddCategoryColumn() async {
     try {
       print('🔧 Forzando migración: Verificando columna category...');
-      
+
       // Intentar agregar la columna sin verificar (SQLite ignorará si ya existe)
       await _database!.execute('''
         ALTER TABLE products 
         ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
       ''');
-      
+
       // Actualizar productos existentes que no tengan category
       await _database!.execute('''
         UPDATE products 
         SET category = 'Sin Categoría' 
         WHERE category IS NULL
       ''');
-      
+
       print('✅ Migración forzada completada');
     } catch (e) {
       print('❌ Error en migración forzada: $e');
     }
   }
-  
+
   // ✅ NUEVO: Crear tabla customers si no existe (SOLO CLIENTES)
   static Future<void> ensureCustomersTableExists() async {
     try {
       print('🔧 Verificando tabla customers...');
-      
+
       // Verificar si la tabla customers ya existe
       final result = await _database!.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'");
+
       if (result.isNotEmpty) {
         print('✅ Tabla customers ya existe');
         return;
       }
-      
+
       print('🔧 Creando tabla customers...');
-      
+
       // Crear SOLO la tabla customers sin tocar nada más
       await _database!.execute('''
         CREATE TABLE IF NOT EXISTS customers (
@@ -1579,7 +1670,7 @@ static Future<void> _cleanupOpenCashSessions() async {
           totalPurchases REAL NOT NULL DEFAULT 0.0
         )
       ''');
-      
+
       print('✅ Tabla customers creada exitosamente');
     } catch (e) {
       print('❌ Error creando tabla customers: $e');
@@ -1587,15 +1678,15 @@ static Future<void> _cleanupOpenCashSessions() async {
       await forceRecreateCustomersTable();
     }
   }
-  
+
   // ✅ NUEVO: Forzar recreación de tabla customers si hay problemas
   static Future<void> forceRecreateCustomersTable() async {
     try {
       print('🔧 Forzando recreación de tabla customers...');
-      
+
       // Eliminar tabla si existe
       await _database!.execute('DROP TABLE IF EXISTS customers');
-      
+
       // Crear tabla nueva
       await _database!.execute('''
         CREATE TABLE customers (
@@ -1615,28 +1706,29 @@ static Future<void> _cleanupOpenCashSessions() async {
           totalPurchases REAL NOT NULL DEFAULT 0.0
         )
       ''');
-      
+
       print('✅ Tabla customers recreada exitosamente');
     } catch (e) {
       print('❌ Error crítico recreando tabla customers: $e');
     }
   }
-  
+
   // ✅ NUEVO: Método público para verificar estado de la tabla customers
   static Future<Map<String, dynamic>> getCustomersTableStatus() async {
     try {
       final result = await _database!.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'");
+
       final exists = result.isNotEmpty;
-      
+
       if (exists) {
         // Verificar estructura de la tabla
-        final columns = await _database!.rawQuery('PRAGMA table_info(customers)');
+        final columns =
+            await _database!.rawQuery('PRAGMA table_info(customers)');
         final hasPointsRate = columns.any((col) => col['name'] == 'pointsRate');
-        final hasAccumulatedPoints = columns.any((col) => col['name'] == 'accumulatedPoints');
-        
+        final hasAccumulatedPoints =
+            columns.any((col) => col['name'] == 'accumulatedPoints');
+
         return {
           'exists': true,
           'hasPointsRate': hasPointsRate,
@@ -1644,7 +1736,7 @@ static Future<void> _cleanupOpenCashSessions() async {
           'columns': columns.length,
         };
       }
-      
+
       return {
         'exists': false,
         'hasPointsRate': false,
@@ -1666,19 +1758,18 @@ static Future<void> _cleanupOpenCashSessions() async {
   static Future<void> _forceVerifyCustomersTable() async {
     try {
       print('🔧 Forzando verificación de tabla customers...');
-      
+
       // Verificar si la tabla customers ya existe
       final result = await _database!.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'");
+
       if (result.isNotEmpty) {
         print('✅ Tabla customers ya existe');
         return;
       }
-      
+
       print('🔧 Creando tabla customers...');
-      
+
       // Crear SOLO la tabla customers sin tocar nada más
       await _database!.execute('''
         CREATE TABLE IF NOT EXISTS customers (
@@ -1698,7 +1789,7 @@ static Future<void> _cleanupOpenCashSessions() async {
           totalPurchases REAL NOT NULL DEFAULT 0.0
         )
       ''');
-      
+
       print('✅ Tabla customers creada exitosamente');
     } catch (e) {
       print('❌ Error forzando verificación de tabla customers: $e');
@@ -1711,12 +1802,11 @@ static Future<void> _cleanupOpenCashSessions() async {
   static Future<void> migrateAddSuppliersTables() async {
     try {
       print('🔧 Migrando: Agregando tablas de proveedores...');
-      
+
       // Verificar si las tablas ya existen
       final suppliersExists = await _database!.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='suppliers'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='suppliers'");
+
       if (suppliersExists.isNotEmpty) {
         print('✅ Tabla suppliers ya existe');
         return;
@@ -1790,16 +1880,13 @@ static Future<void> _cleanupOpenCashSessions() async {
   static Future<Map<String, dynamic>> getSuppliersTablesStatus() async {
     try {
       final suppliersExists = await _database!.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='suppliers'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='suppliers'");
+
       final paymentsExists = await _database!.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='supplier_payments'"
-      );
-      
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='supplier_payments'");
+
       final accountingExists = await _database!.rawQuery(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='accounting_entries'"
-      );
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='accounting_entries'");
 
       return {
         'suppliers_exists': suppliersExists.isNotEmpty,
@@ -1820,119 +1907,139 @@ static Future<void> _cleanupOpenCashSessions() async {
   static Future<void> migrateAddAccountingTables() async {
     try {
       print('🔄 Verificando tablas de contabilidad...');
-      
+
       // Verificar si las tablas ya existen
       final accountingExists = await getAccountingTablesStatus();
       print('📋 Tablas contables existentes: $accountingExists');
-      
+
       // Solo crear las tablas que faltan
       final requiredTables = [
         'accounting_entries',
-        'cash_movements', 
+        'cash_movements',
         'cash_sessions',
         'payment_methods',
         'transaction_categories'
       ];
-      
-      final missingTables = requiredTables.where((table) => !accountingExists.contains(table)).toList();
-      
+
+      final missingTables = requiredTables
+          .where((table) => !accountingExists.contains(table))
+          .toList();
+
       if (missingTables.isEmpty) {
         print('✅ Todas las tablas de contabilidad ya existen');
         // Verificar columnas faltantes en accounting_entries
         print('🔧 Verificando columnas de accounting_entries...');
-        
+
         // Verificar si existe la columna subcategory
         try {
-          await _database!.rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
+          await _database!
+              .rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
           print('✅ Columna subcategory ya existe');
         } catch (e) {
           print('🔧 Agregando columna subcategory...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
           print('✅ Columna subcategory agregada');
         }
-        
+
         // Verificar si existe la columna cash_session_id
         try {
-          await _database!.rawQuery('SELECT cash_session_id FROM accounting_entries LIMIT 1');
+          await _database!.rawQuery(
+              'SELECT cash_session_id FROM accounting_entries LIMIT 1');
           print('✅ Columna cash_session_id ya existe');
         } catch (e) {
           print('🔧 Agregando columna cash_session_id...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
           print('✅ Columna cash_session_id agregada');
         }
-        
+
         // Verificar si existe la columna document_number
         try {
-          await _database!.rawQuery('SELECT document_number FROM accounting_entries LIMIT 1');
+          await _database!.rawQuery(
+              'SELECT document_number FROM accounting_entries LIMIT 1');
           print('✅ Columna document_number ya existe');
         } catch (e) {
           print('🔧 Agregando columna document_number...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
           print('✅ Columna document_number agregada');
         }
-        
+
         // Verificar si existe la columna reference
         try {
-          await _database!.rawQuery('SELECT reference FROM accounting_entries LIMIT 1');
+          await _database!
+              .rawQuery('SELECT reference FROM accounting_entries LIMIT 1');
           print('✅ Columna reference ya existe');
         } catch (e) {
           print('🔧 Agregando columna reference...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN reference TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN reference TEXT');
           print('✅ Columna reference agregada');
         }
-        
+
         // Verificar si existe la columna related_entity
         try {
-          await _database!.rawQuery('SELECT related_entity FROM accounting_entries LIMIT 1');
+          await _database!.rawQuery(
+              'SELECT related_entity FROM accounting_entries LIMIT 1');
           print('✅ Columna related_entity ya existe');
         } catch (e) {
           print('🔧 Agregando columna related_entity...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN related_entity TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN related_entity TEXT');
           print('✅ Columna related_entity agregada');
         }
-        
+
         // Verificar si existe la columna related_entity_id
         try {
-          await _database!.rawQuery('SELECT related_entity_id FROM accounting_entries LIMIT 1');
+          await _database!.rawQuery(
+              'SELECT related_entity_id FROM accounting_entries LIMIT 1');
           print('✅ Columna related_entity_id ya existe');
         } catch (e) {
           print('🔧 Agregando columna related_entity_id...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN related_entity_id INTEGER');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN related_entity_id INTEGER');
           print('✅ Columna related_entity_id agregada');
         }
-        
+
         // Verificar si existe la columna notes
         try {
-          await _database!.rawQuery('SELECT notes FROM accounting_entries LIMIT 1');
+          await _database!
+              .rawQuery('SELECT notes FROM accounting_entries LIMIT 1');
           print('✅ Columna notes ya existe');
         } catch (e) {
           print('🔧 Agregando columna notes...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN notes TEXT');
+          await _database!
+              .execute('ALTER TABLE accounting_entries ADD COLUMN notes TEXT');
           print('✅ Columna notes agregada');
         }
-        
+
         // Verificar si existe la columna payment_method
         try {
-          await _database!.rawQuery('SELECT payment_method FROM accounting_entries LIMIT 1');
+          await _database!.rawQuery(
+              'SELECT payment_method FROM accounting_entries LIMIT 1');
           print('✅ Columna payment_method ya existe');
         } catch (e) {
           print('🔧 Agregando columna payment_method...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN payment_method TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN payment_method TEXT');
           print('✅ Columna payment_method agregada');
         }
-        
+
         // Verificar si existe la columna updated_at
         try {
-          await _database!.rawQuery('SELECT updated_at FROM accounting_entries LIMIT 1');
+          await _database!
+              .rawQuery('SELECT updated_at FROM accounting_entries LIMIT 1');
           print('✅ Columna updated_at ya existe');
         } catch (e) {
           print('🔧 Agregando columna updated_at...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN updated_at TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN updated_at TEXT');
           print('✅ Columna updated_at agregada');
         }
         return;
       }
-      
+
       print('🔨 Creando tablas faltantes: $missingTables');
 
       // Crear tabla de entradas contables (si no existe)
@@ -1965,34 +2072,40 @@ static Future<void> _cleanupOpenCashSessions() async {
       } else {
         // Verificar y agregar columnas faltantes a accounting_entries si ya existe
         print('🔧 Verificando columnas de accounting_entries...');
-        
+
         // Verificar si existe la columna subcategory
         try {
-          await _database!.rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
+          await _database!
+              .rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
           print('✅ Columna subcategory ya existe');
         } catch (e) {
           print('🔧 Agregando columna subcategory...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
           print('✅ Columna subcategory agregada');
         }
-        
+
         // Verificar si existe la columna cash_session_id
         try {
-          await _database!.rawQuery('SELECT cash_session_id FROM accounting_entries LIMIT 1');
+          await _database!.rawQuery(
+              'SELECT cash_session_id FROM accounting_entries LIMIT 1');
           print('✅ Columna cash_session_id ya existe');
         } catch (e) {
           print('🔧 Agregando columna cash_session_id...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
           print('✅ Columna cash_session_id agregada');
         }
-        
+
         // Verificar si existe la columna document_number
         try {
-          await _database!.rawQuery('SELECT document_number FROM accounting_entries LIMIT 1');
+          await _database!.rawQuery(
+              'SELECT document_number FROM accounting_entries LIMIT 1');
           print('✅ Columna document_number ya existe');
         } catch (e) {
           print('🔧 Agregando columna document_number...');
-          await _database!.execute('ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
+          await _database!.execute(
+              'ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
           print('✅ Columna document_number agregada');
         }
       }
@@ -2088,7 +2201,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       // Insertar métodos de pago por defecto
       print('📝 Insertando métodos de pago por defecto...');
       await _insertDefaultPaymentMethods();
-      
+
       // Insertar categorías por defecto
       print('📝 Insertando categorías por defecto...');
       await _insertDefaultTransactionCategories();
@@ -2108,7 +2221,7 @@ static Future<void> _cleanupOpenCashSessions() async {
       final List<String> existingTables = [];
       final tableNames = [
         'accounting_entries',
-        'cash_movements', 
+        'cash_movements',
         'cash_sessions',
         'payment_methods',
         'transaction_categories'
@@ -2116,9 +2229,8 @@ static Future<void> _cleanupOpenCashSessions() async {
 
       for (final tableName in tableNames) {
         final result = await db.rawQuery(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-          [tableName]
-        );
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            [tableName]);
         if (result.isNotEmpty) {
           existingTables.add(tableName);
         }
@@ -2187,7 +2299,8 @@ static Future<void> _cleanupOpenCashSessions() async {
       ];
 
       for (final method in defaultMethods) {
-        await db.insert('payment_methods', method, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert('payment_methods', method,
+            conflictAlgorithm: ConflictAlgorithm.ignore);
       }
 
       print('✅ Métodos de pago por defecto insertados');
@@ -2322,9 +2435,10 @@ static Future<void> _cleanupOpenCashSessions() async {
       // Limpiar categorías existentes para evitar duplicados
       await db.delete('transaction_categories');
       print('🗑️ Categorías existentes eliminadas');
-      
+
       for (final category in defaultCategories) {
-        await db.insert('transaction_categories', category, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert('transaction_categories', category,
+            conflictAlgorithm: ConflictAlgorithm.ignore);
       }
 
       print('✅ Categorías por defecto insertadas');
@@ -2337,7 +2451,7 @@ static Future<void> _cleanupOpenCashSessions() async {
   static Future<void> migrateAddAccountsReceivablePayableTables() async {
     try {
       print('🔄 Verificando tablas de cuentas por cobrar y pagar...');
-      
+
       // Verificar si las tablas ya existen
       final tables = await _database!.rawQuery("""
         SELECT name FROM sqlite_master 
@@ -2348,10 +2462,11 @@ static Future<void> _cleanupOpenCashSessions() async {
           'payable_payments'
         )
       """);
-      
-      final existingTables = tables.map((table) => table['name'] as String).toList();
+
+      final existingTables =
+          tables.map((table) => table['name'] as String).toList();
       print('📋 Tablas de cuentas existentes: $existingTables');
-      
+
       // Crear tabla accounts_receivable
       if (!existingTables.contains('accounts_receivable')) {
         await _database!.execute('''
@@ -2374,7 +2489,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         ''');
         print('✅ Tabla accounts_receivable creada');
       }
-      
+
       // Crear tabla accounts_payable
       if (!existingTables.contains('accounts_payable')) {
         await _database!.execute('''
@@ -2397,7 +2512,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         ''');
         print('✅ Tabla accounts_payable creada');
       }
-      
+
       // Crear tabla receivable_payments
       if (!existingTables.contains('receivable_payments')) {
         await _database!.execute('''
@@ -2417,7 +2532,7 @@ static Future<void> _cleanupOpenCashSessions() async {
         ''');
         print('✅ Tabla receivable_payments creada');
       }
-      
+
       // Crear tabla payable_payments
       if (!existingTables.contains('payable_payments')) {
         await _database!.execute('''
@@ -2443,4 +2558,4 @@ static Future<void> _cleanupOpenCashSessions() async {
       print('❌ Error al crear tablas de cuentas por cobrar y pagar: $e');
     }
   }
-} 
+}

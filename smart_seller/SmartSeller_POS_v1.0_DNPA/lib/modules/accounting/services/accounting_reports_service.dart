@@ -4,10 +4,10 @@ import '../../../services/sqlite_database_service.dart';
 import '../models/accounting_reports.dart';
 
 class AccountingReportsService {
-  
   // ==================== ESTADO DE RESULTADOS ====================
-  
-  static Future<IncomeStatement> generateIncomeStatement(DateTime fromDate, DateTime toDate) async {
+
+  static Future<IncomeStatement> generateIncomeStatement(
+      DateTime fromDate, DateTime toDate) async {
     try {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
@@ -49,15 +49,30 @@ class AccountingReportsService {
       ]);
 
       // Calcular totales
-      final totalIncome = incomeResults.fold<double>(0, (sum, row) => sum + (row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double)));
-      final totalExpenses = expenseResults.fold<double>(0, (sum, row) => sum + (row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double)));
+      final totalIncome = incomeResults.fold<double>(
+          0,
+          (sum, row) =>
+              sum +
+              (row['total_amount'] is int
+                  ? (row['total_amount'] as int).toDouble()
+                  : (row['total_amount'] as double)));
+      final totalExpenses = expenseResults.fold<double>(
+          0,
+          (sum, row) =>
+              sum +
+              (row['total_amount'] is int
+                  ? (row['total_amount'] as int).toDouble()
+                  : (row['total_amount'] as double)));
       final netIncome = totalIncome - totalExpenses;
 
       // Crear categorías de ingresos
       final incomeCategories = incomeResults.map((row) {
-        final amount = row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double);
+        final amount = row['total_amount'] is int
+            ? (row['total_amount'] as int).toDouble()
+            : (row['total_amount'] as double);
         return IncomeCategory(
-          category: _translateCategory(row['category'] as String), // ✅ Traducir categorías
+          category: _translateCategory(
+              row['category'] as String), // ✅ Traducir categorías
           amount: amount,
           transactionCount: row['transaction_count'] as int,
           percentage: totalIncome > 0 ? (amount / totalIncome) * 100 : 0,
@@ -66,9 +81,12 @@ class AccountingReportsService {
 
       // Crear categorías de egresos
       final expenseCategories = expenseResults.map((row) {
-        final amount = row['total_amount'] is int ? (row['total_amount'] as int).toDouble() : (row['total_amount'] as double);
+        final amount = row['total_amount'] is int
+            ? (row['total_amount'] as int).toDouble()
+            : (row['total_amount'] as double);
         return ExpenseCategory(
-          category: _translateCategory(row['category'] as String), // ✅ Traducir categorías
+          category: _translateCategory(
+              row['category'] as String), // ✅ Traducir categorías
           amount: amount,
           transactionCount: row['transaction_count'] as int,
           percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
@@ -91,8 +109,9 @@ class AccountingReportsService {
   }
 
   // ==================== FLUJO DE CAJA ====================
-  
-  static Future<CashFlowReport> generateCashFlowReport(DateTime fromDate, DateTime toDate) async {
+
+  static Future<CashFlowReport> generateCashFlowReport(
+      DateTime fromDate, DateTime toDate) async {
     try {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
@@ -116,14 +135,30 @@ class AccountingReportsService {
       ]);
 
       // Calcular totales
-      final totalIncome = dailyResults.fold<double>(0, (sum, row) => sum + (row['daily_income'] is int ? (row['daily_income'] as int).toDouble() : (row['daily_income'] as double)));
-      final totalExpenses = dailyResults.fold<double>(0, (sum, row) => sum + (row['daily_expenses'] is int ? (row['daily_expenses'] as int).toDouble() : (row['daily_expenses'] as double)));
+      final totalIncome = dailyResults.fold<double>(
+          0,
+          (sum, row) =>
+              sum +
+              (row['daily_income'] is int
+                  ? (row['daily_income'] as int).toDouble()
+                  : (row['daily_income'] as double)));
+      final totalExpenses = dailyResults.fold<double>(
+          0,
+          (sum, row) =>
+              sum +
+              (row['daily_expenses'] is int
+                  ? (row['daily_expenses'] as int).toDouble()
+                  : (row['daily_expenses'] as double)));
       final netCashFlow = totalIncome - totalExpenses;
 
       // Crear flujos diarios
       final dailyFlows = dailyResults.map((row) {
-        final income = row['daily_income'] is int ? (row['daily_income'] as int).toDouble() : (row['daily_income'] as double);
-        final expenses = row['daily_expenses'] is int ? (row['daily_expenses'] as int).toDouble() : (row['daily_expenses'] as double);
+        final income = row['daily_income'] is int
+            ? (row['daily_income'] as int).toDouble()
+            : (row['daily_income'] as double);
+        final expenses = row['daily_expenses'] is int
+            ? (row['daily_expenses'] as int).toDouble()
+            : (row['daily_expenses'] as double);
         return DailyCashFlow(
           date: DateTime.parse(row['flow_date'] as String),
           income: income,
@@ -154,8 +189,9 @@ class AccountingReportsService {
   }
 
   // ==================== REPORTE DE SESIONES DE CAJA ====================
-  
-  static Future<CashSessionReport> generateCashSessionReport(DateTime fromDate, DateTime toDate) async {
+
+  static Future<CashSessionReport> generateCashSessionReport(
+      DateTime fromDate, DateTime toDate) async {
     try {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
@@ -173,11 +209,16 @@ class AccountingReportsService {
         toDate.toIso8601String(),
       ]);
 
-      // Crear resúmenes de sesiones
+      // Crear resúmenes de sesiones (totales desde accounting_entries para precisión)
       final sessions = <CashSessionSummary>[];
       for (final row in sessionResults) {
-        final transactionCount = await _getTransactionCountForSession(row['id'] as int);
-        
+        final sessionId = row['id'] as int;
+        final transactionCount =
+            await _getTransactionCountForSession(sessionId);
+
+        // Totales reales desde transacciones (así el reporte muestra datos reales)
+        final computed = await _getSessionTotalsFromEntries(db, sessionId);
+
         // Obtener el nombre del usuario por separado
         String userName = 'Usuario desconocido';
         if (row['user_id'] != null) {
@@ -188,30 +229,49 @@ class AccountingReportsService {
             whereArgs: [row['user_id']],
           );
           if (userRow.isNotEmpty) {
-            userName = userRow.first['fullName'] as String? ?? 'Usuario desconocido';
+            userName =
+                userRow.first['fullName'] as String? ?? 'Usuario desconocido';
           }
         }
-        
+
+        // Valores numéricos pueden ser null (sesión abierta o sin cerrar)
+        final initialAmount = (row['initial_amount'] is num)
+            ? (row['initial_amount'] as num).toDouble()
+            : 0.0;
+        final totalIncome = computed['income'] ?? 0.0;
+        final totalExpense = computed['expense'] ?? 0.0;
+        final finalAmount = (row['final_amount'] is num)
+            ? (row['final_amount'] as num).toDouble()
+            : (initialAmount + totalIncome - totalExpense);
+        final difference = finalAmount - initialAmount;
+        final status = row['status'] != null ? row['status'] as String : 'open';
+
         sessions.add(CashSessionSummary(
           sessionId: row['id'] as int,
           userName: userName,
           openDate: DateTime.parse(row['open_date'] as String),
-          closeDate: row['close_date'] != null ? DateTime.parse(row['close_date'] as String) : null,
-          initialAmount: (row['initial_amount'] as num).toDouble(),
-          finalAmount: (row['final_amount'] as num).toDouble(),
-          totalIncome: (row['total_income'] as num).toDouble(),
-          totalExpenses: (row['total_expense'] as num).toDouble(),
-          difference: (row['difference'] as num).toDouble(),
-          status: row['status'] as String,
+          closeDate: row['close_date'] != null
+              ? DateTime.parse(row['close_date'] as String)
+              : null,
+          initialAmount: initialAmount,
+          finalAmount: finalAmount,
+          totalIncome: totalIncome,
+          totalExpenses: totalExpense,
+          difference: difference,
+          status: status,
           transactionCount: transactionCount,
         ));
       }
 
       // Calcular totales
-      final totalInitialCash = sessions.fold<double>(0, (sum, session) => sum + session.initialAmount);
-      final totalFinalCash = sessions.fold<double>(0, (sum, session) => sum + session.finalAmount);
-      final totalIncome = sessions.fold<double>(0, (sum, session) => sum + session.totalIncome);
-      final totalExpenses = sessions.fold<double>(0, (sum, session) => sum + session.totalExpenses);
+      final totalInitialCash = sessions.fold<double>(
+          0, (sum, session) => sum + session.initialAmount);
+      final totalFinalCash =
+          sessions.fold<double>(0, (sum, session) => sum + session.finalAmount);
+      final totalIncome =
+          sessions.fold<double>(0, (sum, session) => sum + session.totalIncome);
+      final totalExpenses = sessions.fold<double>(
+          0, (sum, session) => sum + session.totalExpenses);
 
       return CashSessionReport(
         sessions: sessions,
@@ -230,8 +290,9 @@ class AccountingReportsService {
   }
 
   // ==================== AUDITORÍA DE TRANSACCIONES ====================
-  
-  static Future<TransactionAuditReport> generateTransactionAuditReport(DateTime fromDate, DateTime toDate) async {
+
+  static Future<TransactionAuditReport> generateTransactionAuditReport(
+      DateTime fromDate, DateTime toDate) async {
     try {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
@@ -262,17 +323,21 @@ class AccountingReportsService {
             whereArgs: [row['user_id']],
           );
           if (userRow.isNotEmpty) {
-            userName = userRow.first['fullName'] as String? ?? 'Usuario desconocido';
+            userName =
+                userRow.first['fullName'] as String? ?? 'Usuario desconocido';
           }
         }
-        
+
         entries.add(TransactionAuditEntry(
           id: row['id'] as int,
           type: row['type'] as String,
           amount: (row['amount'] as num).toDouble(),
           description: row['description'] as String,
-          category: _translateCategory(row['category'] as String), // ✅ Traducir categorías
-          paymentMethod: _translatePaymentMethod(row['payment_method'] as String? ?? 'N/A'), // ✅ Traducir métodos de pago
+          category: _translateCategory(
+              row['category'] as String), // ✅ Traducir categorías
+          paymentMethod: _translatePaymentMethod(
+              row['payment_method'] as String? ??
+                  'N/A'), // ✅ Traducir métodos de pago
           userName: userName,
           date: DateTime.parse(row['date'] as String),
           reference: row['reference'] as String?,
@@ -283,14 +348,17 @@ class AccountingReportsService {
 
       // Calcular estadísticas
       final totalTransactions = entries.length;
-      final totalAmount = entries.fold<double>(0, (sum, entry) => sum + entry.amount);
-      
+      final totalAmount =
+          entries.fold<double>(0, (sum, entry) => sum + entry.amount);
+
       final transactionsByType = <String, int>{};
       final transactionsByUser = <String, int>{};
-      
+
       for (final entry in entries) {
-        transactionsByType[entry.type] = (transactionsByType[entry.type] ?? 0) + 1;
-        transactionsByUser[entry.userName] = (transactionsByUser[entry.userName] ?? 0) + 1;
+        transactionsByType[entry.type] =
+            (transactionsByType[entry.type] ?? 0) + 1;
+        transactionsByUser[entry.userName] =
+            (transactionsByUser[entry.userName] ?? 0) + 1;
       }
 
       return TransactionAuditReport(
@@ -309,7 +377,7 @@ class AccountingReportsService {
   }
 
   // ==================== MÉTODOS AUXILIARES ====================
-  
+
   static Future<double> _getInitialCashForPeriod(DateTime fromDate) async {
     try {
       final db = SQLiteDatabaseService.database;
@@ -326,11 +394,12 @@ class AccountingReportsService {
       ''';
 
       final result = await db.rawQuery(query, [fromDate.toIso8601String()]);
-      
+
       if (result.isNotEmpty) {
-        return (result.first['final_amount'] as num).toDouble();
+        final val = result.first['final_amount'];
+        return (val is num) ? val.toDouble() : 0.0;
       }
-      
+
       return 0.0;
     } catch (e) {
       print('❌ Error al obtener efectivo inicial: $e');
@@ -409,6 +478,33 @@ class AccountingReportsService {
     }
   }
 
+  /// Totales de ingresos y egresos de una sesión desde accounting_entries.
+  static Future<Map<String, double>> _getSessionTotalsFromEntries(
+      dynamic db, int sessionId) async {
+    try {
+      final incomeResult = await db.rawQuery(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM accounting_entries WHERE cash_session_id = ? AND type = ?',
+        [sessionId, 'income'],
+      );
+      final expenseResult = await db.rawQuery(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM accounting_entries WHERE cash_session_id = ? AND type = ?',
+        [sessionId, 'expense'],
+      );
+      final income =
+          (incomeResult.isNotEmpty && incomeResult.first['total'] is num)
+              ? (incomeResult.first['total'] as num).toDouble()
+              : 0.0;
+      final expense =
+          (expenseResult.isNotEmpty && expenseResult.first['total'] is num)
+              ? (expenseResult.first['total'] as num).toDouble()
+              : 0.0;
+      return {'income': income, 'expense': expense};
+    } catch (e) {
+      print('❌ Error al obtener totales de sesión: $e');
+      return {'income': 0.0, 'expense': 0.0};
+    }
+  }
+
   static Future<int> _getTransactionCountForSession(int sessionId) async {
     try {
       final db = SQLiteDatabaseService.database;
@@ -427,20 +523,93 @@ class AccountingReportsService {
   }
 
   // ==================== REPORTES RÁPIDOS ====================
-  
-  static Future<Map<String, dynamic>> getQuickSummary(DateTime fromDate, DateTime toDate) async {
+
+  /// Ingresos del período agrupados por medio de pago (Efectivo, Tarjeta, etc.).
+  static Future<Map<String, double>> getIncomeByPaymentMethod(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return {};
+
+      final endOfDay =
+          DateTime(toDate.year, toDate.month, toDate.day, 23, 59, 59);
+      final result = await db.rawQuery(
+        '''SELECT COALESCE(payment_method, 'Efectivo') as method, SUM(amount) as total
+           FROM accounting_entries
+           WHERE type = ? AND date >= ? AND date <= ?
+           GROUP BY COALESCE(payment_method, 'Efectivo')''',
+        ['income', fromDate.toIso8601String(), endOfDay.toIso8601String()],
+      );
+
+      final map = <String, double>{};
+      for (final row in result) {
+        final method = row['method'] as String? ?? 'Efectivo';
+        final total =
+            (row['total'] is num) ? (row['total'] as num).toDouble() : 0.0;
+        if (total > 0) map[method] = total;
+      }
+      return map;
+    } catch (e) {
+      print('❌ Error al obtener ingresos por método de pago: $e');
+      return {};
+    }
+  }
+
+  /// Egresos del período agrupados por medio de pago.
+  static Future<Map<String, double>> getExpensesByPaymentMethod(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return {};
+
+      final endOfDay =
+          DateTime(toDate.year, toDate.month, toDate.day, 23, 59, 59);
+      final result = await db.rawQuery(
+        '''SELECT COALESCE(payment_method, 'Efectivo') as method, SUM(amount) as total
+           FROM accounting_entries
+           WHERE type = ? AND date >= ? AND date <= ?
+           GROUP BY COALESCE(payment_method, 'Efectivo')''',
+        ['expense', fromDate.toIso8601String(), endOfDay.toIso8601String()],
+      );
+
+      final map = <String, double>{};
+      for (final row in result) {
+        final method = row['method'] as String? ?? 'Efectivo';
+        final total =
+            (row['total'] is num) ? (row['total'] as num).toDouble() : 0.0;
+        if (total > 0) map[method] = total;
+      }
+      return map;
+    } catch (e) {
+      print('❌ Error al obtener egresos por método de pago: $e');
+      return {};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getQuickSummary(
+      DateTime fromDate, DateTime toDate) async {
     try {
       final incomeStatement = await generateIncomeStatement(fromDate, toDate);
       final cashFlow = await generateCashFlowReport(fromDate, toDate);
-      
+      final incomeByPaymentMethod =
+          await getIncomeByPaymentMethod(fromDate, toDate);
+      final expensesByPaymentMethod =
+          await getExpensesByPaymentMethod(fromDate, toDate);
+
       return {
-        'period': '${fromDate.day}/${fromDate.month}/${fromDate.year} - ${toDate.day}/${toDate.month}/${toDate.year}',
+        'period':
+            '${fromDate.day}/${fromDate.month}/${fromDate.year} - ${toDate.day}/${toDate.month}/${toDate.year}',
         'total_income': incomeStatement.totalIncome,
         'total_expenses': incomeStatement.totalExpenses,
         'net_income': incomeStatement.netIncome,
+        'balance': incomeStatement.netIncome,
         'cash_flow': cashFlow.netCashFlow,
-        'transaction_count': incomeStatement.incomeCategories.fold<int>(0, (sum, cat) => sum + cat.transactionCount) +
-                           incomeStatement.expenseCategories.fold<int>(0, (sum, cat) => sum + cat.transactionCount),
+        'transaction_count': incomeStatement.incomeCategories
+                .fold<int>(0, (sum, cat) => sum + cat.transactionCount) +
+            incomeStatement.expenseCategories
+                .fold<int>(0, (sum, cat) => sum + cat.transactionCount),
+        'income_by_payment_method': incomeByPaymentMethod,
+        'expenses_by_payment_method': expensesByPaymentMethod,
       };
     } catch (e) {
       print('❌ Error al generar resumen rápido: $e');

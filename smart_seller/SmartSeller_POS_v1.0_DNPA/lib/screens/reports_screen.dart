@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import '../services/pdf_reports_service.dart';
 import '../services/company_config_service.dart';
 
@@ -18,7 +20,8 @@ class ReportsScreen extends StatefulWidget {
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProviderStateMixin {
+class _ReportsScreenState extends State<ReportsScreen>
+    with SingleTickerProviderStateMixin {
   DateTime selectedDate = DateTime.now();
   DateTime? endDate;
   ReportType selectedReport = ReportType.sales;
@@ -26,33 +29,36 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
   String? selectedGroup;
   String? selectedPaymentMethod;
   bool isLoading = false;
-  
+
   // Controlador para pestañas
   late TabController _tabController;
-  
+
   // Datos de reportes
   SalesReport? salesReport;
   InventoryReport? inventoryReport;
   ProfitabilityReport? profitabilityReport;
   List<Group> availableGroups = [];
-  
+
   // Filtros avanzados
   bool showAdvancedFilters = false;
-  
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // ✅ Corregido: 5 tabs (ventas, productos, inventario, rentabilidad, grupos)
+    _tabController = TabController(
+        length: 5,
+        vsync:
+            this); // ✅ Corregido: 5 tabs (ventas, productos, inventario, rentabilidad, grupos)
     _loadGroups();
     _loadReportData();
   }
-  
+
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-  
+
   Future<void> _loadGroups() async {
     try {
       final groups = await SQLiteDatabaseService.getAllGroups();
@@ -63,7 +69,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       print('Error cargando grupos: $e');
     }
   }
-  
+
   Future<void> _loadReportData() async {
     setState(() => isLoading = true);
     try {
@@ -83,7 +89,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           );
           break;
         case ReportType.profitability:
-          profitabilityReport = await ReportsService.generateProfitabilityReport(
+          profitabilityReport =
+              await ReportsService.generateProfitabilityReport(
             date: selectedDate,
             endDate: endDate,
             groupFilter: selectedGroup,
@@ -113,7 +120,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       setState(() => isLoading = false);
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,7 +146,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             tooltip: 'Exportar Reporte',
           ),
           IconButton(
-            onPressed: () => setState(() => showAdvancedFilters = !showAdvancedFilters),
+            onPressed: () =>
+                setState(() => showAdvancedFilters = !showAdvancedFilters),
             icon: Icon(
               showAdvancedFilters ? Icons.filter_list_off : Icons.filter_list,
               color: const Color(0xFF22315B),
@@ -152,10 +160,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         children: [
           // Filtros principales
           _buildMainFilters(),
-          
+
           // Filtros avanzados (condicionales)
           if (showAdvancedFilters) _buildAdvancedFilters(),
-          
+
           // Contenido del reporte con pestañas
           Expanded(
             child: isLoading
@@ -166,7 +174,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   Widget _buildMainFilters() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -183,9 +191,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           ),
         ],
       ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
               const Icon(Icons.analytics, color: Color(0xFF22315B)),
@@ -201,33 +209,43 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ],
           ),
           const SizedBox(height: 20),
-            Row(
-              children: [
+          Row(
+            children: [
               // Tipo de Reporte
-                Expanded(
+              Expanded(
                 flex: 2,
                 child: DropdownButtonFormField<ReportType>(
-                    value: selectedReport,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de Reporte',
+                  value: selectedReport,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de Reporte',
                     border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.assessment),
-                    ),
-                    items: const [
-                    DropdownMenuItem(value: ReportType.sales, child: Text('📊 Ventas')),
-                    DropdownMenuItem(value: ReportType.products, child: Text('🏆 Productos Top')),
-                    DropdownMenuItem(value: ReportType.inventory, child: Text('📦 Inventario')),
-                    DropdownMenuItem(value: ReportType.profitability, child: Text('💰 Rentabilidad')),
-                    DropdownMenuItem(value: ReportType.payments, child: Text('💳 Métodos de Pago')),
-                    DropdownMenuItem(value: ReportType.groups, child: Text('📂 Por Grupos')),
-                    ],
-                    onChanged: (value) {
-                      setState(() => selectedReport = value!);
-                      _loadReportData();
-                    },
+                    prefixIcon: Icon(Icons.assessment),
                   ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: ReportType.sales, child: Text('📊 Ventas')),
+                    DropdownMenuItem(
+                        value: ReportType.products,
+                        child: Text('🏆 Productos Top')),
+                    DropdownMenuItem(
+                        value: ReportType.inventory,
+                        child: Text('📦 Inventario')),
+                    DropdownMenuItem(
+                        value: ReportType.profitability,
+                        child: Text('💰 Rentabilidad')),
+                    DropdownMenuItem(
+                        value: ReportType.payments,
+                        child: Text('💳 Métodos de Pago')),
+                    DropdownMenuItem(
+                        value: ReportType.groups, child: Text('📂 Por Grupos')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => selectedReport = value!);
+                    _loadReportData();
+                  },
                 ),
-                const SizedBox(width: 16),
+              ),
+              const SizedBox(width: 16),
               // Período
               Expanded(
                 child: DropdownButtonFormField<ReportPeriod>(
@@ -238,13 +256,24 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     prefixIcon: Icon(Icons.schedule),
                   ),
                   items: const [
-                    DropdownMenuItem(value: ReportPeriod.today, child: Text('Hoy')),
-                    DropdownMenuItem(value: ReportPeriod.yesterday, child: Text('Ayer')),
-                    DropdownMenuItem(value: ReportPeriod.thisWeek, child: Text('Esta Semana')),
-                    DropdownMenuItem(value: ReportPeriod.lastWeek, child: Text('Semana Pasada')),
-                    DropdownMenuItem(value: ReportPeriod.thisMonth, child: Text('Este Mes')),
-                    DropdownMenuItem(value: ReportPeriod.lastMonth, child: Text('Mes Pasado')),
-                    DropdownMenuItem(value: ReportPeriod.custom, child: Text('Personalizado')),
+                    DropdownMenuItem(
+                        value: ReportPeriod.today, child: Text('Hoy')),
+                    DropdownMenuItem(
+                        value: ReportPeriod.yesterday, child: Text('Ayer')),
+                    DropdownMenuItem(
+                        value: ReportPeriod.thisWeek,
+                        child: Text('Esta Semana')),
+                    DropdownMenuItem(
+                        value: ReportPeriod.lastWeek,
+                        child: Text('Semana Pasada')),
+                    DropdownMenuItem(
+                        value: ReportPeriod.thisMonth, child: Text('Este Mes')),
+                    DropdownMenuItem(
+                        value: ReportPeriod.lastMonth,
+                        child: Text('Mes Pasado')),
+                    DropdownMenuItem(
+                        value: ReportPeriod.custom,
+                        child: Text('Personalizado')),
                   ],
                   onChanged: (value) {
                     setState(() => selectedPeriod = value!);
@@ -255,26 +284,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               ),
               const SizedBox(width: 16),
               // Fecha
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _selectDate(context),
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Fecha',
+              Expanded(
+                child: InkWell(
+                  onTap: () => _selectDate(context),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Fecha',
                       border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.calendar_today),
-                      ),
-                      child: Text(
-                        DateFormat('dd/MM/yyyy').format(selectedDate),
-                        style: const TextStyle(fontSize: 16),
-                      ),
+                      prefixIcon: Icon(Icons.calendar_today),
+                    ),
+                    child: Text(
+                      DateFormat('dd/MM/yyyy').format(selectedDate),
+                      style: const TextStyle(fontSize: 16),
                     ),
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -317,11 +346,12 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     prefixIcon: Icon(Icons.category),
                   ),
                   items: [
-                    const DropdownMenuItem(value: null, child: Text('Todos los grupos')),
+                    const DropdownMenuItem(
+                        value: null, child: Text('Todos los grupos')),
                     ...availableGroups.map((group) => DropdownMenuItem(
-                      value: group.name,
-                      child: Text(group.name),
-                    )),
+                          value: group.name,
+                          child: Text(group.name),
+                        )),
                   ],
                   onChanged: (value) {
                     setState(() => selectedGroup = value);
@@ -340,10 +370,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                     prefixIcon: Icon(Icons.payment),
                   ),
                   items: const [
-                    DropdownMenuItem(value: null, child: Text('Todos los métodos')),
-                    DropdownMenuItem(value: 'Efectivo', child: Text('Efectivo')),
+                    DropdownMenuItem(
+                        value: null, child: Text('Todos los métodos')),
+                    DropdownMenuItem(
+                        value: 'Efectivo', child: Text('Efectivo')),
                     DropdownMenuItem(value: 'Tarjeta', child: Text('Tarjeta')),
-                    DropdownMenuItem(value: 'Transferencia', child: Text('Transferencia')),
+                    DropdownMenuItem(
+                        value: 'Transferencia', child: Text('Transferencia')),
                   ],
                   onChanged: (value) {
                     setState(() => selectedPaymentMethod = value);
@@ -400,7 +433,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         break;
     }
   }
-  
+
   Widget _buildReportContent() {
     switch (selectedReport) {
       case ReportType.sales:
@@ -421,7 +454,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         return _buildAccountingReport();
     }
   }
-  
+
   Widget _buildSalesReport() {
     if (salesReport == null) {
       return const Center(child: CircularProgressIndicator());
@@ -435,19 +468,19 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           // Resumen principal
           _buildSalesSummaryCards(),
           const SizedBox(height: 24),
-          
+
           // Gráfico de ventas por hora
           _buildSalesChart(),
           const SizedBox(height: 24),
-          
+
           // Métodos de pago
           _buildPaymentMethodsChart(),
           const SizedBox(height: 24),
-          
+
           // Top productos
           _buildTopProductsSection(),
           const SizedBox(height: 24),
-          
+
           // Transacciones detalladas
           _buildTransactionsSection(),
         ],
@@ -519,8 +552,11 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                         value: method.percentage / 100,
                         backgroundColor: Colors.grey.shade200,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          method.method == 'Efectivo' ? Colors.green :
-                          method.method == 'Tarjeta' ? Colors.blue : Colors.orange,
+                          method.method == 'Efectivo'
+                              ? Colors.green
+                              : method.method == 'Tarjeta'
+                                  ? Colors.blue
+                                  : Colors.orange,
                         ),
                       ),
                     ),
@@ -554,13 +590,13 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   Widget _buildTopProductsSection() {
     return Card(
       child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
               'Top 10 Productos Más Vendidos',
@@ -573,16 +609,18 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
                   backgroundColor: Colors.blue,
                   child: Text(
                     '${product.rank}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
                 title: Text(product.productName),
-                subtitle: Text('${product.groupName} • ${product.quantitySold} unidades'),
+                subtitle: Text(
+                    '${product.groupName} • ${product.quantitySold} unidades'),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
+                  children: [
+                    Text(
                       '\$${NumberFormat('#,###').format(product.totalAmount)}',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -613,18 +651,22 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             const Text(
               'Transacciones Detalladas',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
             ...salesReport!.transactions.map((transaction) {
               return ExpansionTile(
-                title: Text('${transaction.time} - \$${NumberFormat('#,###').format(transaction.total)}'),
-                subtitle: Text('${transaction.paymentMethod} • ${transaction.user}'),
+                title: Text(
+                    '${transaction.time} - \$${NumberFormat('#,###').format(transaction.total)}'),
+                subtitle:
+                    Text('${transaction.paymentMethod} • ${transaction.user}'),
                 children: transaction.items.map((item) {
                   return ListTile(
                     leading: const Icon(Icons.shopping_cart, size: 16),
                     title: Text(item.productName),
-                    subtitle: Text('${item.groupName} • ${item.quantity} unidades'),
-                    trailing: Text('\$${NumberFormat('#,###').format(item.totalPrice)}'),
+                    subtitle:
+                        Text('${item.groupName} • ${item.quantity} unidades'),
+                    trailing: Text(
+                        '\$${NumberFormat('#,###').format(item.totalPrice)}'),
                   );
                 }).toList(),
               );
@@ -634,7 +676,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   Widget _buildProductsReport() {
     if (salesReport == null) {
       return const Center(child: CircularProgressIndicator());
@@ -650,7 +692,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   Widget _buildInventoryReport() {
     if (inventoryReport == null) {
       return const Center(child: CircularProgressIndicator());
@@ -664,14 +706,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           // Resumen de inventario
           _buildInventorySummaryCards(),
           const SizedBox(height: 24),
-          
+
           // Lista de productos
-            _buildInventoryList(),
+          _buildInventoryList(),
         ],
       ),
     );
   }
-  
+
   Widget _buildProfitabilityReport() {
     if (profitabilityReport == null) {
       return const Center(child: CircularProgressIndicator());
@@ -685,7 +727,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           // Resumen de rentabilidad
           _buildProfitabilitySummaryCards(),
           const SizedBox(height: 24),
-          
+
           // Lista de productos por rentabilidad
           _buildProfitabilityList(),
         ],
@@ -777,7 +819,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ...inventoryReport!.items.map((item) {
               Color statusColor = Colors.green;
               IconData statusIcon = Icons.check_circle;
-              
+
               if (item.status == 'LOW') {
                 statusColor = Colors.orange;
                 statusIcon = Icons.warning;
@@ -789,7 +831,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
               return ListTile(
                 leading: Icon(statusIcon, color: statusColor),
                 title: Text(item.productName),
-                subtitle: Text('${item.groupName} • ${item.currentStock}/${item.minStock}'),
+                subtitle: Text(
+                    '${item.groupName} • ${item.currentStock}/${item.minStock}'),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -867,15 +910,22 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             ...profitabilityReport!.products.map((product) {
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: product.profitMargin > 30 ? Colors.green :
-                                  product.profitMargin > 15 ? Colors.orange : Colors.red,
+                  backgroundColor: product.profitMargin > 30
+                      ? Colors.green
+                      : product.profitMargin > 15
+                          ? Colors.orange
+                          : Colors.red,
                   child: Text(
                     '${product.profitMargin.toStringAsFixed(0)}%',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10),
                   ),
                 ),
                 title: Text(product.productName),
-                subtitle: Text('${product.groupName} • ${product.quantitySold} unidades vendidas'),
+                subtitle: Text(
+                    '${product.groupName} • ${product.quantitySold} unidades vendidas'),
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -962,8 +1012,9 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-  
-  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
+
+  Widget _buildSummaryCard(
+      String title, String value, IconData icon, Color color) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -975,16 +1026,16 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
             Text(
               value,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
             ),
             const SizedBox(height: 4),
             Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey.shade600,
-              ),
+                    color: Colors.grey.shade600,
+                  ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -992,10 +1043,10 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   Widget _buildSalesChart() {
     if (salesReport == null) return const SizedBox();
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1016,18 +1067,20 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   Widget _buildChart() {
     if (salesReport == null) return const SizedBox();
-    
-    final maxSales = salesReport!.salesByHour.map((h) => h.amount).reduce((a, b) => a > b ? a : b);
-    
+
+    final maxSales = salesReport!.salesByHour
+        .map((h) => h.amount)
+        .reduce((a, b) => a > b ? a : b);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: salesReport!.salesByHour.map((hourData) {
         final height = maxSales > 0 ? (hourData.amount / maxSales) * 150 : 0.0;
-        
+
         return Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -1049,7 +1102,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       }).toList(),
     );
   }
-  
+
   Widget _buildEmptyState(String message) {
     return Center(
       child: Column(
@@ -1064,14 +1117,14 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           Text(
             message,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+                  color: Colors.grey.shade600,
+                ),
           ),
         ],
       ),
     );
   }
-  
+
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -1084,44 +1137,51 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       _loadReportData();
     }
   }
-  
-  Future<void> _exportReport() async {
+
+  /// Guarda el PDF: intenta diálogo "Guardar como"; si falla, guarda en Documentos.
+  Future<String?> _saveReportPdf(
+      Uint8List pdfBytes, String baseFileName) async {
+    final fileName = '$baseFileName.pdf';
     try {
-      setState(() => isLoading = true);
-      
-      // Obtener configuración de la empresa
-      final companyConfig = await CompanyConfigService.getCompanyConfig();
-      final companyName = companyConfig.companyName;
-      
-      // Generar período del reporte
-      String reportPeriod = _getReportPeriodText();
-      
-      // Seleccionar ubicación para guardar
-      String? outputFile = await FilePicker.platform.saveFile(
+      final String? outputFile = await FilePicker.platform.saveFile(
         dialogTitle: 'Guardar reporte como PDF',
-        fileName: 'reporte_${selectedReport.name}_${DateFormat('yyyyMMdd').format(selectedDate)}.pdf',
+        fileName: fileName,
         allowedExtensions: ['pdf'],
         type: FileType.custom,
       );
+      if (outputFile == null || outputFile.trim().isEmpty) return null;
+      String finalPath = outputFile.trim();
+      if (!finalPath.toLowerCase().endsWith('.pdf'))
+        finalPath = '$finalPath.pdf';
+      final file = File(finalPath);
+      await file.writeAsBytes(pdfBytes);
+      return finalPath;
+    } catch (_) {
+      final dir = await getApplicationDocumentsDirectory();
+      final safeName = baseFileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final finalPath = path.join(dir.path, '$safeName.pdf');
+      final file = File(finalPath);
+      await file.writeAsBytes(pdfBytes);
+      return finalPath;
+    }
+  }
 
-      if (outputFile == null) {
-      Get.snackbar(
-          'Información',
-          'Operación cancelada',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
-        return;
-      }
+  Future<void> _exportReport() async {
+    try {
+      setState(() => isLoading = true);
+
+      // Obtener configuración de la empresa
+      final companyConfig = await CompanyConfigService.getCompanyConfig();
+      final companyName = companyConfig.companyName;
+
+      // Generar período del reporte
+      String reportPeriod = _getReportPeriodText();
 
       Uint8List pdfBytes;
-      
-      // Generar PDF según el tipo de reporte
       switch (selectedReport) {
         case ReportType.sales:
-          if (salesReport == null) {
+          if (salesReport == null)
             throw Exception('No hay datos de ventas para exportar');
-          }
           pdfBytes = await PDFReportsService.generateSalesReportPDF(
             report: salesReport!,
             companyName: companyName,
@@ -1129,9 +1189,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           );
           break;
         case ReportType.inventory:
-          if (inventoryReport == null) {
+          if (inventoryReport == null)
             throw Exception('No hay datos de inventario para exportar');
-          }
           pdfBytes = await PDFReportsService.generateInventoryReportPDF(
             report: inventoryReport!,
             companyName: companyName,
@@ -1139,9 +1198,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           );
           break;
         case ReportType.profitability:
-          if (profitabilityReport == null) {
+          if (profitabilityReport == null)
             throw Exception('No hay datos de rentabilidad para exportar');
-          }
           pdfBytes = await PDFReportsService.generateProfitabilityReportPDF(
             report: profitabilityReport!,
             companyName: companyName,
@@ -1151,10 +1209,8 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
         case ReportType.products:
         case ReportType.payments:
         case ReportType.groups:
-          // Estos se manejan como sub-reportes de ventas
-          if (salesReport == null) {
+          if (salesReport == null)
             throw Exception('No hay datos de ventas para exportar');
-          }
           pdfBytes = await PDFReportsService.generateSalesReportPDF(
             report: salesReport!,
             companyName: companyName,
@@ -1162,26 +1218,26 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
           );
           break;
         case ReportType.suppliers:
-          // TODO: Implementar exportación de reporte de proveedores
-          throw Exception('Exportación de reporte de proveedores no implementada aún');
+          throw Exception(
+              'Exportación de reporte de proveedores no implementada aún');
         case ReportType.accounting:
-          // TODO: Implementar exportación de reporte contable
-          throw Exception('Exportación de reporte contable no implementada aún');
+          throw Exception(
+              'Exportación de reporte contable no implementada aún');
       }
-      
-      // ✅ Asegurar que el archivo tenga extensión .pdf
-      String finalPath = outputFile;
-      if (!finalPath.toLowerCase().endsWith('.pdf')) {
-        finalPath = '$finalPath.pdf';
+
+      final baseFileName =
+          'reporte_${selectedReport.name}_${DateFormat('yyyyMMdd').format(selectedDate)}'
+              .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final savedPath = await _saveReportPdf(pdfBytes, baseFileName);
+      if (savedPath == null) {
+        Get.snackbar('Información', 'Operación cancelada',
+            backgroundColor: Colors.orange, colorText: Colors.white);
+        return;
       }
-      
-      // Guardar archivo PDF en la ubicación seleccionada
-      final file = File(finalPath);
-      await file.writeAsBytes(pdfBytes);
-      
+
       Get.snackbar(
         '✅ Reporte PDF Exportado',
-        'Archivo guardado correctamente como PDF profesional',
+        'Archivo guardado: $savedPath',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -1197,7 +1253,7 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       setState(() => isLoading = false);
     }
   }
-  
+
   String _getReportPeriodText() {
     switch (selectedPeriod) {
       case ReportPeriod.today:
@@ -1284,4 +1340,4 @@ class _ReportsScreenState extends State<ReportsScreen> with SingleTickerProvider
       ),
     );
   }
-} 
+}

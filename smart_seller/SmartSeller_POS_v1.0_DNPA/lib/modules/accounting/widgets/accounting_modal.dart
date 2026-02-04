@@ -10,26 +10,29 @@ import '../models/payment_method.dart';
 import '../models/transaction_category.dart';
 import '../services/accounting_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../utils/puntos_miles_input_formatter.dart';
 import 'electronic_invoice_payment_modal.dart';
 
 class AccountingModal extends StatefulWidget {
   final Function(AccountingEntry)? onTransactionProcessed;
-  
+
   const AccountingModal({super.key, this.onTransactionProcessed});
 
   @override
   State<AccountingModal> createState() => _AccountingModalState();
 }
 
-class _AccountingModalState extends State<AccountingModal> with SingleTickerProviderStateMixin {
+class _AccountingModalState extends State<AccountingModal>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
+
   // Controladores para el formulario
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _documentNumberController = TextEditingController();
-  
+  final TextEditingController _documentNumberController =
+      TextEditingController();
+
   // Variables de estado
   String _selectedTransactionType = 'income';
   String _selectedPaymentMethod = 'CASH';
@@ -37,7 +40,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
   String? _selectedSubcategory;
   bool _isProcessing = false;
   bool _showInvoiceOptions = false;
-  
+
   // Listas de datos
   List<PaymentMethod> _paymentMethods = [];
   List<TransactionCategory> _incomeCategories = [];
@@ -65,14 +68,15 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     try {
       // Cargar métodos de pago
       _paymentMethods = await AccountingService.getActivePaymentMethods();
-      
+
       // Cargar categorías
       _incomeCategories = await AccountingService.getCategoriesByType('income');
-      _expenseCategories = await AccountingService.getCategoriesByType('expense');
-      
+      _expenseCategories =
+          await AccountingService.getCategoriesByType('expense');
+
       // Verificar sesión de caja
       _currentSession = await AccountingService.getOpenCashSession();
-      
+
       setState(() {});
     } catch (e) {
       Get.snackbar('Error', 'Error al cargar datos: $e');
@@ -82,7 +86,8 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
   Future<void> _processTransaction() async {
     // Bloquear registros si no hay sesión de caja abierta
     if (_currentSession == null) {
-      Get.snackbar('Caja cerrada', 'Debes abrir la caja antes de registrar ingresos o egresos');
+      Get.snackbar('Caja cerrada',
+          'Debes abrir la caja antes de registrar ingresos o egresos');
       return;
     }
     if (_amountController.text.trim().isEmpty) {
@@ -137,8 +142,11 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
         paymentMethod: _selectedPaymentMethod,
         userId: currentUser.id!,
         cashSessionId: _currentSession?.id,
-        documentNumber: _showInvoiceOptions ? _documentNumberController.text.trim() : null,
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        documentNumber:
+            _showInvoiceOptions ? _documentNumberController.text.trim() : null,
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -150,16 +158,17 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
         widget.onTransactionProcessed!(entry);
       }
 
-      String successMessage = '${_selectedTransactionType == 'income' ? 'Ingreso' : 'Egreso'} registrado correctamente';
+      String successMessage =
+          '${_selectedTransactionType == 'income' ? 'Ingreso' : 'Egreso'} registrado correctamente';
       if (_showInvoiceOptions) {
-        successMessage += '\nDocumento: ${_documentNumberController.text.trim()}';
+        successMessage +=
+            '\nDocumento: ${_documentNumberController.text.trim()}';
       }
-      
+
       Get.snackbar('Éxito', successMessage);
-      
+
       // Limpiar formulario
       _clearForm();
-      
     } catch (e) {
       Get.snackbar('Error', 'No se pudo procesar la transacción: $e');
     } finally {
@@ -167,8 +176,15 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     }
   }
 
+  static double? _parseMontoColombia(String text) =>
+      parseMontoPuntosMiles(text);
+
+  static String _formatMontoColombia(double value) =>
+      formatMontoPuntosMiles(value);
+
   Future<void> _openCashSessionDialog() async {
-    final TextEditingController initialAmountController = TextEditingController(text: '0');
+    final TextEditingController initialAmountController =
+        TextEditingController(text: '');
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
         title: const Text('Abrir caja'),
@@ -176,17 +192,33 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Ingresa el monto inicial de la caja'),
+            const Text(
+                'Ingresa el monto inicial de la caja (ej: 10.000 o 10.050)'),
             const SizedBox(height: 12),
             TextField(
               controller: initialAmountController,
               decoration: const InputDecoration(
-                labelText: 'Monto inicial',
+                labelText: 'Monto inicial (pesos)',
+                hintText: 'Ej: 10.000 o 150.050',
                 prefixIcon: Icon(Icons.attach_money),
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                PuntosMilesInputFormatter(),
+              ],
+              onSubmitted: (value) {
+                final parsed = _parseMontoColombia(value);
+                if (parsed != null)
+                  initialAmountController.text = _formatMontoColombia(parsed);
+              },
+              onEditingComplete: () {
+                final parsed =
+                    _parseMontoColombia(initialAmountController.text);
+                if (parsed != null)
+                  initialAmountController.text = _formatMontoColombia(parsed);
+              },
             ),
           ],
         ),
@@ -196,7 +228,14 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () => Get.back(result: true),
+            onPressed: () {
+              final text = initialAmountController.text.trim();
+              final parsed = _parseMontoColombia(text);
+              if (parsed != null && parsed >= 0) {
+                initialAmountController.text = _formatMontoColombia(parsed);
+              }
+              Get.back(result: true);
+            },
             child: const Text('Abrir'),
           ),
         ],
@@ -205,7 +244,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     );
 
     if (confirmed == true) {
-      final amount = double.tryParse(initialAmountController.text.trim()) ?? 0.0;
+      final amount = _parseMontoColombia(initialAmountController.text) ?? 0.0;
       final user = AuthService.to.currentUser;
       if (user == null) {
         Get.snackbar('Error', 'Usuario no autenticado');
@@ -214,8 +253,12 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
       try {
         await AccountingService.openCashSession(amount, user.id!);
         _currentSession = await AccountingService.getOpenCashSession();
+        if (!mounted) return;
         setState(() {});
-        Get.snackbar('Éxito', 'Caja abierta con \$${amount.toStringAsFixed(2)}');
+        // Cerrar primero el modal de Gestión Contable para volver al punto de venta
+        Navigator.of(context, rootNavigator: true).pop();
+        Get.snackbar(
+            'Éxito', 'Caja abierta con \$${_formatMontoColombia(amount)}');
       } catch (e) {
         Get.snackbar('Error', 'No se pudo abrir la caja: $e');
       }
@@ -233,7 +276,8 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
   }
 
   // ✅ NUEVO: Widget para botones rápidos de egresos
-  Widget _buildQuickExpenseButton(String label, IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildQuickExpenseButton(
+      String label, IconData icon, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -269,7 +313,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     final amountController = TextEditingController();
     final referenceController = TextEditingController();
     final documentController = TextEditingController();
-    
+
     Get.dialog(
       AlertDialog(
         title: const Text('Pago a Proveedor'),
@@ -320,35 +364,40 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             onPressed: () async {
               final amount = double.tryParse(amountController.text.trim());
               final supplier = supplierController.text.trim();
-              
+
               if (amount == null || amount <= 0) {
                 Get.snackbar('Error', 'Ingrese un monto válido');
                 return;
               }
-              
+
               if (supplier.isEmpty) {
                 Get.snackbar('Error', 'Ingrese el nombre del proveedor');
                 return;
               }
-              
+
               final user = AuthService.to.currentUser;
               if (user == null) {
                 Get.snackbar('Error', 'Usuario no autenticado');
                 return;
               }
-              
+
               try {
                 await AccountingService.recordSupplierPayment(
                   amount,
                   supplier,
                   user.id!,
                   paymentMethod: _selectedPaymentMethod,
-                  reference: referenceController.text.trim().isEmpty ? null : referenceController.text.trim(),
-                  documentNumber: documentController.text.trim().isEmpty ? null : documentController.text.trim(),
+                  reference: referenceController.text.trim().isEmpty
+                      ? null
+                      : referenceController.text.trim(),
+                  documentNumber: documentController.text.trim().isEmpty
+                      ? null
+                      : documentController.text.trim(),
                 );
-                
+
                 Get.back();
-                Get.snackbar('Éxito', 'Pago a proveedor registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito',
+                    'Pago a proveedor registrado: \$${amount.toStringAsFixed(2)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar el pago: $e');
               }
@@ -365,7 +414,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     final descriptionController = TextEditingController();
     final amountController = TextEditingController();
     final referenceController = TextEditingController();
-    
+
     Get.dialog(
       AlertDialog(
         title: const Text('Gasto Operativo'),
@@ -408,23 +457,23 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             onPressed: () async {
               final amount = double.tryParse(amountController.text.trim());
               final description = descriptionController.text.trim();
-              
+
               if (amount == null || amount <= 0) {
                 Get.snackbar('Error', 'Ingrese un monto válido');
                 return;
               }
-              
+
               if (description.isEmpty) {
                 Get.snackbar('Error', 'Ingrese la descripción del gasto');
                 return;
               }
-              
+
               final user = AuthService.to.currentUser;
               if (user == null) {
                 Get.snackbar('Error', 'Usuario no autenticado');
                 return;
               }
-              
+
               try {
                 await AccountingService.recordOperationalExpense(
                   amount,
@@ -432,11 +481,14 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                   'OPERATIONAL',
                   user.id!,
                   paymentMethod: _selectedPaymentMethod,
-                  reference: referenceController.text.trim().isEmpty ? null : referenceController.text.trim(),
+                  reference: referenceController.text.trim().isEmpty
+                      ? null
+                      : referenceController.text.trim(),
                 );
-                
+
                 Get.back();
-                Get.snackbar('Éxito', 'Gasto operativo registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito',
+                    'Gasto operativo registrado: \$${amount.toStringAsFixed(2)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar el gasto: $e');
               }
@@ -453,7 +505,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     final serviceController = TextEditingController();
     final amountController = TextEditingController();
     final referenceController = TextEditingController();
-    
+
     Get.dialog(
       AlertDialog(
         title: const Text('Servicios Públicos'),
@@ -496,23 +548,23 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             onPressed: () async {
               final amount = double.tryParse(amountController.text.trim());
               final service = serviceController.text.trim();
-              
+
               if (amount == null || amount <= 0) {
                 Get.snackbar('Error', 'Ingrese un monto válido');
                 return;
               }
-              
+
               if (service.isEmpty) {
                 Get.snackbar('Error', 'Ingrese el tipo de servicio');
                 return;
               }
-              
+
               final user = AuthService.to.currentUser;
               if (user == null) {
                 Get.snackbar('Error', 'Usuario no autenticado');
                 return;
               }
-              
+
               try {
                 await AccountingService.recordOperationalExpense(
                   amount,
@@ -520,11 +572,14 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                   'UTILITIES',
                   user.id!,
                   paymentMethod: _selectedPaymentMethod,
-                  reference: referenceController.text.trim().isEmpty ? null : referenceController.text.trim(),
+                  reference: referenceController.text.trim().isEmpty
+                      ? null
+                      : referenceController.text.trim(),
                 );
-                
+
                 Get.back();
-                Get.snackbar('Éxito', 'Servicio público registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito',
+                    'Servicio público registrado: \$${amount.toStringAsFixed(2)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar el servicio: $e');
               }
@@ -541,7 +596,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     final descriptionController = TextEditingController();
     final amountController = TextEditingController();
     final referenceController = TextEditingController();
-    
+
     Get.dialog(
       AlertDialog(
         title: const Text('Mantenimiento'),
@@ -584,23 +639,24 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             onPressed: () async {
               final amount = double.tryParse(amountController.text.trim());
               final description = descriptionController.text.trim();
-              
+
               if (amount == null || amount <= 0) {
                 Get.snackbar('Error', 'Ingrese un monto válido');
                 return;
               }
-              
+
               if (description.isEmpty) {
-                Get.snackbar('Error', 'Ingrese la descripción del mantenimiento');
+                Get.snackbar(
+                    'Error', 'Ingrese la descripción del mantenimiento');
                 return;
               }
-              
+
               final user = AuthService.to.currentUser;
               if (user == null) {
                 Get.snackbar('Error', 'Usuario no autenticado');
                 return;
               }
-              
+
               try {
                 await AccountingService.recordOperationalExpense(
                   amount,
@@ -608,13 +664,17 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                   'MAINTENANCE',
                   user.id!,
                   paymentMethod: _selectedPaymentMethod,
-                  reference: referenceController.text.trim().isEmpty ? null : referenceController.text.trim(),
+                  reference: referenceController.text.trim().isEmpty
+                      ? null
+                      : referenceController.text.trim(),
                 );
-                
+
                 Get.back();
-                Get.snackbar('Éxito', 'Mantenimiento registrado: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito',
+                    'Mantenimiento registrado: \$${amount.toStringAsFixed(2)}');
               } catch (e) {
-                Get.snackbar('Error', 'No se pudo registrar el mantenimiento: $e');
+                Get.snackbar(
+                    'Error', 'No se pudo registrar el mantenimiento: $e');
               }
             },
             child: const Text('Registrar'),
@@ -630,7 +690,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     final amountController = TextEditingController();
     final referenceController = TextEditingController();
     final documentController = TextEditingController();
-    
+
     Get.dialog(
       AlertDialog(
         title: const Text('Devolución a Proveedor'),
@@ -681,35 +741,40 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             onPressed: () async {
               final amount = double.tryParse(amountController.text.trim());
               final supplier = supplierController.text.trim();
-              
+
               if (amount == null || amount <= 0) {
                 Get.snackbar('Error', 'Ingrese un monto válido');
                 return;
               }
-              
+
               if (supplier.isEmpty) {
                 Get.snackbar('Error', 'Ingrese el nombre del proveedor');
                 return;
               }
-              
+
               final user = AuthService.to.currentUser;
               if (user == null) {
                 Get.snackbar('Error', 'Usuario no autenticado');
                 return;
               }
-              
+
               try {
                 await AccountingService.recordSupplierReturn(
                   amount,
                   supplier,
                   user.id!,
                   paymentMethod: _selectedPaymentMethod,
-                  reference: referenceController.text.trim().isEmpty ? null : referenceController.text.trim(),
-                  documentNumber: documentController.text.trim().isEmpty ? null : documentController.text.trim(),
+                  reference: referenceController.text.trim().isEmpty
+                      ? null
+                      : referenceController.text.trim(),
+                  documentNumber: documentController.text.trim().isEmpty
+                      ? null
+                      : documentController.text.trim(),
                 );
-                
+
                 Get.back();
-                Get.snackbar('Éxito', 'Devolución a proveedor registrada: \$${amount.toStringAsFixed(2)}');
+                Get.snackbar('Éxito',
+                    'Devolución a proveedor registrada: \$${amount.toStringAsFixed(2)}');
               } catch (e) {
                 Get.snackbar('Error', 'No se pudo registrar la devolución: $e');
               }
@@ -764,7 +829,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
               ],
             ),
             const Divider(),
-            
+
             // Información de sesión de caja
             if (_currentSession != null)
               Container(
@@ -776,7 +841,8 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.account_balance_wallet, color: Colors.green.shade700),
+                    Icon(Icons.account_balance_wallet,
+                        color: Colors.green.shade700),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -833,9 +899,9 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                   ],
                 ),
               ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Tabs
             TabBar(
               controller: _tabController,
@@ -850,9 +916,9 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Contenido de tabs
             Expanded(
               child: TabBarView(
@@ -863,9 +929,9 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Botones de acción
             Row(
               children: [
@@ -879,19 +945,21 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _isProcessing ? null : _processTransaction,
-                    icon: _isProcessing 
+                    icon: _isProcessing
                         ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Icon(_selectedTransactionType == 'income' ? Icons.add : Icons.remove),
-                    label: Text(_isProcessing 
-                        ? 'Procesando...' 
+                        : Icon(_selectedTransactionType == 'income'
+                            ? Icons.add
+                            : Icons.remove),
+                    label: Text(_isProcessing
+                        ? 'Procesando...'
                         : 'Registrar ${_selectedTransactionType == 'income' ? 'Ingreso' : 'Egreso'}'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _selectedTransactionType == 'income' 
-                          ? Colors.green 
+                      backgroundColor: _selectedTransactionType == 'income'
+                          ? Colors.green
                           : Colors.red,
                       foregroundColor: Colors.white,
                     ),
@@ -975,9 +1043,9 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 16),
-                
+
                 // Botón especial para pagos de facturas electrónicas
                 SizedBox(
                   width: double.infinity,
@@ -997,9 +1065,9 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
               ],
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Formulario general de egresos
           Container(
             padding: const EdgeInsets.all(16),
@@ -1027,7 +1095,8 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
     );
   }
 
-  Widget _buildTransactionForm(String type, List<TransactionCategory> categories) {
+  Widget _buildTransactionForm(
+      String type, List<TransactionCategory> categories) {
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -1045,7 +1114,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Descripción
           TextField(
             controller: _descriptionController,
@@ -1057,11 +1126,12 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 16),
-          
+
           // Categoría
           DropdownButtonFormField<String>(
-            value: _selectedCategory != null && categories.any((cat) => cat.code == _selectedCategory) 
-                ? _selectedCategory 
+            value: _selectedCategory != null &&
+                    categories.any((cat) => cat.code == _selectedCategory)
+                ? _selectedCategory
                 : null,
             decoration: const InputDecoration(
               labelText: 'Categoría *',
@@ -1082,12 +1152,16 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Método de pago
           DropdownButtonFormField<String>(
-            value: _selectedPaymentMethod != null && _paymentMethods.any((method) => method.code == _selectedPaymentMethod) 
-                ? _selectedPaymentMethod 
-                : (_paymentMethods.isNotEmpty ? _paymentMethods.first.code : null),
+            value: _selectedPaymentMethod != null &&
+                    _paymentMethods
+                        .any((method) => method.code == _selectedPaymentMethod)
+                ? _selectedPaymentMethod
+                : (_paymentMethods.isNotEmpty
+                    ? _paymentMethods.first.code
+                    : null),
             decoration: const InputDecoration(
               labelText: 'Método de Pago',
               border: OutlineInputBorder(),
@@ -1101,12 +1175,15 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             }).toList(),
             onChanged: (value) {
               setState(() {
-                _selectedPaymentMethod = value ?? (_paymentMethods.isNotEmpty ? _paymentMethods.first.code : 'CASH');
+                _selectedPaymentMethod = value ??
+                    (_paymentMethods.isNotEmpty
+                        ? _paymentMethods.first.code
+                        : 'CASH');
               });
             },
           ),
           const SizedBox(height: 16),
-          
+
           // Opciones de facturación
           Card(
             color: Colors.blue.shade50,
@@ -1155,7 +1232,7 @@ class _AccountingModalState extends State<AccountingModal> with SingleTickerProv
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Notas
           TextField(
             controller: _notesController,

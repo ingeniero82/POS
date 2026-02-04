@@ -35,14 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Simular delay de autenticación
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Usar el AuthService para hacer login
       final success = await AuthService.to.login(username, password);
 
+      if (!mounted) return;
+
       if (success) {
-        // Login exitoso
         final user = AuthService.to.currentUser;
         Get.snackbar(
           'Éxito',
@@ -50,24 +47,30 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: Colors.green,
           colorText: Colors.white,
           icon: const Icon(Icons.check_circle, color: Colors.white),
-          duration: const Duration(seconds: 2),
+          duration: const Duration(seconds: 1),
         );
-        
-        // Navegar al dashboard
+        // Navegar al dashboard (no hacer setState después: la pantalla se destruye)
         Get.offAllNamed('/dashboard');
-      } else {
-        // Credenciales incorrectas
-        Get.snackbar(
-          'Error',
-          'Usuario o contraseña incorrectos',
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-          icon: const Icon(Icons.error, color: Colors.white),
-          duration: const Duration(seconds: 3),
-        );
+        return;
       }
+
+      setState(() {
+        _isLoading = false;
+      });
+      Get.snackbar(
+        'Error',
+        'Usuario o contraseña incorrectos',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        icon: const Icon(Icons.error, color: Colors.white),
+        duration: const Duration(seconds: 3),
+      );
     } catch (e) {
-      // Error inesperado
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       Get.snackbar(
         'Error',
         'Ocurrió un error inesperado: $e',
@@ -76,10 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
         icon: const Icon(Icons.error, color: Colors.white),
         duration: const Duration(seconds: 3),
       );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -101,6 +100,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: 90,
                   height: 90,
                   fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22315B).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.store, size: 48, color: Color(0xFF22315B)),
+                  ),
                 ),
                 const SizedBox(width: 18),
                 const Text(
@@ -175,7 +183,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             color: const Color(0xFF22315B),
                           ),
                           onPressed: () {

@@ -19,7 +19,7 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(DashboardController());
     final authService = Get.put(AuthService());
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FA), // Fondo general gris claro
       body: Row(
@@ -51,15 +51,18 @@ class DashboardScreen extends StatelessWidget {
                       _SidebarButton(
                         icon: Icons.dashboard,
                         label: 'Dashboard',
-                        selected: controller.selectedMenu.value == DashboardMenu.dashboard,
-                        onTap: () => controller.selectMenu(DashboardMenu.dashboard),
+                        selected: controller.selectedMenu.value ==
+                            DashboardMenu.dashboard,
+                        onTap: () =>
+                            controller.selectMenu(DashboardMenu.dashboard),
                       ),
                       // Punto de Venta - Solo si tiene permisos
                       if (authService.hasPermission(Permission.accessPOS))
                         _SidebarButton(
                           icon: Icons.point_of_sale,
                           label: 'Punto de Venta',
-                          selected: controller.selectedMenu.value == DashboardMenu.puntoDeVenta,
+                          selected: controller.selectedMenu.value ==
+                              DashboardMenu.puntoDeVenta,
                           onTap: () {
                             Get.toNamed('/pos');
                           },
@@ -69,8 +72,10 @@ class DashboardScreen extends StatelessWidget {
                         _SidebarButton(
                           icon: Icons.inventory_2,
                           label: 'Inventario',
-                          selected: controller.selectedMenu.value == DashboardMenu.inventario,
-                          onTap: () => controller.selectMenu(DashboardMenu.inventario),
+                          selected: controller.selectedMenu.value ==
+                              DashboardMenu.inventario,
+                          onTap: () =>
+                              controller.selectMenu(DashboardMenu.inventario),
                         ),
 
                       // Clientes - Solo si tiene permisos
@@ -78,7 +83,8 @@ class DashboardScreen extends StatelessWidget {
                         _SidebarButton(
                           icon: Icons.people,
                           label: 'Clientes',
-                          selected: controller.selectedMenu.value == DashboardMenu.clientes,
+                          selected: controller.selectedMenu.value ==
+                              DashboardMenu.clientes,
                           onTap: () {
                             Get.toNamed('/clientes');
                           },
@@ -118,8 +124,10 @@ class DashboardScreen extends StatelessWidget {
                         _SidebarButton(
                           icon: Icons.settings,
                           label: 'Configuración',
-                          selected: controller.selectedMenu.value == DashboardMenu.configuracion,
-                          onTap: () => controller.selectMenu(DashboardMenu.configuracion),
+                          selected: controller.selectedMenu.value ==
+                              DashboardMenu.configuracion,
+                          onTap: () => controller
+                              .selectMenu(DashboardMenu.configuracion),
                         ),
                       // Configuración de Empresa - Solo si tiene permisos de configuración
                       if (authService.hasPermission(Permission.accessSettings))
@@ -131,25 +139,39 @@ class DashboardScreen extends StatelessWidget {
                             Get.toNamed('/configuracion-empresa');
                           },
                         ),
+                      // Impresora POS - Mantenimiento puede elegir impresora sin tocar código
+                      if (authService
+                              .hasPermission(Permission.accessSettings) ||
+                          authService
+                              .hasPermission(Permission.accessCompanyConfig))
+                        _SidebarButton(
+                          icon: Icons.print,
+                          label: 'Impresora POS',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/configuracion-impresora');
+                          },
+                        ),
                       // Usuarios - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewUsers))
                         _SidebarButton(
                           icon: Icons.person,
                           label: 'Usuarios',
-                          selected: controller.selectedMenu.value == DashboardMenu.usuarios,
-                          onTap: () => controller.selectMenu(DashboardMenu.usuarios),
+                          selected: controller.selectedMenu.value ==
+                              DashboardMenu.usuarios,
+                          onTap: () =>
+                              controller.selectMenu(DashboardMenu.usuarios),
                         ),
                       // Permisos - Solo si tiene permisos de configuración
                       if (authService.hasPermission(Permission.modifySettings))
                         _SidebarButton(
                           icon: Icons.security,
                           label: 'Permisos',
-                          selected: controller.selectedMenu.value == DashboardMenu.permisos,
-                          onTap: () => controller.selectMenu(DashboardMenu.permisos),
+                          selected: controller.selectedMenu.value ==
+                              DashboardMenu.permisos,
+                          onTap: () =>
+                              controller.selectMenu(DashboardMenu.permisos),
                         ),
-                      
-
-
                     ],
                   ),
                 ),
@@ -161,7 +183,8 @@ class DashboardScreen extends StatelessWidget {
                       color: Colors.white.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 16, horizontal: 12),
                     child: Column(
                       children: [
                         Row(
@@ -172,33 +195,35 @@ class DashboardScreen extends StatelessWidget {
                                 shape: BoxShape.circle,
                               ),
                               padding: const EdgeInsets.all(8),
-                              child: const Icon(Icons.person, color: Colors.white, size: 28),
+                              child: const Icon(Icons.person,
+                                  color: Colors.white, size: 28),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
                               child: Obx(() => Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    authService.currentUserName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    authService.currentUserRole,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              )),
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        authService.currentUserName,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        authService.currentUserRole,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  )),
                             ),
                           ],
                         ),
@@ -246,7 +271,10 @@ class DashboardScreen extends StatelessWidget {
                   case DashboardMenu.reportes:
                     return const ReportsScreen();
                   case DashboardMenu.configuracion:
-                    return Center(child: Text('Configuración', style: TextStyle(fontSize: 28, color: Colors.grey[700])));
+                    return Center(
+                        child: Text('Configuración',
+                            style: TextStyle(
+                                fontSize: 28, color: Colors.grey[700])));
                   case DashboardMenu.usuarios:
                     return const UsersScreen();
                   case DashboardMenu.permisos:
@@ -505,7 +533,7 @@ class _DashboardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = Get.find<AuthService>();
-    
+
     // Funciones para los accesos rápidos
     void _nuevaVenta() {
       if (authService.hasPermission(Permission.accessPOS)) {
@@ -519,7 +547,7 @@ class _DashboardContent extends StatelessWidget {
         );
       }
     }
-    
+
     void _gestionarInventario() {
       if (authService.hasPermission(Permission.viewInventory)) {
         Get.toNamed('/productos');
@@ -532,7 +560,7 @@ class _DashboardContent extends StatelessWidget {
         );
       }
     }
-    
+
     void _gestionarClientes() {
       if (authService.hasPermission(Permission.viewClients)) {
         Get.snackbar(
@@ -550,7 +578,7 @@ class _DashboardContent extends StatelessWidget {
         );
       }
     }
-    
+
     void _verReportes() {
       if (authService.hasPermission(Permission.viewReports)) {
         Get.snackbar(
@@ -568,7 +596,7 @@ class _DashboardContent extends StatelessWidget {
         );
       }
     }
-    
+
     void _configuracion() {
       if (authService.hasPermission(Permission.accessSettings)) {
         Get.toNamed('/migracion');
@@ -581,15 +609,15 @@ class _DashboardContent extends StatelessWidget {
         );
       }
     }
-    
+
     void _debug() {
       Get.toNamed('/debug');
     }
-    
+
     void _moduleMigration() {
       Get.toNamed('/module-migration');
     }
-    
+
     void _gestionarUsuarios() {
       if (authService.hasPermission(Permission.viewUsers)) {
         Get.toNamed('/usuarios');
@@ -601,262 +629,279 @@ class _DashboardContent extends StatelessWidget {
           colorText: Colors.white,
         );
       }
-        }
-    
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-        // Header azul
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 32),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2196F3), // Azul principal
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: const [
-              Text(
-                'Panel de Control',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 6),
-              Text(
-                'Bienvenido de vuelta, gestiona tu supermercado de manera eficiente',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 32),
-        // Tarjetas de resumen adaptables según permisos
-        if (authService.hasPermission(Permission.viewReports)) ...[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: _SummaryCard(
-                title: 'VENTAS HOY',
-                value: NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0').format(2450),
-                subtitle: '+15% vs ayer',
-                icon: Icons.monetization_on,
-                color: Color(0xFF4CAF50),
-                borderColor: Color(0xFF4CAF50),
-              ),
-            ),
-            SizedBox(width: 20),
-            Expanded(
-              child: _SummaryCard(
-                title: 'PRODUCTOS VENDIDOS',
-                value: '156',
-                subtitle: '+8% vs ayer',
-                icon: Icons.inventory_2,
-                color: Color(0xFFFF9800),
-                borderColor: Color(0xFFFF9800),
-              ),
-            ),
-            SizedBox(width: 20),
-            Expanded(
-              child: _SummaryCard(
-                title: 'CLIENTES ATENDIDOS',
-                value: '42',
-                subtitle: '+22% vs ayer',
-                icon: Icons.people,
-                color: Color(0xFFF44336),
-                borderColor: Color(0xFFF44336),
-              ),
-            ),
-            SizedBox(width: 20),
-            Expanded(
-              child: _SummaryCard(
-                title: 'INGRESOS SEMANALES',
-                value: NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0').format(12850),
-                subtitle: '+5% vs sem. anterior',
-                icon: Icons.sticky_note_2,
-                color: Color(0xFF7C4DFF),
-                borderColor: Color(0xFF7C4DFF),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        ],
-        // Mensaje para usuarios sin permisos de reportes
-        if (!authService.hasPermission(Permission.viewReports)) ...[
+          // Header azul
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 32),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
+              color: const Color(0xFF2196F3), // Azul principal
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
             ),
             child: Column(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Colors.blue[700],
-                  size: 32,
-                ),
-                const SizedBox(height: 12),
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: const [
                 Text(
-                  'Bienvenido al Panel de Control',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[700],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Usa las acciones rápidas para acceder a las funciones disponibles.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue[600],
-                  ),
+                  'Panel de Control',
                   textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Bienvenido de vuelta, gestiona tu supermercado de manera eficiente',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 32),
-        ],
-        // Acciones Rápidas
-        const Text(
-          'Acciones Rápidas',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF22315B),
-          ),
-        ),
-        const SizedBox(height: 18),
-        // Verificar si hay acciones rápidas disponibles
-        Builder(
-          builder: (context) {
-            final hasAnyPermission = authService.hasPermission(Permission.accessPOS) ||
-                                   authService.hasPermission(Permission.viewInventory) ||
-                                   authService.hasPermission(Permission.viewClients) ||
-                                   authService.hasPermission(Permission.viewReports) ||
-                                   authService.hasPermission(Permission.accessSettings) ||
-                                   authService.hasPermission(Permission.viewUsers);
-            
-            if (!hasAnyPermission) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+          // Tarjetas de resumen adaptables según permisos
+          if (authService.hasPermission(Permission.viewReports)) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: _SummaryCard(
+                    title: 'VENTAS HOY',
+                    value: NumberFormat.currency(
+                            locale: 'es_CO',
+                            symbol: '\$ ',
+                            decimalDigits: 0,
+                            customPattern: '\u00A4#,##0')
+                        .format(2450),
+                    subtitle: '+15% vs ayer',
+                    icon: Icons.monetization_on,
+                    color: Color(0xFF4CAF50),
+                    borderColor: Color(0xFF4CAF50),
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_outlined,
-                      color: Colors.orange[700],
-                      size: 32,
+                SizedBox(width: 20),
+                Expanded(
+                  child: _SummaryCard(
+                    title: 'PRODUCTOS VENDIDOS',
+                    value: '156',
+                    subtitle: '+8% vs ayer',
+                    icon: Icons.inventory_2,
+                    color: Color(0xFFFF9800),
+                    borderColor: Color(0xFFFF9800),
+                  ),
+                ),
+                SizedBox(width: 20),
+                Expanded(
+                  child: _SummaryCard(
+                    title: 'CLIENTES ATENDIDOS',
+                    value: '42',
+                    subtitle: '+22% vs ayer',
+                    icon: Icons.people,
+                    color: Color(0xFFF44336),
+                    borderColor: Color(0xFFF44336),
+                  ),
+                ),
+                SizedBox(width: 20),
+                Expanded(
+                  child: _SummaryCard(
+                    title: 'INGRESOS SEMANALES',
+                    value: NumberFormat.currency(
+                            locale: 'es_CO',
+                            symbol: '\$ ',
+                            decimalDigits: 0,
+                            customPattern: '\u00A4#,##0')
+                        .format(12850),
+                    subtitle: '+5% vs sem. anterior',
+                    icon: Icons.sticky_note_2,
+                    color: Color(0xFF7C4DFF),
+                    borderColor: Color(0xFF7C4DFF),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+          ],
+          // Mensaje para usuarios sin permisos de reportes
+          if (!authService.hasPermission(Permission.viewReports)) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.blue[700],
+                    size: 32,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Bienvenido al Panel de Control',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[700],
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Sin Acciones Disponibles',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Usa las acciones rápidas para acceder a las funciones disponibles.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue[600],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+          // Acciones Rápidas
+          const Text(
+            'Acciones Rápidas',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF22315B),
+            ),
+          ),
+          const SizedBox(height: 18),
+          // Verificar si hay acciones rápidas disponibles
+          Builder(
+            builder: (context) {
+              final hasAnyPermission =
+                  authService.hasPermission(Permission.accessPOS) ||
+                      authService.hasPermission(Permission.viewInventory) ||
+                      authService.hasPermission(Permission.viewClients) ||
+                      authService.hasPermission(Permission.viewReports) ||
+                      authService.hasPermission(Permission.accessSettings) ||
+                      authService.hasPermission(Permission.viewUsers);
+
+              if (!hasAnyPermission) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_outlined,
                         color: Colors.orange[700],
+                        size: 32,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No tienes permisos para acceder a ninguna función del sistema. Contacta al administrador.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.orange[600],
+                      const SizedBox(height: 12),
+                      Text(
+                        'Sin Acciones Disponibles',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange[700],
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No tienes permisos para acceder a ninguna función del sistema. Contacta al administrador.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.orange[600],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Center(
+                child: Wrap(
+                  spacing: 24,
+                  runSpacing: 24,
+                  children: [
+                    // Nueva Venta - Solo si tiene permisos de POS
+                    if (authService.hasPermission(Permission.accessPOS))
+                      _QuickActionCard(
+                        icon: Icons.point_of_sale,
+                        color: Color(0xFF2979FF),
+                        title: 'Nueva Venta',
+                        description:
+                            'Iniciar una nueva transacción de venta y procesar productos',
+                        onTap: _nuevaVenta,
+                      ),
+                    // Gestionar Inventario - Solo si tiene permisos de inventario
+                    if (authService.hasPermission(Permission.viewInventory))
+                      _QuickActionCard(
+                        icon: Icons.inventory,
+                        color: Color(0xFF7C4DFF),
+                        title: 'Gestionar Inventario',
+                        description:
+                            'Administrar stock, agregar productos y controlar existencias',
+                        onTap: _gestionarInventario,
+                      ),
+                    // Gestión de Clientes - Solo si tiene permisos de clientes
+                    if (authService.hasPermission(Permission.viewClients))
+                      _QuickActionCard(
+                        icon: Icons.groups,
+                        color: Color(0xFFFFA000),
+                        title: 'Gestión de Clientes',
+                        description:
+                            'Registrar clientes, consultar historial y programas de fidelización',
+                        onTap: _gestionarClientes,
+                      ),
+                    // Ver Reportes - Solo si tiene permisos de reportes
+                    if (authService.hasPermission(Permission.viewReports))
+                      _QuickActionCard(
+                        icon: Icons.bar_chart,
+                        color: Color(0xFF00BFA5),
+                        title: 'Ver Reportes',
+                        description:
+                            'Consultar reportes de ventas, estadísticas y análisis del negocio',
+                        onTap: _verReportes,
+                      ),
+                    // Configuración - Solo si tiene permisos de configuración
+                    if (authService.hasPermission(Permission.accessSettings))
+                      _QuickActionCard(
+                        icon: Icons.settings,
+                        color: Color(0xFF616161),
+                        title: 'Configuración',
+                        description:
+                            'Ajustar parámetros del sistema, impuestos y configuraciones generales',
+                        onTap: _configuracion,
+                      ),
+                    // Gestión de Usuarios - Solo si tiene permisos de usuarios
+                    if (authService.hasPermission(Permission.viewUsers))
+                      _QuickActionCard(
+                        icon: Icons.person,
+                        color: Color(0xFFD32F2F),
+                        title: 'Gestión de Usuarios',
+                        description:
+                            'Administrar usuarios del sistema, permisos y roles de acceso',
+                        onTap: _gestionarUsuarios,
+                      ),
                   ],
                 ),
               );
-            }
-            
-            return Center(
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 24,
-            children: [
-                  // Nueva Venta - Solo si tiene permisos de POS
-                  if (authService.hasPermission(Permission.accessPOS))
-              _QuickActionCard(
-                icon: Icons.point_of_sale,
-                color: Color(0xFF2979FF),
-                title: 'Nueva Venta',
-                description: 'Iniciar una nueva transacción de venta y procesar productos',
-                      onTap: _nuevaVenta,
-              ),
-                  // Gestionar Inventario - Solo si tiene permisos de inventario
-                  if (authService.hasPermission(Permission.viewInventory))
-              _QuickActionCard(
-                icon: Icons.inventory,
-                color: Color(0xFF7C4DFF),
-                title: 'Gestionar Inventario',
-                description: 'Administrar stock, agregar productos y controlar existencias',
-                      onTap: _gestionarInventario,
-              ),
-                  // Gestión de Clientes - Solo si tiene permisos de clientes
-                  if (authService.hasPermission(Permission.viewClients))
-              _QuickActionCard(
-                icon: Icons.groups,
-                color: Color(0xFFFFA000),
-                title: 'Gestión de Clientes',
-                description: 'Registrar clientes, consultar historial y programas de fidelización',
-                      onTap: _gestionarClientes,
-              ),
-                  // Ver Reportes - Solo si tiene permisos de reportes
-                  if (authService.hasPermission(Permission.viewReports))
-              _QuickActionCard(
-                icon: Icons.bar_chart,
-                color: Color(0xFF00BFA5),
-                title: 'Ver Reportes',
-                description: 'Consultar reportes de ventas, estadísticas y análisis del negocio',
-                      onTap: _verReportes,
-              ),
-                  // Configuración - Solo si tiene permisos de configuración
-                  if (authService.hasPermission(Permission.accessSettings))
-              _QuickActionCard(
-                icon: Icons.settings,
-                color: Color(0xFF616161),
-                title: 'Configuración',
-                description: 'Ajustar parámetros del sistema, impuestos y configuraciones generales',
-                      onTap: _configuracion,
-              ),
-                  // Gestión de Usuarios - Solo si tiene permisos de usuarios
-                  if (authService.hasPermission(Permission.viewUsers))
-              _QuickActionCard(
-                icon: Icons.person,
-                color: Color(0xFFD32F2F),
-                title: 'Gestión de Usuarios',
-                description: 'Administrar usuarios del sistema, permisos y roles de acceso',
-                      onTap: _gestionarUsuarios,
-              ),
-            ],
+            },
           ),
-            );
-          },
-        ),
-      ],
+        ],
       ),
     );
   }
-} 
+}

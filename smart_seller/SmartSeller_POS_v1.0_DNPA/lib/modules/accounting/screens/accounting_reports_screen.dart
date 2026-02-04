@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../../services/sqlite_database_service.dart';
@@ -16,29 +18,35 @@ class AccountingReportsScreen extends StatefulWidget {
   const AccountingReportsScreen({super.key});
 
   @override
-  State<AccountingReportsScreen> createState() => _AccountingReportsScreenState();
+  State<AccountingReportsScreen> createState() =>
+      _AccountingReportsScreenState();
 }
 
-class _AccountingReportsScreenState extends State<AccountingReportsScreen> with SingleTickerProviderStateMixin {
+class _AccountingReportsScreenState extends State<AccountingReportsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
+
   DateTime _fromDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _toDate = DateTime.now();
-  
+
   Map<String, dynamic> _quickSummary = {};
   IncomeStatement? _incomeStatement;
   CashFlowReport? _cashFlowReport;
   CashSessionReport? _cashSessionReport;
   TransactionAuditReport? _auditReport;
-  
+
   bool _isLoading = false;
-  
-  static final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$');
+
+  static final NumberFormat _currencyFormat =
+      NumberFormat.currency(locale: 'es_CO', symbol: '\$');
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // ✅ Corregido: 5 tabs (Resumen, Estado, Flujo, Sesiones, Auditoría)
+    _tabController = TabController(
+        length: 5,
+        vsync:
+            this); // ✅ Corregido: 5 tabs (Resumen, Estado, Flujo, Sesiones, Auditoría)
     _loadQuickSummary();
   }
 
@@ -50,9 +58,10 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
   Future<void> _loadQuickSummary() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final summary = await AccountingReportsService.getQuickSummary(_fromDate, _toDate);
+      final summary =
+          await AccountingReportsService.getQuickSummary(_fromDate, _toDate);
       setState(() {
         _quickSummary = summary;
         _isLoading = false;
@@ -65,9 +74,10 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
   Future<void> _loadIncomeStatement() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final statement = await AccountingReportsService.generateIncomeStatement(_fromDate, _toDate);
+      final statement = await AccountingReportsService.generateIncomeStatement(
+          _fromDate, _toDate);
       setState(() {
         _incomeStatement = statement;
         _isLoading = false;
@@ -80,24 +90,27 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
   Future<void> _loadCashFlowReport() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final report = await AccountingReportsService.generateCashFlowReport(_fromDate, _toDate);
+      final report = await AccountingReportsService.generateCashFlowReport(
+          _fromDate, _toDate);
       setState(() {
         _cashFlowReport = report;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      Get.snackbar('Error', 'No se pudo generar el reporte de flujo de caja: $e');
+      Get.snackbar(
+          'Error', 'No se pudo generar el reporte de flujo de caja: $e');
     }
   }
 
   Future<void> _loadCashSessionReport() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final report = await AccountingReportsService.generateCashSessionReport(_fromDate, _toDate);
+      final report = await AccountingReportsService.generateCashSessionReport(
+          _fromDate, _toDate);
       setState(() {
         _cashSessionReport = report;
         _isLoading = false;
@@ -110,9 +123,11 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
   Future<void> _loadAuditReport() async {
     setState(() => _isLoading = true);
-    
+
     try {
-      final report = await AccountingReportsService.generateTransactionAuditReport(_fromDate, _toDate);
+      final report =
+          await AccountingReportsService.generateTransactionAuditReport(
+              _fromDate, _toDate);
       setState(() {
         _auditReport = report;
         _isLoading = false;
@@ -130,7 +145,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
       lastDate: DateTime.now(),
       initialDateRange: DateTimeRange(start: _fromDate, end: _toDate),
     );
-    
+
     if (picked != null) {
       setState(() {
         _fromDate = picked.start;
@@ -145,7 +160,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
     final shouldExport = await Get.dialog<bool>(
       AlertDialog(
         title: const Text('Exportar Todos los Reportes'),
-        content: const Text('¿Descargar TODOS los reportes (Resumen, Estado de Resultados, Flujo de Caja, Sesiones, Auditoría) en un solo PDF?'),
+        content: const Text(
+            '¿Descargar TODOS los reportes (Resumen, Estado de Resultados, Flujo de Caja, Sesiones, Auditoría) en un solo PDF?'),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
@@ -163,51 +179,38 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
     try {
       setState(() => _isLoading = true);
-      Get.snackbar('Info', 'Generando reporte completo PDF...', backgroundColor: Colors.blue, colorText: Colors.white);
-      
+      Get.snackbar('Info', 'Generando reporte completo PDF...',
+          backgroundColor: Colors.blue, colorText: Colors.white);
+
       // Cargar TODOS los reportes
       await _loadQuickSummary();
       await _loadIncomeStatement();
       await _loadCashFlowReport();
       await _loadCashSessionReport();
       await _loadAuditReport();
-      
-      if (_quickSummary.isEmpty || _incomeStatement == null || _cashFlowReport == null || 
-          _cashSessionReport == null || _auditReport == null) {
+
+      if (_quickSummary.isEmpty ||
+          _incomeStatement == null ||
+          _cashFlowReport == null ||
+          _cashSessionReport == null ||
+          _auditReport == null) {
         throw Exception('No se pudieron cargar todos los reportes');
       }
-      
-      // Crear nombre del archivo con fecha
-      final fileName = 'reporte_completo_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}';
-      
-      // Seleccionar ubicación para guardar
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Guardar reporte completo como PDF',
-        fileName: '$fileName.pdf',
-        allowedExtensions: ['pdf'],
-        type: FileType.custom,
-      );
 
-      if (outputFile == null) {
-        Get.snackbar('Información', 'Operación cancelada', backgroundColor: Colors.orange, colorText: Colors.white);
+      final baseFileName =
+          'reporte_completo_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}';
+      Uint8List pdfBytes = await _generateCompleteReportPDF();
+
+      final savedPath = await _savePdfBytes(pdfBytes, baseFileName);
+      if (savedPath == null) {
+        Get.snackbar('Información', 'Operación cancelada',
+            backgroundColor: Colors.orange, colorText: Colors.white);
         return;
       }
 
-      String finalPath = outputFile;
-      if (!finalPath.toLowerCase().endsWith('.pdf')) {
-        finalPath = '$finalPath.pdf';
-      }
-
-      // Generar PDF completo con TODAS las secciones
-      Uint8List pdfBytes = await _generateCompleteReportPDF();
-      
-      // Guardar archivo
-      final file = File(finalPath);
-      await file.writeAsBytes(pdfBytes);
-      
       Get.snackbar(
         '✅ Reporte Completo PDF Exportado',
-        'Archivo guardado: $finalPath\nIncluye: Resumen, Estado, Flujo, Sesiones y Auditoría',
+        'Archivo guardado: $savedPath\nIncluye: Resumen, Estado, Flujo, Sesiones y Auditoría',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 4),
@@ -221,6 +224,36 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
       );
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  /// Guarda los bytes del PDF. Intenta primero el diálogo "Guardar como";
+  /// si falla (p. ej. en Windows), guarda en Documentos y devuelve la ruta.
+  Future<String?> _savePdfBytes(Uint8List pdfBytes, String baseFileName) async {
+    final fileName = '$baseFileName.pdf';
+    // 1) Intentar diálogo de guardar (puede fallar o no estar soportado en algunos Windows)
+    try {
+      final String? outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: 'Guardar reporte como PDF',
+        fileName: fileName,
+        allowedExtensions: ['pdf'],
+        type: FileType.custom,
+      );
+      if (outputFile == null || outputFile.isEmpty) return null;
+      String finalPath = outputFile.trim();
+      if (!finalPath.toLowerCase().endsWith('.pdf'))
+        finalPath = '$finalPath.pdf';
+      final file = File(finalPath);
+      await file.writeAsBytes(pdfBytes);
+      return finalPath;
+    } catch (_) {
+      // 2) Fallback: guardar en carpeta Documentos
+      final dir = await getApplicationDocumentsDirectory();
+      final safeName = baseFileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+      final finalPath = path.join(dir.path, '$safeName.pdf');
+      final file = File(finalPath);
+      await file.writeAsBytes(pdfBytes);
+      return finalPath;
     }
   }
 
@@ -248,92 +281,87 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
     try {
       setState(() => _isLoading = true);
-      
+
       // Cargar el reporte necesario según la pestaña activa
       final tabIndex = _tabController.index;
-      
+
       // Mostrar indicador de carga
-      Get.snackbar('Info', 'Generando reporte PDF...', backgroundColor: Colors.blue, colorText: Colors.white, duration: const Duration(seconds: 1));
-      
+      Get.snackbar('Info', 'Generando reporte PDF...',
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 1));
+
       switch (tabIndex) {
         case 0: // Resumen
           await _loadQuickSummary();
-          if (_quickSummary.isEmpty) throw Exception('No hay datos de resumen para exportar');
+          if (_quickSummary.isEmpty)
+            throw Exception('No hay datos de resumen para exportar');
           break;
         case 1: // Estado de Resultados
           await _loadIncomeStatement();
-          if (_incomeStatement == null) throw Exception('No hay datos de estado de resultados');
+          if (_incomeStatement == null)
+            throw Exception('No hay datos de estado de resultados');
           break;
         case 2: // Flujo de Caja
           await _loadCashFlowReport();
-          if (_cashFlowReport == null) throw Exception('No hay datos de flujo de caja');
+          if (_cashFlowReport == null)
+            throw Exception('No hay datos de flujo de caja');
           break;
         case 3: // Sesiones
           await _loadCashSessionReport();
-          if (_cashSessionReport == null) throw Exception('No hay datos de sesiones');
+          if (_cashSessionReport == null)
+            throw Exception('No hay datos de sesiones');
           break;
         case 4: // Auditoría
           await _loadAuditReport();
-          if (_auditReport == null) throw Exception('No hay datos de auditoría');
+          if (_auditReport == null)
+            throw Exception('No hay datos de auditoría');
           break;
       }
-      
-      // Crear nombre del archivo con fecha
-      final fileName = 'reporte_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}';
-      
-      // Seleccionar ubicación para guardar
-      String? outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Guardar reporte como PDF',
-        fileName: '$fileName.pdf',
-        allowedExtensions: ['pdf'],
-        type: FileType.custom,
-      );
 
-      if (outputFile == null) {
-        Get.snackbar('Información', 'Operación cancelada', backgroundColor: Colors.orange, colorText: Colors.white);
-        return;
-      }
-
-      // ✅ Asegurar que el archivo tenga extensión .pdf
-      String finalPath = outputFile;
-      if (!finalPath.toLowerCase().endsWith('.pdf')) {
-        finalPath = '$finalPath.pdf';
-      }
+      final baseFileName =
+          'reporte_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}';
 
       // Generar PDF según la pestaña activa
       Uint8List pdfBytes;
-      
       switch (tabIndex) {
         case 0: // Resumen
           pdfBytes = await _generateQuickSummaryPDF();
           break;
         case 1: // Estado de Resultados
-          if (_incomeStatement == null) throw Exception('No hay datos de estado de resultados');
+          if (_incomeStatement == null)
+            throw Exception('No hay datos de estado de resultados');
           pdfBytes = await _generateIncomeStatementPDF(_incomeStatement!);
           break;
         case 2: // Flujo de Caja
-          if (_cashFlowReport == null) throw Exception('No hay datos de flujo de caja');
+          if (_cashFlowReport == null)
+            throw Exception('No hay datos de flujo de caja');
           pdfBytes = await _generateCashFlowPDF(_cashFlowReport!);
           break;
         case 3: // Sesiones
-          if (_cashSessionReport == null) throw Exception('No hay datos de sesiones');
+          if (_cashSessionReport == null)
+            throw Exception('No hay datos de sesiones');
           pdfBytes = await _generateCashSessionPDF(_cashSessionReport!);
           break;
         case 4: // Auditoría
-          if (_auditReport == null) throw Exception('No hay datos de auditoría');
+          if (_auditReport == null)
+            throw Exception('No hay datos de auditoría');
           pdfBytes = await _generateAuditPDF(_auditReport!);
           break;
         default:
           throw Exception('Pestaña no reconocida');
       }
-      
-      // Guardar archivo
-      final file = File(finalPath);
-      await file.writeAsBytes(pdfBytes);
-      
+
+      final savedPath = await _savePdfBytes(pdfBytes, baseFileName);
+      if (savedPath == null) {
+        Get.snackbar('Información', 'Operación cancelada',
+            backgroundColor: Colors.orange, colorText: Colors.white);
+        return;
+      }
+
       Get.snackbar(
         '✅ Reporte PDF Exportado',
-        'Archivo guardado correctamente: $finalPath',
+        'Archivo guardado: $savedPath',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -430,7 +458,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               ],
             ),
           ),
-          
+
           // Contenido de las pestañas
           Expanded(
             child: _isLoading
@@ -478,16 +506,18 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
                 child: _buildSummaryCard(
                   'Utilidad Neta',
                   '\$${(_quickSummary['net_income'] ?? 0).toStringAsFixed(2)}',
-                  (_quickSummary['net_income'] ?? 0) >= 0 ? Colors.green : Colors.red,
+                  (_quickSummary['net_income'] ?? 0) >= 0
+                      ? Colors.green
+                      : Colors.red,
                   Icons.account_balance,
                 ),
               ),
@@ -502,17 +532,109 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
-          
+
+          // Ingresos por medio de pago
+          if (_quickSummary['income_by_payment_method'] != null &&
+              (_quickSummary['income_by_payment_method'] as Map)
+                  .isNotEmpty) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Ingresos por medio de pago',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: (_quickSummary['income_by_payment_method'] as Map)
+                      .entries
+                      .map<Widget>((e) {
+                    final amount =
+                        (e.value is num) ? (e.value as num).toDouble() : 0.0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(e.key.toString(),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500)),
+                          Text(
+                            '\$${amount.toStringAsFixed(0)}',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Egresos por medio de pago
+          if (_quickSummary['expenses_by_payment_method'] != null &&
+              (_quickSummary['expenses_by_payment_method'] as Map)
+                  .isNotEmpty) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Egresos por medio de pago',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: (_quickSummary['expenses_by_payment_method'] as Map)
+                      .entries
+                      .map<Widget>((e) {
+                    final amount =
+                        (e.value is num) ? (e.value as num).toDouble() : 0.0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(e.key.toString(),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500)),
+                          Text(
+                            '\$${amount.toStringAsFixed(0)}',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red.shade700),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
           // Botones para generar reportes detallados
           Text(
             'Reportes Detallados',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -548,7 +670,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, Color color, IconData icon) {
+  Widget _buildSummaryCard(
+      String title, String value, Color color, IconData icon) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -575,7 +698,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
     );
   }
 
-  Widget _buildReportButton(String title, IconData icon, Color color, VoidCallback onPressed) {
+  Widget _buildReportButton(
+      String title, IconData icon, Color color, VoidCallback onPressed) {
     return ElevatedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon),
@@ -591,7 +715,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
   Widget _buildIncomeStatementTab() {
     if (_incomeStatement == null) {
       return const Center(
-        child: Text('Haz clic en "Estado de Resultados" para generar el reporte'),
+        child:
+            Text('Haz clic en "Estado de Resultados" para generar el reporte'),
       );
     }
 
@@ -614,19 +739,25 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildSummaryItem('Total Ingresos', _incomeStatement!.totalIncome, Colors.green),
-                      _buildSummaryItem('Total Egresos', _incomeStatement!.totalExpenses, Colors.red),
-                      _buildSummaryItem('Utilidad Neta', _incomeStatement!.netIncome, 
-                          _incomeStatement!.netIncome >= 0 ? Colors.green : Colors.red),
+                      _buildSummaryItem('Total Ingresos',
+                          _incomeStatement!.totalIncome, Colors.green),
+                      _buildSummaryItem('Total Egresos',
+                          _incomeStatement!.totalExpenses, Colors.red),
+                      _buildSummaryItem(
+                          'Utilidad Neta',
+                          _incomeStatement!.netIncome,
+                          _incomeStatement!.netIncome >= 0
+                              ? Colors.green
+                              : Colors.red),
                     ],
                   ),
                 ],
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Ingresos por categoría
           Card(
             child: Padding(
@@ -639,15 +770,16 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  ..._incomeStatement!.incomeCategories.map((category) => 
-                    _buildCategoryItem(category.category, category.amount, category.percentage, Colors.green)),
+                  ..._incomeStatement!.incomeCategories.map((category) =>
+                      _buildCategoryItem(category.category, category.amount,
+                          category.percentage, Colors.green)),
                 ],
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Egresos por categoría
           Card(
             child: Padding(
@@ -660,8 +792,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  ..._incomeStatement!.expenseCategories.map((category) => 
-                    _buildCategoryItem(category.category, category.amount, category.percentage, Colors.red)),
+                  ..._incomeStatement!.expenseCategories.map((category) =>
+                      _buildCategoryItem(category.category, category.amount,
+                          category.percentage, Colors.red)),
                 ],
               ),
             ),
@@ -690,7 +823,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
     );
   }
 
-  Widget _buildCategoryItem(String category, double amount, double percentage, Color color) {
+  Widget _buildCategoryItem(
+      String category, double amount, double percentage, Color color) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -740,19 +874,25 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildSummaryItem('Efectivo Inicial', _cashFlowReport!.initialCash, Colors.blue),
-                      _buildSummaryItem('Efectivo Final', _cashFlowReport!.finalCash, Colors.green),
-                      _buildSummaryItem('Flujo Neto', _cashFlowReport!.netCashFlow, 
-                          _cashFlowReport!.netCashFlow >= 0 ? Colors.green : Colors.red),
+                      _buildSummaryItem('Efectivo Inicial',
+                          _cashFlowReport!.initialCash, Colors.blue),
+                      _buildSummaryItem('Efectivo Final',
+                          _cashFlowReport!.finalCash, Colors.green),
+                      _buildSummaryItem(
+                          'Flujo Neto',
+                          _cashFlowReport!.netCashFlow,
+                          _cashFlowReport!.netCashFlow >= 0
+                              ? Colors.green
+                              : Colors.red),
                     ],
                   ),
                 ],
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Flujo diario
           Card(
             child: Padding(
@@ -765,8 +905,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  ..._cashFlowReport!.dailyFlows.map((flow) => 
-                    _buildDailyFlowItem(flow)),
+                  ..._cashFlowReport!.dailyFlows
+                      .map((flow) => _buildDailyFlowItem(flow)),
                 ],
               ),
             ),
@@ -783,10 +923,13 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(DateFormat('dd/MM/yyyy').format(flow.date)),
-          Text('\$${flow.income.toStringAsFixed(2)}', style: const TextStyle(color: Colors.green)),
-          Text('\$${flow.expenses.toStringAsFixed(2)}', style: const TextStyle(color: Colors.red)),
-          Text('\$${flow.netFlow.toStringAsFixed(2)}', 
-              style: TextStyle(color: flow.netFlow >= 0 ? Colors.green : Colors.red)),
+          Text('\$${flow.income.toStringAsFixed(2)}',
+              style: const TextStyle(color: Colors.green)),
+          Text('\$${flow.expenses.toStringAsFixed(2)}',
+              style: const TextStyle(color: Colors.red)),
+          Text('\$${flow.netFlow.toStringAsFixed(2)}',
+              style: TextStyle(
+                  color: flow.netFlow >= 0 ? Colors.green : Colors.red)),
         ],
       ),
     );
@@ -817,18 +960,23 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildSummaryItem('Total Sesiones', _cashSessionReport!.totalSessions.toDouble(), Colors.blue),
-                      _buildSummaryItem('Total Ingresos', _cashSessionReport!.totalIncome, Colors.green),
-                      _buildSummaryItem('Total Egresos', _cashSessionReport!.totalExpenses, Colors.red),
+                      _buildSummaryItem(
+                          'Total Sesiones',
+                          _cashSessionReport!.totalSessions.toDouble(),
+                          Colors.blue),
+                      _buildSummaryItem('Total Ingresos',
+                          _cashSessionReport!.totalIncome, Colors.green),
+                      _buildSummaryItem('Total Egresos',
+                          _cashSessionReport!.totalExpenses, Colors.red),
                     ],
                   ),
                 ],
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Lista de sesiones
           Card(
             child: Padding(
@@ -841,8 +989,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  ..._cashSessionReport!.sessions.map((session) => 
-                    _buildSessionItem(session)),
+                  ..._cashSessionReport!.sessions
+                      .map((session) => _buildSessionItem(session)),
                 ],
               ),
             ),
@@ -868,7 +1016,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: session.status == 'closed' ? Colors.green : Colors.orange,
+                  color:
+                      session.status == 'closed' ? Colors.green : Colors.orange,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -879,9 +1028,11 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
             ],
           ),
           Text('Usuario: ${session.userName}'),
-          Text('Apertura: ${DateFormat('dd/MM/yyyy HH:mm').format(session.openDate)}'),
+          Text(
+              'Apertura: ${DateFormat('dd/MM/yyyy HH:mm').format(session.openDate)}'),
           if (session.closeDate != null)
-            Text('Cierre: ${DateFormat('dd/MM/yyyy HH:mm').format(session.closeDate!)}'),
+            Text(
+                'Cierre: ${DateFormat('dd/MM/yyyy HH:mm').format(session.closeDate!)}'),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -921,17 +1072,21 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildSummaryItem('Total Transacciones', _auditReport!.totalTransactions.toDouble(), Colors.blue),
-                      _buildSummaryItem('Monto Total', _auditReport!.totalAmount, Colors.green),
+                      _buildSummaryItem(
+                          'Total Transacciones',
+                          _auditReport!.totalTransactions.toDouble(),
+                          Colors.blue),
+                      _buildSummaryItem('Monto Total',
+                          _auditReport!.totalAmount, Colors.green),
                     ],
                   ),
                 ],
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Lista de transacciones
           Card(
             child: Padding(
@@ -944,8 +1099,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
-                  ..._auditReport!.entries.take(50).map((entry) => 
-                    _buildAuditItem(entry)),
+                  ..._auditReport!.entries
+                      .take(50)
+                      .map((entry) => _buildAuditItem(entry)),
                 ],
               ),
             ),
@@ -1000,13 +1156,16 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
   Future<Uint8List> _generateQuickSummaryPDF() async {
     // Obtener información de la empresa
     final companyConfigs = await SQLiteDatabaseService.getCompanyConfig();
-    final companyName = companyConfigs.isNotEmpty ? companyConfigs.first.companyName : 'SmartSeller POS';
-    
-    final period = '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
-    
+    final companyName = companyConfigs.isNotEmpty
+        ? companyConfigs.first.companyName
+        : 'SmartSeller POS';
+
+    final period =
+        '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
+
     // Crear PDF
     final pdf = pw.Document();
-    
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -1029,7 +1188,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
             ),
             pw.SizedBox(height: 20),
-            
+
             // Resumen de cada reporte
             pw.Text(
               'Resumen Ejecutivo',
@@ -1050,7 +1209,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               'Balance Neto',
               (_quickSummary['balance'] as num? ?? 0).toDouble(),
             ),
-            
+
             // Información adicional
             pw.SizedBox(height: 20),
             pw.Text(
@@ -1061,15 +1220,19 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
         },
       ),
     );
-    
+
     return pdf.save();
   }
 
-  Future<Uint8List> _generateIncomeStatementPDF(IncomeStatement statement) async {
+  Future<Uint8List> _generateIncomeStatementPDF(
+      IncomeStatement statement) async {
     final companyConfigs = await SQLiteDatabaseService.getCompanyConfig();
-    final companyName = companyConfigs.isNotEmpty ? companyConfigs.first.companyName : 'SmartSeller POS';
-    final period = '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
-    
+    final companyName = companyConfigs.isNotEmpty
+        ? companyConfigs.first.companyName
+        : 'SmartSeller POS';
+    final period =
+        '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
+
     final pdf = pw.Document();
     pdf.addPage(
       pw.MultiPage(
@@ -1079,37 +1242,52 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
           return [
             _buildPDFTitle(companyName, 'Estado de Resultados', period),
             pw.SizedBox(height: 20),
-            
+
             // Ingresos
-            pw.Text('INGRESOS', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('INGRESOS',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 12),
             pw.Table(
-              columnWidths: {0: const pw.FlexColumnWidth(3), 1: const pw.FlexColumnWidth(1)},
+              columnWidths: {
+                0: const pw.FlexColumnWidth(3),
+                1: const pw.FlexColumnWidth(1)
+              },
               children: [
                 _buildPDFTableRow('Total Ingresos', statement.totalIncome),
                 for (final category in statement.incomeCategories.take(5))
                   _buildPDFTableRow(category.category, category.amount),
               ],
             ),
-            
+
             pw.SizedBox(height: 20),
-            
+
             // Egresos
-            pw.Text('EGRESOS', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('EGRESOS',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 12),
             pw.Table(
-              columnWidths: {0: const pw.FlexColumnWidth(3), 1: const pw.FlexColumnWidth(1)},
+              columnWidths: {
+                0: const pw.FlexColumnWidth(3),
+                1: const pw.FlexColumnWidth(1)
+              },
               children: [
                 _buildPDFTableRow('Total Egresos', statement.totalExpenses),
                 for (final category in statement.expenseCategories.take(5))
                   _buildPDFTableRow(category.category, category.amount),
               ],
             ),
-            
+
             pw.SizedBox(height: 20),
-            pw.Text('RESULTADO', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
+            pw.Text('RESULTADO',
+                style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blue900)),
             pw.SizedBox(height: 12),
-            _buildPDFCard('Utilidad Neta', statement.netIncome, isImportant: true),
+            _buildPDFCard('Utilidad Neta', statement.netIncome,
+                isImportant: true),
           ];
         },
       ),
@@ -1119,9 +1297,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
   Future<Uint8List> _generateCashFlowPDF(CashFlowReport report) async {
     final companyConfigs = await SQLiteDatabaseService.getCompanyConfig();
-    final companyName = companyConfigs.isNotEmpty ? companyConfigs.first.companyName : 'SmartSeller POS';
-    final period = '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
-    
+    final companyName = companyConfigs.isNotEmpty
+        ? companyConfigs.first.companyName
+        : 'SmartSeller POS';
+    final period =
+        '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
+
     final pdf = pw.Document();
     pdf.addPage(
       pw.MultiPage(
@@ -1131,20 +1312,23 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
           return [
             _buildPDFTitle(companyName, 'Flujo de Caja', period),
             pw.SizedBox(height: 20),
-            
-            pw.Text('ENTRADAS', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('ENTRADAS',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 12),
             _buildPDFCard('Ingresos Totales', report.totalIncome),
-            
             pw.SizedBox(height: 20),
-            
-            pw.Text('SALIDAS', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('SALIDAS',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 12),
             _buildPDFCard('Egresos Totales', report.totalExpenses),
-            
             pw.SizedBox(height: 20),
-            
-            pw.Text('SALDO', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.green900)),
+            pw.Text('SALDO',
+                style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.green900)),
             pw.SizedBox(height: 12),
             _buildPDFCard('Flujo Neto', report.netCashFlow, isImportant: true),
           ];
@@ -1156,9 +1340,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
   Future<Uint8List> _generateCashSessionPDF(CashSessionReport report) async {
     final companyConfigs = await SQLiteDatabaseService.getCompanyConfig();
-    final companyName = companyConfigs.isNotEmpty ? companyConfigs.first.companyName : 'SmartSeller POS';
-    final period = '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
-    
+    final companyName = companyConfigs.isNotEmpty
+        ? companyConfigs.first.companyName
+        : 'SmartSeller POS';
+    final period =
+        '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
+
     final pdf = pw.Document();
     pdf.addPage(
       pw.MultiPage(
@@ -1168,39 +1355,65 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
           return [
             _buildPDFTitle(companyName, 'Sesiones de Caja', period),
             pw.SizedBox(height: 20),
-            
-            pw.Text('Resumen de Sesiones', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Resumen de Sesiones',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 12),
             pw.Table(
               columnWidths: {
-                0: const pw.FlexColumnWidth(2),
-                1: const pw.FlexColumnWidth(1),
+                0: const pw.FlexColumnWidth(1.5),
+                1: const pw.FlexColumnWidth(1.2),
                 2: const pw.FlexColumnWidth(1),
+                3: const pw.FlexColumnWidth(1),
+                4: const pw.FlexColumnWidth(1),
               },
               children: [
                 pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                   children: [
                     _buildPDFTableCell('Cajero', isHeader: true),
                     _buildPDFTableCell('Fecha Apertura', isHeader: true),
+                    _buildPDFTableCell('Ingresos', isHeader: true),
+                    _buildPDFTableCell('Egresos', isHeader: true),
                     _buildPDFTableCell('Saldo Final', isHeader: true),
                   ],
                 ),
                 ...report.sessions.take(10).map((session) => pw.TableRow(
-                  children: [
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(8),
-                      child: pw.Text(session.userName, style: const pw.TextStyle(fontSize: 10)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(8),
-                      child: pw.Text(DateFormat('dd/MM/yyyy').format(session.openDate), style: const pw.TextStyle(fontSize: 10)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(8),
-                      child: pw.Text(_currencyFormat.format(session.finalAmount), style: const pw.TextStyle(fontSize: 10)),
-                    ),
-                  ],
-                )),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(session.userName,
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              DateFormat('dd/MM/yyyy').format(session.openDate),
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              _currencyFormat.format(session.totalIncome),
+                              style: const pw.TextStyle(
+                                  fontSize: 9, color: PdfColors.green700)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              _currencyFormat.format(session.totalExpenses),
+                              style: const pw.TextStyle(
+                                  fontSize: 9, color: PdfColors.red700)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              _currencyFormat.format(session.finalAmount),
+                              style: pw.TextStyle(
+                                  fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                        ),
+                      ],
+                    )),
               ],
             ),
           ];
@@ -1212,9 +1425,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
 
   Future<Uint8List> _generateAuditPDF(TransactionAuditReport report) async {
     final companyConfigs = await SQLiteDatabaseService.getCompanyConfig();
-    final companyName = companyConfigs.isNotEmpty ? companyConfigs.first.companyName : 'SmartSeller POS';
-    final period = '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
-    
+    final companyName = companyConfigs.isNotEmpty
+        ? companyConfigs.first.companyName
+        : 'SmartSeller POS';
+    final period =
+        '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
+
     final pdf = pw.Document();
     pdf.addPage(
       pw.MultiPage(
@@ -1224,27 +1440,32 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
           return [
             _buildPDFTitle(companyName, 'Auditoría de Transacciones', period),
             pw.SizedBox(height: 20),
-            
-            pw.Text('Estadísticas', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Estadísticas',
+                style:
+                    pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 12),
-            _buildPDFCard('Total Transacciones', report.totalTransactions.toDouble()),
+            _buildPDFCardCount(
+                'Cantidad de transacciones', report.totalTransactions),
             pw.SizedBox(height: 8),
-            _buildPDFCard('Monto Total', report.totalAmount),
+            _buildPDFCard('Monto total', report.totalAmount),
           ];
         },
       ),
     );
     return pdf.save();
   }
-  
+
   // ✅ NUEVO: Generar PDF completo con TODAS las secciones
   Future<Uint8List> _generateCompleteReportPDF() async {
     final companyConfigs = await SQLiteDatabaseService.getCompanyConfig();
-    final companyName = companyConfigs.isNotEmpty ? companyConfigs.first.companyName : 'SmartSeller POS';
-    final period = '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
-    
+    final companyName = companyConfigs.isNotEmpty
+        ? companyConfigs.first.companyName
+        : 'SmartSeller POS';
+    final period =
+        '${DateFormat('dd/MM/yyyy').format(_fromDate)} - ${DateFormat('dd/MM/yyyy').format(_toDate)}';
+
     final pdf = pw.Document();
-    
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -1261,9 +1482,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               'REPORTE COMPLETO DE CONTABILIDAD',
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Documento de control financiero para gestión del negocio',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
             pw.SizedBox(height: 8),
             pw.Text(
-              'Período: $period',
+              'Período del reporte: $period',
               style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
             ),
             pw.SizedBox(height: 4),
@@ -1272,68 +1498,135 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
               style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
             pw.SizedBox(height: 40),
-            
+
             pw.Divider(thickness: 2, color: PdfColors.blue900),
             pw.SizedBox(height: 30),
-            
+
             // ========== 1. RESUMEN EJECUTIVO ==========
             pw.Text(
               '1. RESUMEN EJECUTIVO',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+              style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue900),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Vista consolidada de ingresos, egresos y resultado del período.',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
             pw.SizedBox(height: 12),
-            _buildPDFCard('Total Ingresos', (_quickSummary['total_income'] as num? ?? 0).toDouble()),
+            _buildPDFCard('Total Ingresos',
+                (_quickSummary['total_income'] as num? ?? 0).toDouble()),
             pw.SizedBox(height: 8),
-            _buildPDFCard('Total Egresos', (_quickSummary['total_expenses'] as num? ?? 0).toDouble()),
+            _buildPDFCard('Total Egresos',
+                (_quickSummary['total_expenses'] as num? ?? 0).toDouble()),
             pw.SizedBox(height: 8),
-            _buildPDFCard('Utilidad Neta', (_quickSummary['net_income'] as num? ?? 0).toDouble(), isImportant: true),
+            _buildPDFCard('Utilidad Neta',
+                (_quickSummary['net_income'] as num? ?? 0).toDouble(),
+                isImportant: true),
             pw.SizedBox(height: 8),
-            _buildPDFCard('Total Transacciones', (_quickSummary['transaction_count'] as num? ?? 0).toDouble()),
-            
+            _buildPDFCardCount('Cantidad de transacciones',
+                (_quickSummary['transaction_count'] as num?)?.toInt() ?? 0),
+
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'Ingresos por medio de pago',
+              style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue800),
+            ),
+            pw.SizedBox(height: 8),
+            _buildIncomeByPaymentMethodSection(),
+            pw.SizedBox(height: 16),
+            pw.Text(
+              'Egresos por medio de pago',
+              style: pw.TextStyle(
+                  fontSize: 14,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue800),
+            ),
+            pw.SizedBox(height: 8),
+            _buildExpensesByPaymentMethodSection(),
+
             pw.SizedBox(height: 40),
             pw.Divider(thickness: 2, color: PdfColors.grey300),
             pw.SizedBox(height: 40),
-            
+
             // ========== 2. ESTADO DE RESULTADOS ==========
             pw.Text(
               '2. ESTADO DE RESULTADOS',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+              style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue900),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Desglose de ingresos por categoría y total de egresos.',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
             pw.SizedBox(height: 12),
-            pw.Text('INGRESOS', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Text('INGRESOS',
+                style:
+                    pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 8),
             pw.Table(
-              columnWidths: {0: const pw.FlexColumnWidth(3), 1: const pw.FlexColumnWidth(1)},
+              columnWidths: {
+                0: const pw.FlexColumnWidth(3),
+                1: const pw.FlexColumnWidth(1)
+              },
               children: [
-                _buildPDFTableRow('Total Ingresos', _incomeStatement!.totalIncome),
-                for (final category in _incomeStatement!.incomeCategories.take(5))
+                _buildPDFTableRow(
+                    'Total Ingresos', _incomeStatement!.totalIncome),
+                for (final category
+                    in _incomeStatement!.incomeCategories.take(5))
                   _buildPDFTableRow(category.category, category.amount),
               ],
             ),
             pw.SizedBox(height: 12),
-            pw.Text('EGRESOS', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Text('EGRESOS',
+                style:
+                    pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 8),
             pw.Table(
-              columnWidths: {0: const pw.FlexColumnWidth(3), 1: const pw.FlexColumnWidth(1)},
+              columnWidths: {
+                0: const pw.FlexColumnWidth(3),
+                1: const pw.FlexColumnWidth(1)
+              },
               children: [
-                _buildPDFTableRow('Total Egresos', _incomeStatement!.totalExpenses),
-                for (final category in _incomeStatement!.expenseCategories.take(5))
+                _buildPDFTableRow(
+                    'Total Egresos', _incomeStatement!.totalExpenses),
+                for (final category
+                    in _incomeStatement!.expenseCategories.take(5))
                   _buildPDFTableRow(category.category, category.amount),
               ],
             ),
             pw.SizedBox(height: 12),
-            pw.Text('RESULTADO', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+            pw.Text('RESULTADO',
+                style:
+                    pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 8),
-            _buildPDFCard('Utilidad Neta', _incomeStatement!.netIncome, isImportant: true),
-            
+            _buildPDFCard('Utilidad Neta', _incomeStatement!.netIncome,
+                isImportant: true),
+
             pw.SizedBox(height: 40),
             pw.Divider(thickness: 2, color: PdfColors.grey300),
             pw.SizedBox(height: 40),
-            
+
             // ========== 3. FLUJO DE CAJA ==========
             pw.Text(
               '3. FLUJO DE CAJA',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+              style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue900),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Entradas, salidas y saldo de efectivo en el período.',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
             pw.SizedBox(height: 12),
             _buildPDFCard('Efectivo Inicial', _cashFlowReport!.initialCash),
@@ -1342,21 +1635,31 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
             pw.SizedBox(height: 8),
             _buildPDFCard('Egresos Totales', _cashFlowReport!.totalExpenses),
             pw.SizedBox(height: 8),
-            _buildPDFCard('Flujo Neto', _cashFlowReport!.netCashFlow, isImportant: true),
+            _buildPDFCard('Flujo Neto', _cashFlowReport!.netCashFlow,
+                isImportant: true),
             pw.SizedBox(height: 8),
             _buildPDFCard('Efectivo Final', _cashFlowReport!.finalCash),
-            
+
             pw.SizedBox(height: 40),
             pw.Divider(thickness: 2, color: PdfColors.grey300),
             pw.SizedBox(height: 40),
-            
+
             // ========== 4. SESIONES DE CAJA ==========
             pw.Text(
               '4. SESIONES DE CAJA',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+              style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue900),
             ),
-            pw.SizedBox(height: 12),
-            pw.Text('Total de Sesiones: ${_cashSessionReport!.totalSessions}',
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Detalle por turno: ingresos, egresos y saldo final de cada cajero.',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Text(
+                'Total de sesiones en el período: ${_cashSessionReport!.totalSessions}',
                 style: pw.TextStyle(fontSize: 12)),
             pw.SizedBox(height: 12),
             pw.Table(
@@ -1365,6 +1668,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                 1: const pw.FlexColumnWidth(1.2),
                 2: const pw.FlexColumnWidth(1),
                 3: const pw.FlexColumnWidth(1),
+                4: const pw.FlexColumnWidth(1),
               },
               children: [
                 pw.TableRow(
@@ -1377,52 +1681,83 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                     _buildPDFTableCell('Saldo Final', isHeader: true),
                   ],
                 ),
-                ..._cashSessionReport!.sessions.take(10).map((session) => pw.TableRow(
-                  children: [
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(session.userName, style: const pw.TextStyle(fontSize: 9)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(DateFormat('dd/MM/yyyy').format(session.openDate), style: const pw.TextStyle(fontSize: 9)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(_currencyFormat.format(session.totalIncome), style: const pw.TextStyle(fontSize: 9, color: PdfColors.green700)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(_currencyFormat.format(session.totalExpenses), style: const pw.TextStyle(fontSize: 9, color: PdfColors.red700)),
-                    ),
-                    pw.Padding(
-                      padding: const pw.EdgeInsets.all(6),
-                      child: pw.Text(_currencyFormat.format(session.finalAmount), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                    ),
-                  ],
-                )),
+                ..._cashSessionReport!.sessions.take(10).map((session) =>
+                    pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(session.userName,
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              DateFormat('dd/MM/yyyy').format(session.openDate),
+                              style: const pw.TextStyle(fontSize: 9)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              _currencyFormat.format(session.totalIncome),
+                              style: const pw.TextStyle(
+                                  fontSize: 9, color: PdfColors.green700)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              _currencyFormat.format(session.totalExpenses),
+                              style: const pw.TextStyle(
+                                  fontSize: 9, color: PdfColors.red700)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(
+                              _currencyFormat.format(session.finalAmount),
+                              style: pw.TextStyle(
+                                  fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                        ),
+                      ],
+                    )),
               ],
             ),
-            
+
             pw.SizedBox(height: 40),
             pw.Divider(thickness: 2, color: PdfColors.grey300),
             pw.SizedBox(height: 40),
-            
-            // ========== 5. AUDITORÍA ==========
+
+            // ========== 5. AUDITORÍA DE TRANSACCIONES ==========
             pw.Text(
               '5. AUDITORÍA DE TRANSACCIONES',
-              style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900),
+              style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue900),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Registro de todas las operaciones del período.',
+              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
             ),
             pw.SizedBox(height: 12),
-            _buildPDFCard('Total Transacciones', _auditReport!.totalTransactions.toDouble()),
+            _buildPDFCardCount(
+                'Cantidad de transacciones', _auditReport!.totalTransactions),
             pw.SizedBox(height: 8),
-            _buildPDFCard('Monto Total', _auditReport!.totalAmount),
+            _buildPDFCard('Monto total', _auditReport!.totalAmount),
             pw.SizedBox(height: 20),
-            
+
             pw.Divider(thickness: 2, color: PdfColors.blue900),
             pw.SizedBox(height: 20),
-            
-            // ========== FIRMAS Y REFERENCIAS ==========
+
+            // ========== PIE Y FIRMAS ==========
+            pw.SizedBox(height: 16),
+            pw.Center(
+              child: pw.Text(
+                'Documento generado electrónicamente por Smart Seller POS. Este reporte es de carácter informativo.',
+                style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+                textAlign: pw.TextAlign.center,
+              ),
+            ),
+            pw.SizedBox(height: 24),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -1430,25 +1765,34 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      'Reporte generado por Smart Seller POS',
-                      style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+                      'Smart Seller POS',
+                      style: pw.TextStyle(
+                          fontSize: 10, fontWeight: pw.FontWeight.bold),
                     ),
-                    pw.SizedBox(height: 20),
+                    pw.Text('Sistema de punto de venta y contabilidad',
+                        style: pw.TextStyle(
+                            fontSize: 9, color: PdfColors.grey600)),
+                    pw.SizedBox(height: 16),
                     pw.Divider(),
-                    pw.SizedBox(height: 8),
-                    pw.Text('Firma Administrador', style: pw.TextStyle(fontSize: 10)),
+                    pw.SizedBox(height: 6),
+                    pw.Text('Firma responsable',
+                        style: pw.TextStyle(fontSize: 10)),
                   ],
                 ),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
                     pw.Text(
-                      'Smart Seller POS v2.0',
-                      style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+                      'Fecha de generación',
+                      style:
+                          pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
                     ),
-                    pw.SizedBox(height: 20),
+                    pw.Text(
+                        DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now()),
+                        style: pw.TextStyle(fontSize: 10)),
+                    pw.SizedBox(height: 16),
                     pw.Divider(),
-                    pw.SizedBox(height: 8),
+                    pw.SizedBox(height: 6),
                     pw.Text('Fecha', style: pw.TextStyle(fontSize: 10)),
                   ],
                 ),
@@ -1458,25 +1802,29 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
         },
       ),
     );
-    
+
     return pdf.save();
   }
-  
+
   // ✅ HELPER METHODS PARA PDF
   pw.Widget _buildPDFTitle(String company, String title, String period) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(company, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+        pw.Text(company,
+            style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(height: 4),
-        pw.Text(title, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+        pw.Text(title,
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(height: 8),
-        pw.Text('Período: $period', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+        pw.Text('Período: $period',
+            style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
       ],
     );
   }
-  
-  pw.Widget _buildPDFCard(String label, double value, {bool isImportant = false}) {
+
+  pw.Widget _buildPDFCard(String label, double value,
+      {bool isImportant = false}) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
@@ -1491,7 +1839,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
             _currencyFormat.format(value),
             style: pw.TextStyle(
               fontSize: isImportant ? 18 : 12,
-              fontWeight: isImportant ? pw.FontWeight.bold : pw.FontWeight.normal,
+              fontWeight:
+                  isImportant ? pw.FontWeight.bold : pw.FontWeight.normal,
               color: isImportant ? PdfColors.green700 : PdfColors.black,
             ),
           ),
@@ -1499,16 +1848,116 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> with 
       ),
     );
   }
-  
+
+  /// Para cantidades (ej. número de transacciones), no formato moneda.
+  pw.Widget _buildIncomeByPaymentMethodSection() {
+    return _buildPaymentMethodSection(
+      _quickSummary['income_by_payment_method'],
+      'No hay ingresos registrados por medio de pago en este período.',
+    );
+  }
+
+  pw.Widget _buildExpensesByPaymentMethodSection() {
+    return _buildPaymentMethodSection(
+      _quickSummary['expenses_by_payment_method'],
+      'No hay egresos registrados por medio de pago en este período.',
+    );
+  }
+
+  pw.Widget _buildPaymentMethodSection(dynamic raw, String emptyMessage) {
+    if (raw == null || raw is! Map) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8),
+        child: pw.Text(
+          'No hay desglose por medio de pago en este período.',
+          style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+        ),
+      );
+    }
+    final byMethod = Map<String, double>.fromEntries(
+      raw.entries.map((e) => MapEntry(
+            e.key.toString(),
+            (e.value is num) ? (e.value as num).toDouble() : 0.0,
+          )),
+    );
+    if (byMethod.isEmpty) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8),
+        child: pw.Text(
+          emptyMessage,
+          style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+        ),
+      );
+    }
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Table(
+        columnWidths: {
+          0: const pw.FlexColumnWidth(2),
+          1: const pw.FlexColumnWidth(1),
+        },
+        children: [
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+            children: [
+              _buildPDFTableCell('Medio de pago', isHeader: true),
+              _buildPDFTableCell('Total', isHeader: true),
+            ],
+          ),
+          ...byMethod.entries.map((e) => pw.TableRow(
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(8),
+                    child:
+                        pw.Text(e.key, style: const pw.TextStyle(fontSize: 10)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(8),
+                    child: pw.Text(_currencyFormat.format(e.value),
+                        style: const pw.TextStyle(fontSize: 10)),
+                  ),
+                ],
+              )),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildPDFCardCount(String label, int value) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: const pw.TextStyle(fontSize: 12)),
+          pw.Text(
+            value.toString(),
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
   pw.TableRow _buildPDFTableRow(String label, double value) {
     return pw.TableRow(
       children: [
         pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(label)),
-        pw.Padding(padding: const pw.EdgeInsets.all(8), child: pw.Text(_currencyFormat.format(value))),
+        pw.Padding(
+            padding: const pw.EdgeInsets.all(8),
+            child: pw.Text(_currencyFormat.format(value))),
       ],
     );
   }
-  
+
   pw.Widget _buildPDFTableCell(String text, {bool isHeader = false}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(8),

@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../modules/accounting/services/accounting_service.dart';
 
 import '../services/print_service.dart';
+import '../utils/puntos_miles_input_formatter.dart';
 import 'package:intl/intl.dart';
 
 class CartItem {
@@ -16,7 +17,6 @@ class CartItem {
   double price; // Cambiado de final para permitir modificaciones temporales
   final String unit;
   int quantity;
-
 
   CartItem({
     required this.name,
@@ -26,25 +26,25 @@ class CartItem {
   });
 
   double get total => price * quantity;
-  
+
   String get displayInfo => '$quantity ${unit}';
 }
 
 class PosController extends GetxController {
   var cartItems = <CartItem>[].obs;
-  
+
   // ✅ NUEVO: Variables para gestión de clientes
   var selectedCustomer = Rxn<Customer>();
   var isSearchingCustomer = false.obs;
   var customerSearchResults = <Customer>[].obs;
   var customerSearchQuery = ''.obs;
-  
+
   // ✅ NUEVO: Variables para gestión de clientes de facturación electrónica
   var selectedClient = Rxn<Client>();
   var isSearchingClient = false.obs;
   var clientSearchResults = <Client>[].obs;
   var clientSearchQuery = ''.obs;
-  
+
   // ✅ NUEVO: Callback para limpiar campo de búsqueda
   Function()? onClearSearchField;
 
@@ -52,27 +52,28 @@ class PosController extends GetxController {
   void onInit() {
     super.onInit();
   }
-  
+
   // ✅ NUEVO: Método para buscar clientes
   Future<void> searchCustomers(String query) async {
     if (query.trim().isEmpty) {
       customerSearchResults.clear();
       return;
     }
-    
+
     try {
       isSearchingCustomer.value = true;
       final allCustomers = await SQLiteDatabaseService.getAllCustomers();
-      
+
       // Filtrar por nombre, email, cédula o teléfono
       final filtered = allCustomers.where((customer) {
         final searchLower = query.toLowerCase();
         return customer.name.toLowerCase().contains(searchLower) ||
-               customer.email.toLowerCase().contains(searchLower) ||
-               (customer.documentNumber?.toLowerCase().contains(searchLower) ?? false) ||
-               customer.phone.contains(query);
+            customer.email.toLowerCase().contains(searchLower) ||
+            (customer.documentNumber?.toLowerCase().contains(searchLower) ??
+                false) ||
+            customer.phone.contains(query);
       }).toList();
-      
+
       customerSearchResults.value = filtered;
     } catch (e) {
       print('Error buscando clientes: $e');
@@ -81,7 +82,7 @@ class PosController extends GetxController {
       isSearchingCustomer.value = false;
     }
   }
-  
+
   // ✅ NUEVO: Método para seleccionar cliente
   void selectCustomer(Customer customer) {
     selectedCustomer.value = customer;
@@ -94,7 +95,7 @@ class PosController extends GetxController {
       colorText: Colors.white,
     );
   }
-  
+
   // ✅ NUEVO: Método para limpiar cliente seleccionado
   void clearSelectedCustomer() {
     selectedCustomer.value = null;
@@ -104,28 +105,28 @@ class PosController extends GetxController {
       duration: const Duration(seconds: 1),
     );
   }
-  
+
   // ✅ NUEVO: Método para buscar clientes de facturación electrónica
   Future<void> searchClients(String query) async {
     if (query.trim().isEmpty) {
       clientSearchResults.clear();
       return;
     }
-    
+
     try {
       isSearchingClient.value = true;
       // Por ahora simulamos la búsqueda, en el futuro se conectará con la base de datos
       final allClients = await _getAllClients();
-      
+
       // Filtrar por nombre, email, documento o teléfono
       final filtered = allClients.where((client) {
         final searchLower = query.toLowerCase();
         return client.businessName.toLowerCase().contains(searchLower) ||
-               (client.email?.toLowerCase().contains(searchLower) ?? false) ||
-               client.documentNumber.toLowerCase().contains(searchLower) ||
-               (client.phone?.contains(query) ?? false);
+            (client.email?.toLowerCase().contains(searchLower) ?? false) ||
+            client.documentNumber.toLowerCase().contains(searchLower) ||
+            (client.phone?.contains(query) ?? false);
       }).toList();
-      
+
       clientSearchResults.value = filtered;
     } catch (e) {
       print('Error buscando clientes: $e');
@@ -134,7 +135,7 @@ class PosController extends GetxController {
       isSearchingClient.value = false;
     }
   }
-  
+
   // ✅ NUEVO: Método para seleccionar cliente de facturación electrónica
   void selectClient(Client client) {
     selectedClient.value = client;
@@ -147,7 +148,7 @@ class PosController extends GetxController {
       colorText: Colors.white,
     );
   }
-  
+
   // ✅ NUEVO: Método para limpiar cliente seleccionado
   void clearSelectedClient() {
     selectedClient.value = null;
@@ -157,12 +158,12 @@ class PosController extends GetxController {
       duration: const Duration(seconds: 1),
     );
   }
-  
+
   // ✅ NUEVO: Método temporal para obtener clientes (simulado)
   Future<List<Client>> _getAllClients() async {
     // Simular delay de base de datos
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     // Retornar clientes de ejemplo
     return [
       Client(
@@ -193,7 +194,7 @@ class PosController extends GetxController {
       ),
     ];
   }
-  
+
   // ✅ NUEVO: Método para mostrar modal de selección de cliente
   void showCustomerSelectionModal() {
     Get.dialog(
@@ -219,7 +220,7 @@ class PosController extends GetxController {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Campo de búsqueda
               TextField(
                 onChanged: (value) {
@@ -235,26 +236,27 @@ class PosController extends GetxController {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Lista de resultados
               Expanded(
                 child: Obx(() {
                   if (isSearchingCustomer.value) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
-                  if (customerSearchResults.isEmpty && customerSearchQuery.value.isNotEmpty) {
+
+                  if (customerSearchResults.isEmpty &&
+                      customerSearchQuery.value.isNotEmpty) {
                     return const Center(
                       child: Text('No se encontraron clientes'),
                     );
                   }
-                  
+
                   if (customerSearchResults.isEmpty) {
                     return const Center(
                       child: Text('Busca un cliente para comenzar'),
                     );
                   }
-                  
+
                   return ListView.builder(
                     itemCount: customerSearchResults.length,
                     itemBuilder: (context, index) {
@@ -264,7 +266,9 @@ class PosController extends GetxController {
                           backgroundColor: Colors.blue,
                           child: Text(
                             customer.name.substring(0, 1).toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                         title: Text(customer.name),
@@ -272,7 +276,8 @@ class PosController extends GetxController {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(customer.email),
-                            Text('${customer.pointsRate} pts/\$1000 - Acumulados: ${customer.accumulatedPoints}'),
+                            Text(
+                                '${customer.pointsRate} pts/\$1000 - Acumulados: ${customer.accumulatedPoints}'),
                           ],
                         ),
                         trailing: ElevatedButton(
@@ -290,18 +295,18 @@ class PosController extends GetxController {
       ),
     );
   }
-  
+
   // ✅ NUEVO: Método para actualizar puntos del cliente después de la venta
   Future<void> updateCustomerAfterSale() async {
     if (selectedCustomer.value == null) return;
-    
+
     try {
       final customer = selectedCustomer.value!;
       // 🎯 AQUÍ ESTÁ LA LÓGICA: Usar la tasa del cliente
       final pointsEarned = customer.calculatePointsEarned(total);
       final newAccumulatedPoints = customer.accumulatedPoints + pointsEarned;
       final newTotalPurchases = customer.totalPurchases + total;
-      
+
       // Actualizar puntos acumulados y total de compras
       await SQLiteDatabaseService.updateCustomer(
         customer.copyWith(
@@ -311,7 +316,7 @@ class PosController extends GetxController {
           updatedAt: DateTime.now(),
         ),
       );
-      
+
       // Actualizar el cliente en memoria
       selectedCustomer.value = customer.copyWith(
         accumulatedPoints: newAccumulatedPoints,
@@ -319,9 +324,10 @@ class PosController extends GetxController {
         lastPurchase: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      
-      print('✅ Cliente actualizado: ${customer.name} - Puntos ganados: $pointsEarned - Acumulados: $newAccumulatedPoints - Total: \$${newTotalPurchases}');
-      
+
+      print(
+          '✅ Cliente actualizado: ${customer.name} - Puntos ganados: $pointsEarned - Acumulados: $newAccumulatedPoints - Total: \$${newTotalPurchases}');
+
       // Limpiar cliente seleccionado
       selectedCustomer.value = null;
     } catch (e) {
@@ -330,17 +336,21 @@ class PosController extends GetxController {
   }
 
   // Agregar producto al carrito
-  void addToCart(String name, double price, String unit, {
+  void addToCart(
+    String name,
+    double price,
+    String unit, {
     int quantity = 1,
     int? availableStock,
   }) {
     // Buscar si el producto ya existe en el carrito
     final existingIndex = cartItems.indexWhere((item) => item.name == name);
-    
+
     if (existingIndex >= 0) {
       // Si existe, verificar stock antes de aumentar
       final currentQuantity = cartItems[existingIndex].quantity;
-      if (availableStock != null && currentQuantity + quantity > availableStock) {
+      if (availableStock != null &&
+          currentQuantity + quantity > availableStock) {
         Get.snackbar(
           'Stock insuficiente',
           'No hay más unidades disponibles de $name',
@@ -369,11 +379,10 @@ class PosController extends GetxController {
         price: price,
         unit: unit,
         quantity: quantity,
-
       ));
     }
   }
-  
+
   // Cambiar precio temporal de un item del carrito
   void changeItemPrice(int index, double newPrice) {
     if (index >= 0 && index < cartItems.length) {
@@ -384,11 +393,10 @@ class PosController extends GetxController {
         price: newPrice,
         unit: item.unit,
         quantity: item.quantity,
-
       );
       cartItems[index] = updatedItem;
       cartItems.refresh();
-      
+
       Get.snackbar(
         'Precio actualizado',
         'Precio cambiado a \$${newPrice.toStringAsFixed(0)}',
@@ -399,17 +407,13 @@ class PosController extends GetxController {
     }
   }
 
-
-
-  
-  
   // Remover producto del carrito
   void removeFromCart(int index) {
     if (index >= 0 && index < cartItems.length) {
       cartItems.removeAt(index);
     }
   }
-  
+
   // Cambiar cantidad de un producto
   void updateQuantity(int index, int newQuantity) {
     if (index >= 0 && index < cartItems.length && newQuantity > 0) {
@@ -417,7 +421,7 @@ class PosController extends GetxController {
       cartItems.refresh();
     }
   }
-  
+
   // Cambiar precio de un producto del carrito
   void updateItemPrice(int index, double newPrice) {
     if (index >= 0 && index < cartItems.length && newPrice > 0) {
@@ -425,9 +429,7 @@ class PosController extends GetxController {
       cartItems.refresh();
     }
   }
-  
 
-  
   // Limpiar carrito
   void clearCart() {
     cartItems.clear();
@@ -438,33 +440,25 @@ class PosController extends GetxController {
       snackPosition: SnackPosition.BOTTOM,
     );
   }
-  
 
-  
-  
-  
-
-  
-
-  
   // Calcular subtotal
   double get subtotal {
     return cartItems.fold(0.0, (sum, item) => sum + item.total);
   }
-  
+
   // Calcular impuestos (19%)
   double get taxes {
     return subtotal * 0.19;
   }
-  
+
   // Calcular total
   double get total {
     return subtotal + taxes;
   }
-  
+
   // ✅ NUEVO: Getter para obtener el cliente actual
   Client? get currentClient => selectedClient.value;
-  
+
   // ✅ NUEVA FUNCIÓN: Forzar limpieza de focus después de completar venta
   void _forceFocusCleanup() {
     // Forzar que se pierda el focus de cualquier widget
@@ -472,10 +466,14 @@ class PosController extends GetxController {
       FocusManager.instance.primaryFocus?.unfocus();
     });
   }
-  
+
   // Procesar pago
   void processPayment() async {
-    final NumberFormat copFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0');
+    final NumberFormat copFormat = NumberFormat.currency(
+        locale: 'es_CO',
+        symbol: '\$ ',
+        decimalDigits: 0,
+        customPattern: '\u00A4#,##0');
     if (cartItems.isEmpty) {
       Get.snackbar(
         'Carrito vacío',
@@ -484,7 +482,7 @@ class PosController extends GetxController {
       );
       return;
     }
-    
+
     // Mostrar opciones de pago
     Get.dialog(
       Dialog(
@@ -502,10 +500,13 @@ class PosController extends GetxController {
               const SizedBox(height: 16),
               Text(
                 'Total a pagar: ${copFormat.format(total)}',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50)),
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4CAF50)),
               ),
               const SizedBox(height: 24),
-              
+
               // Opciones de pago
               Row(
                 children: [
@@ -514,9 +515,9 @@ class PosController extends GetxController {
                       icon: Icons.money,
                       title: 'Efectivo',
                       subtitle: 'Pago en efectivo',
-                      onTap: () => _processPaymentWithMethod('Efectivo'),
+                      onTap: () => _showCashReceivedDialog(copFormat),
                     ),
-              ),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _PaymentOption(
@@ -550,22 +551,431 @@ class PosController extends GetxController {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-                  TextButton(
-                    onPressed: () => Get.back(),
-                child: const Text('Cancelar', style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 12),
+              // Pago mixto: parte efectivo, parte Nequi, etc.
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showMixedPaymentDialog(copFormat),
+                  icon: const Icon(Icons.account_balance_wallet),
+                  label: const Text(
+                      'Pago mixto (ej. parte efectivo, parte Nequi)'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    foregroundColor: Colors.deepPurple,
+                    side: const BorderSide(color: Colors.deepPurple),
                   ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancelar', style: TextStyle(fontSize: 16)),
+              ),
             ],
           ),
         ),
       ),
     );
   }
-  
-  void _processPaymentWithMethod(String method) async {
-    final NumberFormat copFormat = NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0');
+
+  /// Tras confirmar pago en efectivo: abre cajón para entregar vuelto, luego procesa venta y pregunta si imprime.
+  Future<void> _onConfirmCashPayment() async {
+    try {
+      final printService = PrintService.instance;
+      await printService.initialize();
+      Get.snackbar(
+        'Entregue el vuelto',
+        'Abriendo cajón monedero...',
+        backgroundColor: Colors.blue,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      await printService.openCashDrawer();
+    } catch (_) {}
+    _processPaymentWithMethod('Efectivo');
+  }
+
+  /// Diálogo para pago en efectivo: ingresa monto recibido y muestra vuelto.
+  /// Usa punto de miles automático (Colombia) para no confundir cifras.
+  void _showCashReceivedDialog(NumberFormat copFormat) {
     Get.back(); // Cierra el diálogo de métodos de pago
-    
+    final totalToPay = total;
+    final controller = TextEditingController(
+      text: formatMontoPuntosMiles(totalToPay),
+    );
+    final vuelto = 0.0.obs;
+    final canConfirm = false.obs;
+
+    void updateVuelto() {
+      final value = parseMontoPuntosMiles(controller.text) ?? 0;
+      canConfirm.value = value >= totalToPay;
+      vuelto.value = value >= totalToPay ? value - totalToPay : 0;
+    }
+
+    Get.dialog(
+      Dialog(
+        child: Container(
+          width: 380,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Pago en efectivo',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Total a pagar: ${copFormat.format(totalToPay)}',
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4CAF50)),
+              ),
+              const SizedBox(height: 20),
+              const Text('Monto con que paga:', style: TextStyle(fontSize: 14)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                  PuntosMilesInputFormatter(),
+                ],
+                decoration: const InputDecoration(
+                  prefixText: '\$ ',
+                  border: OutlineInputBorder(),
+                  hintText: 'Ej: 10.000',
+                ),
+                onChanged: (_) => updateVuelto(),
+                onSubmitted: (_) {
+                  final value = parseMontoPuntosMiles(controller.text) ?? 0;
+                  if (value >= totalToPay) {
+                    Get.back();
+                    _onConfirmCashPayment();
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              Obx(() => Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Vuelto:',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(
+                          '\$ ${formatMontoPuntosMiles(vuelto.value)}',
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepOrange),
+                        ),
+                      ],
+                    ),
+                  )),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Obx(() => ElevatedButton.icon(
+                          onPressed: canConfirm.value
+                              ? () {
+                                  Get.back();
+                                  _onConfirmCashPayment();
+                                }
+                              : null,
+                          icon: const Icon(Icons.check),
+                          label: const Text('Confirmar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        )),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => updateVuelto());
+    controller.addListener(updateVuelto);
+  }
+
+  static const List<String> _paymentMethodOptions = [
+    'Efectivo',
+    'Tarjeta',
+    'Transferencia',
+    'QR',
+  ];
+
+  void _showMixedPaymentDialog(NumberFormat copFormat) {
+    Get.back(); // Cierra el diálogo de métodos de pago
+    final totalToPay = total;
+    final parts = <PaymentPart>[];
+    final amountControllers = <TextEditingController>[];
+
+    void addRow() {
+      parts.add(PaymentPart(method: 'Efectivo', amount: 0));
+      amountControllers.add(TextEditingController(text: '0'));
+    }
+
+    addRow(); // Una fila inicial
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setState) {
+          double suma = 0;
+          for (var i = 0; i < amountControllers.length; i++) {
+            suma += double.tryParse(amountControllers[i]
+                    .text
+                    .replaceAll(RegExp(r'[^\d.]'), '')) ??
+                0.0;
+          }
+          final restante = totalToPay - suma;
+          final canConfirm = parts.isNotEmpty &&
+              suma >= totalToPay - 0.01 &&
+              suma <= totalToPay + 0.01;
+
+          return Dialog(
+            child: Container(
+              width: 420,
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Pago mixto',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Total: ${copFormat.format(totalToPay)}',
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF4CAF50)),
+                    ),
+                    const SizedBox(height: 16),
+                    ...List.generate(parts.length, (i) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 130,
+                              child: DropdownButton<String>(
+                                value: parts[i].method,
+                                isExpanded: true,
+                                items: _paymentMethodOptions
+                                    .map((m) => DropdownMenuItem(
+                                        value: m, child: Text(m)))
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    parts[i] = PaymentPart(
+                                        method: v, amount: parts[i].amount);
+                                    setState(() {});
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 100,
+                              child: TextField(
+                                controller: amountControllers[i],
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  prefixText: '\$ ',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                onChanged: (_) => setState(() {}),
+                              ),
+                            ),
+                            if (parts.length > 1)
+                              IconButton(
+                                icon: const Icon(Icons.remove_circle_outline),
+                                onPressed: () {
+                                  amountControllers[i].dispose();
+                                  amountControllers.removeAt(i);
+                                  parts.removeAt(i);
+                                  setState(() {});
+                                },
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () {
+                        addRow();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar otro pago'),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: restante.abs() < 0.01
+                            ? Colors.green.shade50
+                            : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: restante.abs() < 0.01
+                                ? Colors.green
+                                : Colors.orange),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Suma: ${copFormat.format(suma)}'),
+                          Text(
+                            'Restante: ${copFormat.format(restante)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        TextButton(
+                            onPressed: () {
+                              for (final c in amountControllers) c.dispose();
+                              Get.back();
+                            },
+                            child: const Text('Cancelar')),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: canConfirm
+                                ? () {
+                                    for (var i = 0; i < parts.length; i++) {
+                                      final a = double.tryParse(
+                                              amountControllers[i]
+                                                  .text
+                                                  .replaceAll(
+                                                      RegExp(r'[^\d.]'), '')) ??
+                                          0.0;
+                                      parts[i] = PaymentPart(
+                                          method: parts[i].method, amount: a);
+                                    }
+                                    for (final c in amountControllers)
+                                      c.dispose();
+                                    Get.back();
+                                    _processPaymentWithBreakdown(
+                                        List.from(parts), copFormat);
+                                  }
+                                : null,
+                            icon: const Icon(Icons.check),
+                            label: const Text('Confirmar'),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      barrierDismissible: false,
+    );
+  }
+
+  void _processPaymentWithBreakdown(
+      List<PaymentPart> parts, NumberFormat copFormat) async {
+    Get.back();
+    final totalToPay = total;
+    final sum = parts.fold(0.0, (s, p) => s + p.amount);
+    if (sum < totalToPay - 0.01 || sum > totalToPay + 0.01) {
+      Get.snackbar('Error', 'La suma de los pagos debe ser igual al total',
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+    try {
+      final sale = Sale(
+        date: DateTime.now(),
+        total: totalToPay,
+        user: AuthService.to.currentUser?.username ?? 'usuario',
+        paymentMethod: 'Mixto',
+        paymentBreakdown: parts,
+        items: cartItems
+            .map((item) => SaleItem(
+                  name: item.name,
+                  price: item.price,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                ))
+            .toList(),
+      );
+      await SQLiteDatabaseService.saveSale(sale);
+      try {
+        final currentUser = AuthService.to.currentUser;
+        if (currentUser != null && currentUser.id != null) {
+          for (final part in parts) {
+            await AccountingService.recordSaleIncome(
+              part.amount,
+              'Venta POS - ${part.method}',
+              currentUser.id!,
+              paymentMethod: part.method,
+              reference: 'sale_mixto',
+            );
+          }
+        }
+      } catch (e) {
+        print('❌ Error registrando ingreso contable: $e');
+      }
+      await updateCustomerAfterSale();
+      _showPrintConfirmationDialog(sale, 'Mixto', copFormat);
+    } catch (e) {
+      Get.snackbar('Error', 'Error al procesar la venta: $e',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  void _processPaymentWithMethod(String method) async {
+    final NumberFormat copFormat = NumberFormat.currency(
+        locale: 'es_CO',
+        symbol: '\$ ',
+        decimalDigits: 0,
+        customPattern: '\u00A4#,##0');
+    Get.back(); // Cierra el diálogo de métodos de pago
+
     try {
       // Crear la venta
       final sale = Sale(
@@ -573,17 +983,19 @@ class PosController extends GetxController {
         total: total,
         user: AuthService.to.currentUser?.username ?? 'usuario',
         paymentMethod: method,
-        items: cartItems.map((item) => SaleItem(
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          unit: item.unit,
-        )).toList(),
+        items: cartItems
+            .map((item) => SaleItem(
+                  name: item.name,
+                  price: item.price,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                ))
+            .toList(),
       );
-      
+
       // Guardar la venta
       await SQLiteDatabaseService.saveSale(sale);
-      
+
       // ✅ NUEVO: Registrar ingreso contable automático
       try {
         final currentUser = AuthService.to.currentUser;
@@ -601,12 +1013,12 @@ class PosController extends GetxController {
         print('❌ Error registrando ingreso contable: $e');
         // No interrumpir la venta por error contable
       }
-      
+
       // ✅ NUEVO: Actualizar puntos del cliente si hay uno seleccionado
       await updateCustomerAfterSale();
-      
+
       // El stock se actualiza automáticamente en saveSale
-      
+
       // Mostrar confirmación con opción de imprimir
       _showPrintConfirmationDialog(sale, method, copFormat);
     } catch (e) {
@@ -619,31 +1031,32 @@ class PosController extends GetxController {
       );
     }
   }
-  
+
   // Mostrar diálogo de confirmación con opción de imprimir
-  void _showPrintConfirmationDialog(Sale sale, String method, NumberFormat copFormat) {
+  void _showPrintConfirmationDialog(
+      Sale sale, String method, NumberFormat copFormat) {
     // Nodos de foco para los botones
     final FocusNode yesButtonFocus = FocusNode();
     final FocusNode noButtonFocus = FocusNode();
-    
+
     // Variable para prevenir ejecución duplicada
     bool isProcessing = false;
-    
+
     // Enfocar el botón "SÍ" automáticamente
     WidgetsBinding.instance.addPostFrameCallback((_) {
       yesButtonFocus.requestFocus();
     });
-    
+
     // Función para imprimir (solo se ejecuta una vez)
     void handlePrint() {
       if (isProcessing) return;
       isProcessing = true;
-      
+
       print('🖨️ Ejecutando handlePrint()...');
-      
+
       // ✅ MEJORADO: Cerrar modal inmediatamente
       Get.back();
-      
+
       // ✅ MEJORADO: Feedback visual después de cerrar
       Get.snackbar(
         '🖨️ Imprimiendo...',
@@ -652,7 +1065,7 @@ class PosController extends GetxController {
         colorText: Colors.white,
         duration: const Duration(seconds: 1),
       );
-      
+
       // ✅ MEJORADO: Ejecutar impresión después de cerrar modal
       Future.delayed(const Duration(milliseconds: 100), () {
         _printReceipt(sale, method, copFormat);
@@ -664,22 +1077,22 @@ class PosController extends GetxController {
           colorText: Colors.white,
           duration: const Duration(seconds: 2),
         );
-        
+
         // ✅ NUEVO: Forzar limpieza de focus después de completar venta
         _forceFocusCleanup();
       });
     }
-    
+
     // Función para no imprimir (solo se ejecuta una vez)
     void handleNoPrint() {
       if (isProcessing) return;
       isProcessing = true;
-      
+
       print('❌ Ejecutando handleNoPrint()...');
-      
+
       // ✅ MEJORADO: Cerrar modal inmediatamente
       Get.back();
-      
+
       // ✅ MEJORADO: Feedback visual después de cerrar
       Get.snackbar(
         '✅ Venta completada',
@@ -688,16 +1101,16 @@ class PosController extends GetxController {
         colorText: Colors.white,
         duration: const Duration(seconds: 1),
       );
-      
+
       // ✅ MEJORADO: Limpiar carrito después de cerrar modal
       Future.delayed(const Duration(milliseconds: 100), () {
         clearCart();
-        
+
         // ✅ NUEVO: Limpiar campo de búsqueda para evitar que la "N" quede ahí
         print('🔧 DEBUG: Llamando callback para limpiar campo de búsqueda...');
         onClearSearchField?.call();
         print('🔧 DEBUG: Callback ejecutado correctamente');
-        
+
         // ✅ NUEVO: Notificar que se debe restaurar el foco
         Get.snackbar(
           '✅ Listo para siguiente cliente',
@@ -706,12 +1119,12 @@ class PosController extends GetxController {
           colorText: Colors.white,
           duration: const Duration(seconds: 2),
         );
-        
+
         // ✅ NUEVO: Forzar limpieza de focus después de completar venta
         _forceFocusCleanup();
       });
     }
-    
+
     Get.dialog(
       Dialog(
         child: RawKeyboardListener(
@@ -724,28 +1137,28 @@ class PosController extends GetxController {
               // - S: Imprimir recibo (acceso rápido)
               // - Escape: No imprimir
               // - N: No imprimir (acceso rápido)
-              
+
               // Debug: Imprimir la tecla presionada
               print('🔍 Tecla presionada: ${event.logicalKey.keyLabel}');
-              
+
               if (event.logicalKey == LogicalKeyboardKey.enter) {
                 print('✅ Enter detectado - Imprimiendo...');
                 handlePrint();
               } else if (event.logicalKey == LogicalKeyboardKey.escape) {
                 print('❌ Escape detectado - No imprimir...');
                 handleNoPrint();
-              } else if (event.logicalKey == LogicalKeyboardKey.keyS || 
-                         event.logicalKey.keyLabel == 'S' ||
-                         event.logicalKey.keyLabel == 's' ||
-                         event.character == 'S' ||
-                         event.character == 's') {
+              } else if (event.logicalKey == LogicalKeyboardKey.keyS ||
+                  event.logicalKey.keyLabel == 'S' ||
+                  event.logicalKey.keyLabel == 's' ||
+                  event.character == 'S' ||
+                  event.character == 's') {
                 print('✅ S detectado - Imprimiendo...');
                 handlePrint();
-              } else if (event.logicalKey == LogicalKeyboardKey.keyN || 
-                         event.logicalKey.keyLabel == 'N' ||
-                         event.logicalKey.keyLabel == 'n' ||
-                         event.character == 'N' ||
-                         event.character == 'n') {
+              } else if (event.logicalKey == LogicalKeyboardKey.keyN ||
+                  event.logicalKey.keyLabel == 'N' ||
+                  event.logicalKey.keyLabel == 'n' ||
+                  event.character == 'N' ||
+                  event.character == 'n') {
                 print('❌ N detectado - No imprimir...');
                 handleNoPrint();
               }
@@ -770,22 +1183,25 @@ class PosController extends GetxController {
                 const SizedBox(height: 8),
                 Text(
                   'Total: ${copFormat.format(total)}',
-                  style: const TextStyle(fontSize: 18, color: Color(0xFF4CAF50)),
+                  style:
+                      const TextStyle(fontSize: 18, color: Color(0xFF4CAF50)),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Método: $method',
+                  method == 'Mixto' && sale.paymentBreakdown != null
+                      ? 'Método: Mixto (${sale.paymentBreakdown!.map((p) => '${p.method}: ${copFormat.format(p.amount)}').join(', ')})'
+                      : 'Método: $method',
                   style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Pregunta sobre imprimir
                 const Text(
                   '¿Desea imprimir el recibo?',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Botones de respuesta
                 Row(
                   children: [
@@ -803,7 +1219,7 @@ class PosController extends GetxController {
                         child: const Text(
                           'SÍ (S)',
                           style: TextStyle(
-                            color: Colors.white, 
+                            color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -825,7 +1241,7 @@ class PosController extends GetxController {
                         child: const Text(
                           'NO (N)',
                           style: TextStyle(
-                            color: Colors.black87, 
+                            color: Colors.black87,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -835,7 +1251,7 @@ class PosController extends GetxController {
                   ],
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Texto de ayuda actualizado
                 const Text(
                   'Presiona Enter/S para imprimir o Escape/N para continuar',
@@ -851,12 +1267,12 @@ class PosController extends GetxController {
       transitionDuration: const Duration(milliseconds: 200),
     );
   }
-  
+
   // Imprimir recibo
   void _printReceipt(Sale sale, String method, NumberFormat copFormat) async {
     try {
       print('🖨️ Iniciando proceso de impresión...');
-      
+
       // Mostrar diálogo de imprimiendo
       Get.dialog(
         Dialog(
@@ -878,14 +1294,15 @@ class PosController extends GetxController {
         ),
         barrierDismissible: false,
       );
-      
+
       // Inicializar servicio de impresión
       final printService = PrintService.instance;
       await printService.initialize();
-      
-      print('🔍 Estado de la impresora: ${printService.isConnected ? 'Conectada' : 'No conectada'}');
+
+      print(
+          '🔍 Estado de la impresora: ${printService.isConnected ? 'Conectada' : 'No conectada'}');
       print('🔌 Puerto: ${printService.printerPort}');
-      
+
       // Verificar si la impresora está conectada
       if (!printService.isConnected) {
         Get.back(); // Cerrar diálogo de imprimiendo
@@ -900,25 +1317,20 @@ class PosController extends GetxController {
         clearCart();
         return;
       }
-      
+
       // Imprimir recibo
       final success = await printService.printReceipt(
-        sale, 
-        cartItems, 
-        subtotal, 
-        taxes, 
-        total,
-        paymentMethod: sale.paymentMethod
-      );
-      
+          sale, cartItems, subtotal, taxes, total,
+          paymentMethod: sale.paymentMethod);
+
       Get.back(); // Cerrar diálogo de imprimiendo
-      
+
       if (success) {
         print('✅ Recibo impreso exitosamente');
-        
+
         // Esperar un momento antes de abrir el cajón (para que la impresora termine)
         await Future.delayed(const Duration(milliseconds: 500));
-        
+
         // Abrir cajón monedero automáticamente
         print('💰 Intentando abrir cajón monedero...');
         final drawerOpened = await printService.openCashDrawer();
@@ -927,7 +1339,7 @@ class PosController extends GetxController {
         } else {
           print('❌ Error: El cajón monedero NO se pudo abrir');
         }
-        
+
         Get.snackbar(
           'Venta completada',
           'El recibo se imprimió correctamente${drawerOpened ? ' y el cajón se abrió' : ''}\n¡Listo para la siguiente venta!',
@@ -947,10 +1359,10 @@ class PosController extends GetxController {
           duration: const Duration(seconds: 3),
         );
       }
-      
+
       // Limpiar el carrito y regresar al POS listo para la siguiente venta
       clearCart();
-      
+
       // Asegurar que estamos en la pantalla de POS
       await Future.delayed(const Duration(milliseconds: 500));
       Get.offAllNamed('/pos'); // Regresar al POS limpio y listo
@@ -1014,4 +1426,4 @@ class _PaymentOption extends StatelessWidget {
       ),
     );
   }
-} 
+}

@@ -30,32 +30,30 @@ class PosScreen extends StatefulWidget {
 
 class _PosScreenState extends State<PosScreen> {
   final TextEditingController _barcodeController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController(text: '1');
+  final TextEditingController _quantityController =
+      TextEditingController(text: '1');
   final FocusNode _barcodeFocus = FocusNode();
   final FocusNode _quantityFocus = FocusNode();
-  
+
   List<Product> _products = [];
   bool _isLoading = true;
   String _currentMode = 'barcode'; // barcode, quantity, payment
   Product? _selectedProduct;
   bool _isTactileMode = false; // Modo táctil activado/desactivado
-  
+
   // Controlador del POS
   late PosController _posController;
-  
 
-  
   // Variables para autorización
   bool _isAuthorized = false;
   DateTime? _authorizationTime;
   String? _authorizedUser;
-  
-  
+
   @override
   void initState() {
     super.initState();
     _posController = Get.put(PosController());
-    
+
     // ✅ NUEVO: Configurar callback para limpiar campo de búsqueda
     _posController.onClearSearchField = () {
       print('🔧 DEBUG: Callback ejecutado - Limpiando campo de búsqueda...');
@@ -66,10 +64,10 @@ class _PosScreenState extends State<PosScreen> {
     };
 
     _loadProducts();
-    
+
     // ✅ Auto-focus al barcode al iniciar
     _ensureBarcodeFocus();
-    
+
     // ✅ Verificar sesión de caja abierta; si no existe, solicitar apertura
     Future.microtask(() async {
       try {
@@ -84,7 +82,7 @@ class _PosScreenState extends State<PosScreen> {
       } catch (_) {}
     });
   }
-  
+
   @override
   void dispose() {
     _barcodeController.dispose();
@@ -93,7 +91,7 @@ class _PosScreenState extends State<PosScreen> {
     _quantityFocus.dispose();
     super.dispose();
   }
-  
+
   // ✅ FUNCIÓN HELPER PARA ASEGURAR FOCUS
   void _ensureBarcodeFocus() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -104,11 +102,7 @@ class _PosScreenState extends State<PosScreen> {
       });
     });
   }
-  
 
-  
-
-  
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
@@ -121,22 +115,22 @@ class _PosScreenState extends State<PosScreen> {
       _ensureBarcodeFocus();
     }
   }
-  
+
   String quitarTildes(String texto) {
     return texto
-      .replaceAll(RegExp(r'[áàäâã]'), 'a')
-      .replaceAll(RegExp(r'[éèëê]'), 'e')
-      .replaceAll(RegExp(r'[íìïî]'), 'i')
-      .replaceAll(RegExp(r'[óòöôõ]'), 'o')
-      .replaceAll(RegExp(r'[úùüû]'), 'u')
-      .replaceAll(RegExp(r'[ÁÀÄÂÃ]'), 'A')
-      .replaceAll(RegExp(r'[ÉÈËÊ]'), 'E')
-      .replaceAll(RegExp(r'[ÍÌÏÎ]'), 'I')
-      .replaceAll(RegExp(r'[ÓÒÖÔÕ]'), 'O')
-      .replaceAll(RegExp(r'[ÚÙÜÛ]'), 'U');
+        .replaceAll(RegExp(r'[áàäâã]'), 'a')
+        .replaceAll(RegExp(r'[éèëê]'), 'e')
+        .replaceAll(RegExp(r'[íìïî]'), 'i')
+        .replaceAll(RegExp(r'[óòöôõ]'), 'o')
+        .replaceAll(RegExp(r'[úùüû]'), 'u')
+        .replaceAll(RegExp(r'[ÁÀÄÂÃ]'), 'A')
+        .replaceAll(RegExp(r'[ÉÈËÊ]'), 'E')
+        .replaceAll(RegExp(r'[ÍÌÏÎ]'), 'I')
+        .replaceAll(RegExp(r'[ÓÒÖÔÕ]'), 'O')
+        .replaceAll(RegExp(r'[ÚÙÜÛ]'), 'U');
   }
-  
-    @override
+
+  @override
   Widget build(BuildContext context) {
     return KeyboardListener(
       focusNode: FocusNode(),
@@ -145,8 +139,13 @@ class _PosScreenState extends State<PosScreen> {
         // ✅ MEJORADO: Solo manejar teclas específicas, permitir que otras pasen
         if (event is KeyDownEvent) {
           final keyLabel = event.logicalKey.keyLabel;
-          if (keyLabel == 'F1' || keyLabel == 'F2' || keyLabel == 'F4' || 
-              keyLabel == 'F5' || keyLabel == 'F6' || keyLabel == 'Escape' || 
+          if (keyLabel == 'F1' ||
+              keyLabel == 'F2' ||
+              keyLabel == 'F3' ||
+              keyLabel == 'F4' ||
+              keyLabel == 'F5' ||
+              keyLabel == 'F6' ||
+              keyLabel == 'Escape' ||
               keyLabel == 'Enter') {
             _handleKeyPress(event);
           }
@@ -158,102 +157,105 @@ class _PosScreenState extends State<PosScreen> {
         body: Column(
           mainAxisSize: MainAxisSize.max,
           children: [
-          // AppBar degradado
-          Container(
-            width: double.infinity,
-            height: kToolbarHeight + 8,
-            padding: const EdgeInsets.only(top: 8),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF2979FF), Color(0xFF6C47FF)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  tooltip: 'Volver al Dashboard',
-                  onPressed: () {
-                    // ✅ SOLUCIÓN DIRECTA: Forzar navegación sin importar el estado
-                    Get.offAllNamed('/dashboard');
-                  },
-                ),
-                const Expanded(
-                  child: Center(
-                    child: Text(
-                      'SMART SELLER POS',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: _showHelp,
-                  icon: const Icon(Icons.help, color: Colors.white),
-                  tooltip: 'Ayuda (F1)',
-                ),
-              ],
-            ),
-          ),
-          
-          // Indicador de autorización
-          if (_isAuthorized && _authorizationTime != null)
+            // AppBar degradado
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.green.shade100,
-                border: Border.all(color: Colors.green.shade300),
+              height: kToolbarHeight + 8,
+              padding: const EdgeInsets.only(top: 8),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF2979FF), Color(0xFF6C47FF)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.verified_user, color: Colors.green.shade700, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Autorizado: ${_authorizedUser ?? 'Usuario'} - ${_getTimeRemaining()}',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.w500,
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    tooltip: 'Volver al Dashboard',
+                    onPressed: () {
+                      // ✅ SOLUCIÓN DIRECTA: Forzar navegación sin importar el estado
+                      Get.offAllNamed('/dashboard');
+                    },
+                  ),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'SMART SELLER POS',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
-                  TextButton(
-                    onPressed: _clearAuthorization,
-                    child: Text('Cerrar', style: TextStyle(color: Colors.green.shade700)),
+                  IconButton(
+                    onPressed: _showHelp,
+                    icon: const Icon(Icons.help, color: Colors.white),
+                    tooltip: 'Ayuda (F1)',
                   ),
                 ],
               ),
             ),
-            
-          Expanded(
-            child: Row(
-              children: [
-                // Panel izquierdo - Búsqueda y productos
-                Expanded(
-                  flex: 2,
-                  child: _buildLeftPanel(),
+
+            // Indicador de autorización
+            if (_isAuthorized && _authorizationTime != null)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  border: Border.all(color: Colors.green.shade300),
                 ),
-                // Panel derecho - Carrito y totales
-                Expanded(
-                  flex: 1,
-                  child: _buildRightPanel(),
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_user,
+                        color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Autorizado: ${_authorizedUser ?? 'Usuario'} - ${_getTimeRemaining()}',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _clearAuthorization,
+                      child: Text('Cerrar',
+                          style: TextStyle(color: Colors.green.shade700)),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+
+            Expanded(
+              child: Row(
+                children: [
+                  // Panel izquierdo - Búsqueda y productos
+                  Expanded(
+                    flex: 2,
+                    child: _buildLeftPanel(),
+                  ),
+                  // Panel derecho - Carrito y totales
+                  Expanded(
+                    flex: 1,
+                    child: _buildRightPanel(),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    ),  // Cierre del KeyboardListener
+          ],
+        ),
+      ), // Cierre del KeyboardListener
     );
   }
-  
+
   Widget _buildLeftPanel() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -262,12 +264,12 @@ class _PosScreenState extends State<PosScreen> {
           // Barra de búsqueda/escaneo
           _buildSearchBar(),
           const SizedBox(height: 16),
-          
+
           // Producto seleccionado
           if (_selectedProduct != null) _buildSelectedProduct(),
-          
+
           const SizedBox(height: 16),
-          
+
           // Lista de productos recientes
           Expanded(
             child: _buildRecentProducts(),
@@ -276,7 +278,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   Widget _buildSearchBar() {
     return Card(
       child: Padding(
@@ -285,24 +287,31 @@ class _PosScreenState extends State<PosScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _currentMode == 'barcode' 
-                ? '📱 Escanear código de barras'
-                : '⌨️ Ingresar cantidad',
+              _currentMode == 'barcode'
+                  ? '📱 Escanear código de barras'
+                  : '⌨️ Ingresar cantidad',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             TextField(
-              controller: _currentMode == 'barcode' ? _barcodeController : _quantityController,
-              focusNode: _currentMode == 'barcode' ? _barcodeFocus : _quantityFocus,
+              controller: _currentMode == 'barcode'
+                  ? _barcodeController
+                  : _quantityController,
+              focusNode:
+                  _currentMode == 'barcode' ? _barcodeFocus : _quantityFocus,
               autofocus: false, // ❌ Cambiado a false para evitar conflictos
-              keyboardType: _currentMode == 'quantity' ? TextInputType.number : TextInputType.text,
+              keyboardType: _currentMode == 'quantity'
+                  ? TextInputType.number
+                  : TextInputType.text,
               decoration: InputDecoration(
-                hintText: _currentMode == 'barcode' 
+                hintText: _currentMode == 'barcode'
                     ? 'Escanear código o escribir código PLU...'
                     : 'Cantidad (Enter = 1)',
                 border: const OutlineInputBorder(),
                 suffixIcon: Icon(
-                  _currentMode == 'barcode' ? Icons.qr_code_scanner : Icons.keyboard,
+                  _currentMode == 'barcode'
+                      ? Icons.qr_code_scanner
+                      : Icons.keyboard,
                 ),
               ),
               onSubmitted: (value) => _handleSubmit(value),
@@ -310,7 +319,8 @@ class _PosScreenState extends State<PosScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                _buildModeButton('barcode', '📱 Escanear', Icons.qr_code_scanner),
+                _buildModeButton(
+                    'barcode', '📱 Escanear', Icons.qr_code_scanner),
                 const SizedBox(width: 8),
                 // Botón de cantidad solo en modo táctil
                 if (_isTactileMode) ...[
@@ -320,12 +330,287 @@ class _PosScreenState extends State<PosScreen> {
                 _buildModeButton('payment', '💳 Pago', Icons.payment),
               ],
             ),
+            // En modo táctil: teclado en pantalla y ver todos los productos (cuando no está en la imagen)
+            if (_isTactileMode) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _showSearchKeyboard,
+                      icon: const Icon(Icons.keyboard, size: 20),
+                      label: const Text('Teclado para buscar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _showAllProductsDialog,
+                      icon: const Icon(Icons.list, size: 20),
+                      label: const Text('Ver todos'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
-  
+
+  void _showSearchKeyboard() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateSheet) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Escribir código o parte del nombre',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _barcodeController.text.isEmpty
+                              ? '...'
+                              : _barcodeController.text,
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _barcodeController.clear();
+                          setStateSheet(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildSearchKeypad(setStateSheet),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cerrar'),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          final value = _barcodeController.text.trim();
+                          Navigator.of(context).pop();
+                          if (value.isNotEmpty) _handleSubmit(value);
+                        },
+                        icon: const Icon(Icons.search),
+                        label: const Text('Buscar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchKeypad(StateSetter setStateSheet) {
+    final keys = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['0', '⌫', 'A-Z'],
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: keys.map((row) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: row.map((key) {
+              if (key == '⌫') {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (_barcodeController.text.isNotEmpty) {
+                          _barcodeController.text = _barcodeController.text
+                              .substring(0, _barcodeController.text.length - 1);
+                          setStateSheet(() {});
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Icon(Icons.backspace),
+                    ),
+                  ),
+                );
+              }
+              if (key == 'A-Z') {
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ElevatedButton(
+                      onPressed: () => _showLetterKeypad(setStateSheet),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('A-Z', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                );
+              }
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _barcodeController.text += key;
+                      setStateSheet(() {});
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: Text(key,
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  void _showLetterKeypad(StateSetter setStateSheet) {
+    final letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: letters.split('').map((char) {
+            return SizedBox(
+              width: 36,
+              child: ElevatedButton(
+                onPressed: () {
+                  _barcodeController.text += char.toLowerCase();
+                  setStateSheet(() {});
+                  Navigator.of(ctx).pop();
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: Size.zero,
+                ),
+                child: Text(char),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showAllProductsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.list, color: Colors.blue),
+            const SizedBox(width: 8),
+            Text('Todos los productos (${_products.length})'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 400,
+          child: ListView.builder(
+            itemCount: _products.length,
+            itemBuilder: (context, index) {
+              final product = _products[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.blue[100],
+                  child: Icon(Icons.inventory_2, color: Colors.blue[700]),
+                ),
+                title: Text(
+                  product.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  '${product.code} · \$${NumberFormat('#,0').format(product.price)}',
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _selectProduct(product);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildModeButton(String mode, String label, IconData icon) {
     final isSelected = _currentMode == mode;
     return Expanded(
@@ -341,7 +626,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   Widget _buildSelectedProduct() {
     return Card(
       color: Colors.blue[50],
@@ -362,7 +647,6 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   ),
                 ),
-
               ],
             ),
             const SizedBox(height: 8),
@@ -371,10 +655,11 @@ class _PosScreenState extends State<PosScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             Text('Código: ${_selectedProduct!.code}'),
-            Text('Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
+            Text(
+                'Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
             Text('Stock: ${_selectedProduct!.stock}'),
             const SizedBox(height: 16),
-            
+
             // Campo de cantidad
             TextField(
               controller: _quantityController,
@@ -390,9 +675,7 @@ class _PosScreenState extends State<PosScreen> {
               onSubmitted: (value) => _addToCart(int.tryParse(value) ?? 1),
             ),
             const SizedBox(height: 16),
-            
 
-            
             // Botones de acción
             Row(
               children: [
@@ -410,7 +693,8 @@ class _PosScreenState extends State<PosScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _addToCart(int.tryParse(_quantityController.text) ?? 1),
+                    onPressed: () =>
+                        _addToCart(int.tryParse(_quantityController.text) ?? 1),
                     icon: const Icon(Icons.add_shopping_cart),
                     label: const Text('Agregar'),
                     style: ElevatedButton.styleFrom(
@@ -426,7 +710,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   Widget _buildRecentProducts() {
     return Card(
       child: Padding(
@@ -442,7 +726,8 @@ class _PosScreenState extends State<PosScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.blue[100],
                     borderRadius: BorderRadius.circular(12),
@@ -463,16 +748,18 @@ class _PosScreenState extends State<PosScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 4, // 4 columnas para más productos
-                        childAspectRatio: 0.9, // Más alto que ancho para mejor visualización
+                        childAspectRatio:
+                            0.9, // Más alto que ancho para mejor visualización
                         crossAxisSpacing: 8,
                         mainAxisSpacing: 8,
                       ),
                       itemCount: _products.take(12).length,
                       itemBuilder: (context, index) {
                         final product = _products[index];
-                        
+
                         return _ProductButton(
                           product: product,
                           teclaNumero: '', // ❌ SIN NÚMERO DE TECLA
@@ -486,36 +773,58 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   Widget _buildRightPanel() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // ✅ NUEVO: Selección de cliente del sistema
-          _buildCustomerSelection(),
-          const SizedBox(height: 16),
-          
-          // ✅ NUEVO: Cliente para facturación electrónica
-          _buildElectronicInvoiceClient(),
-          const SizedBox(height: 16),
-          
-          // Totales
-          _buildTotals(),
-          const SizedBox(height: 16),
-          
-          // Carrito
-          Expanded(
-            child: _buildCart(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Altura mínima para el carrito: en pantallas pequeñas (ej. segunda pantalla del cliente)
+        // así siempre se ven al menos 2-3 productos además del subtotal e IVA.
+        const double minCartHeight = 220.0;
+        final availableHeight = constraints.maxHeight;
+        final fixedHeights = 16.0 * 4 +
+            80 +
+            80 +
+            120 +
+            80; // aprox. clientes + totales + botones
+        final cartHeight = (availableHeight - fixedHeights)
+            .clamp(minCartHeight, double.infinity);
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                children: [
+                  // ✅ Selección de cliente del sistema
+                  _buildCustomerSelection(),
+                  const SizedBox(height: 16),
+
+                  // ✅ Cliente para facturación electrónica
+                  _buildElectronicInvoiceClient(),
+                  const SizedBox(height: 16),
+
+                  // Totales
+                  _buildTotals(),
+                  const SizedBox(height: 16),
+
+                  // Carrito: altura mínima para que siempre se vean productos (resoluciones pequeñas)
+                  SizedBox(
+                    height: cartHeight,
+                    child: _buildCart(),
+                  ),
+
+                  // Botones de acción
+                  _buildActionButtons(),
+                ],
+              ),
+            ),
           ),
-          
-          // Botones de acción
-          _buildActionButtons(),
-        ],
-      ),
+        );
+      },
     );
   }
-  
+
   // ✅ NUEVO: Widget para selección de cliente
   Widget _buildCustomerSelection() {
     return Card(
@@ -579,7 +888,8 @@ class _PosScreenState extends State<PosScreen> {
                     if (customer.documentNumber != null)
                       Text(
                         'Doc: ${customer.documentNumber}',
-                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                   ],
                 );
@@ -613,7 +923,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   // ✅ NUEVO: Widget para cliente de facturación electrónica
   Widget _buildElectronicInvoiceClient() {
     return Card(
@@ -632,13 +942,20 @@ class _PosScreenState extends State<PosScreen> {
                 ),
                 Obx(() {
                   if (_posController.currentClient != null) {
-                    final validationSummary = ClientValidationService.getClientValidationSummary(_posController.currentClient!);
-                    final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
-                    
+                    final validationSummary =
+                        ClientValidationService.getClientValidationSummary(
+                            _posController.currentClient!);
+                    final canReceiveInvoice =
+                        validationSummary['canReceiveElectronicInvoice']
+                            as bool;
+
                     return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: canReceiveInvoice ? Colors.green[100] : Colors.red[100],
+                        color: canReceiveInvoice
+                            ? Colors.green[100]
+                            : Colors.red[100],
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -646,7 +963,9 @@ class _PosScreenState extends State<PosScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: canReceiveInvoice ? Colors.green[800] : Colors.red[800],
+                          color: canReceiveInvoice
+                              ? Colors.green[800]
+                              : Colors.red[800],
                         ),
                       ),
                     );
@@ -659,10 +978,13 @@ class _PosScreenState extends State<PosScreen> {
             Obx(() {
               if (_posController.currentClient != null) {
                 final client = _posController.currentClient!;
-                final validationSummary = ClientValidationService.getClientValidationSummary(client);
-                final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
-                final missingFields = validationSummary['missingFields'] as List<String>;
-                
+                final validationSummary =
+                    ClientValidationService.getClientValidationSummary(client);
+                final canReceiveInvoice =
+                    validationSummary['canReceiveElectronicInvoice'] as bool;
+                final missingFields =
+                    validationSummary['missingFields'] as List<String>;
+
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -671,7 +993,9 @@ class _PosScreenState extends State<PosScreen> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: canReceiveInvoice ? Colors.green[800] : Colors.red[800],
+                        color: canReceiveInvoice
+                            ? Colors.green[800]
+                            : Colors.red[800],
                       ),
                     ),
                     Text(
@@ -685,7 +1009,8 @@ class _PosScreenState extends State<PosScreen> {
                     if (client.city != null && client.department != null)
                       Text(
                         '${client.city}, ${client.department}',
-                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     if (!canReceiveInvoice && missingFields.isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -747,9 +1072,10 @@ class _PosScreenState extends State<PosScreen> {
                   style: TextStyle(fontSize: 16),
                 ),
                 Obx(() => Text(
-                  '\$${_posController.subtotal.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                )),
+                      '\$${_posController.subtotal.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    )),
               ],
             ),
             const SizedBox(height: 8),
@@ -762,9 +1088,10 @@ class _PosScreenState extends State<PosScreen> {
                   style: TextStyle(fontSize: 16),
                 ),
                 Obx(() => Text(
-                  '\$${_posController.taxes.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                )),
+                      '\$${_posController.taxes.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    )),
               ],
             ),
             const Divider(),
@@ -781,14 +1108,14 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                 ),
                 Obx(() => Text(
-                  '\$${_posController.total.toStringAsFixed(0)}',
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange,
-                  ),
-                )),
+                      '\$${_posController.total.toStringAsFixed(0)}',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    )),
               ],
             ),
           ],
@@ -796,9 +1123,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
 
-  
   Widget _buildCart() {
     return Card(
       child: Padding(
@@ -814,9 +1139,9 @@ class _PosScreenState extends State<PosScreen> {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Obx(() => Text(
-                  '${_posController.cartItems.length} items',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                )),
+                      '${_posController.cartItems.length} items',
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    )),
               ],
             ),
             const SizedBox(height: 16),
@@ -831,7 +1156,7 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   );
                 }
-                
+
                 return ListView.builder(
                   itemCount: _posController.cartItems.length,
                   itemBuilder: (context, index) {
@@ -845,7 +1170,8 @@ class _PosScreenState extends State<PosScreen> {
                         item.name,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      subtitle: Text('${item.unit} x \$${item.price.toStringAsFixed(0)}'),
+                      subtitle: Text(
+                          '${item.unit} x \$${item.price.toStringAsFixed(0)}'),
                       trailing: Text(
                         '\$${(item.quantity * item.price).toStringAsFixed(0)}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -861,118 +1187,192 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   Widget _buildActionButtons() {
-    return Column(
-      children: [
-        // Fila de botones principales
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 520;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _showAccountingModal,
-                icon: const Icon(Icons.account_balance),
-                label: const Text('Conta (F4)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+            // Fila de botones principales: Wrap en pantallas estrechas para que no queden como columnas
+            isNarrow
+                ? Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _actionBtn(
+                        onPressed: _showAccountingModal,
+                        icon: Icons.account_balance,
+                        label: 'Conta (F4)',
+                        color: Colors.red,
+                      ),
+                      _actionBtn(
+                        onPressed: _openCashDrawer,
+                        icon: Icons.account_balance_wallet,
+                        label: 'Cajón (F5)',
+                        color: Colors.orange,
+                      ),
+                      _actionBtn(
+                        onPressed: _toggleTactileMode,
+                        icon: _isTactileMode ? Icons.keyboard : Icons.touch_app,
+                        label: _isTactileMode ? 'KB' : 'Touch',
+                        color:
+                            _isTactileMode ? Colors.grey[600]! : Colors.purple,
+                        isTactile: _isTactileMode,
+                      ),
+                      _actionBtn(
+                        onPressed: _finalizeSale,
+                        icon: Icons.payment,
+                        label: 'Finalizar Venta (F6)',
+                        color: Colors.green,
+                        wide: true,
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _actionBtn(
+                          onPressed: _showAccountingModal,
+                          icon: Icons.account_balance,
+                          label: 'Conta (F4)',
+                          color: Colors.red,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _actionBtn(
+                          onPressed: _openCashDrawer,
+                          icon: Icons.account_balance_wallet,
+                          label: 'Cajón (F5)',
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _actionBtn(
+                          onPressed: _toggleTactileMode,
+                          icon:
+                              _isTactileMode ? Icons.keyboard : Icons.touch_app,
+                          label: _isTactileMode ? 'KB' : 'Touch',
+                          color: _isTactileMode
+                              ? Colors.grey[600]!
+                              : Colors.purple,
+                          isTactile: _isTactileMode,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: _actionBtn(
+                          onPressed: _finalizeSale,
+                          icon: Icons.payment,
+                          label: 'Finalizar Venta (F6)',
+                          color: Colors.green,
+                          wide: true,
+                        ),
+                      ),
+                    ],
+                  ),
+            const SizedBox(height: 8),
+            // Fila de botones secundarios (cliente)
+            Row(
+              children: [
+                Expanded(
+                  child: Obx(() => ElevatedButton.icon(
+                        onPressed: _showClientSelectionDialog,
+                        icon: Icon(
+                          _posController.currentClient != null
+                              ? Icons.person
+                              : Icons.person_add,
+                          color: _posController.currentClient != null
+                              ? Colors.white
+                              : Colors.blue[700],
+                        ),
+                        label: Text(
+                          _posController.currentClient != null
+                              ? 'Cliente: ${_posController.currentClient!.businessName}'
+                              : 'Seleccionar Cliente',
+                          style: TextStyle(
+                            fontSize: isNarrow ? 11 : 12,
+                            color: _posController.currentClient != null
+                                ? Colors.white
+                                : Colors.blue[700],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _posController.currentClient != null
+                              ? Colors.blue
+                              : Colors.blue[50],
+                          foregroundColor: _posController.currentClient != null
+                              ? Colors.white
+                              : Colors.blue[700],
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      )),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _openCashDrawer,
-                icon: const Icon(Icons.account_balance_wallet),
-                label: const Text('Cajón (F5)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _toggleTactileMode,
-                icon: Icon(_isTactileMode ? Icons.keyboard : Icons.touch_app),
-                label: Text(_isTactileMode ? 'KB' : 'Touch'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _isTactileMode ? Colors.grey[600] : Colors.purple,
-                  foregroundColor: Colors.white,
-                  elevation: _isTactileMode ? 2 : 8,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton.icon(
-                onPressed: _finalizeSale,
-                icon: const Icon(Icons.payment),
-                label: const Text('Finalizar Venta (F6)'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-              ),
+                if (_posController.currentClient != null) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: isNarrow ? 120 : null,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _posController.clearSelectedClient();
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.clear, size: 16),
+                      label: Text('Limpiar Cliente',
+                          style: TextStyle(fontSize: isNarrow ? 11 : 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        
-        // ✅ NUEVO: Fila de botones secundarios
-        Row(
-          children: [
-            Expanded(
-              child: Obx(() => ElevatedButton.icon(
-                onPressed: _showClientSelectionDialog,
-                icon: Icon(
-                  _posController.currentClient != null ? Icons.person : Icons.person_add,
-                  color: _posController.currentClient != null ? Colors.white : Colors.blue[700],
-                ),
-                label: Text(
-                  _posController.currentClient != null 
-                      ? 'Cliente: ${_posController.currentClient!.businessName}'
-                      : 'Seleccionar Cliente',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _posController.currentClient != null ? Colors.white : Colors.blue[700],
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _posController.currentClient != null ? Colors.blue : Colors.blue[50],
-                  foregroundColor: _posController.currentClient != null ? Colors.white : Colors.blue[700],
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                ),
-              )),
-            ),
-            if (_posController.currentClient != null) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _posController.clearSelectedClient();
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.clear, size: 16),
-                  label: const Text('Limpiar Cliente', style: TextStyle(fontSize: 12)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ],
+        );
+      },
     );
   }
-  
+
+  Widget _actionBtn({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+    bool wide = false,
+    bool isTactile = false,
+  }) {
+    return SizedBox(
+      width: wide ? null : 120,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 12),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1,
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          elevation: isTactile ? 2 : 8,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        ),
+      ),
+    );
+  }
+
   // ================== MÉTODOS DE LÓGICA ==================
-  
+
   void _handleKeyPress(KeyEvent event) {
     if (event is KeyDownEvent) {
       // Solo manejar teclas de función
@@ -982,6 +1382,9 @@ class _PosScreenState extends State<PosScreen> {
           break;
         case 'F2':
           _showReprintMenu(); // ✅ NUEVO: Abrir menú de reimpresión
+          break;
+        case 'F3':
+          _finalizeSaleElectronic(); // Facturación electrónica directa
           break;
         case 'F4':
           _showAccountingModal();
@@ -1004,10 +1407,10 @@ class _PosScreenState extends State<PosScreen> {
       }
     }
   }
-  
+
   void _handleSubmit(String value) {
     if (value.isEmpty) return;
-    
+
     switch (_currentMode) {
       case 'barcode':
         _searchProduct(value);
@@ -1020,24 +1423,23 @@ class _PosScreenState extends State<PosScreen> {
         break;
     }
   }
-  
+
   void _switchMode(String mode) {
     // Si hay un producto pesado seleccionado, no permitir cambiar a modo cantidad
 
-    
     setState(() {
       _currentMode = mode;
       if (mode != 'quantity') {
         _selectedProduct = null;
       }
     });
-    
+
     // Si está en modo táctil y se selecciona cantidad, mostrar diálogo táctil
     if (_isTactileMode && mode == 'quantity') {
       _showTactileQuantityDialog();
       return;
     }
-    
+
     // ✅ MEJORAR FOCUS - Con delay para asegurar que el widget se haya reconstruido
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -1051,15 +1453,16 @@ class _PosScreenState extends State<PosScreen> {
       });
     });
   }
-  
+
   void _toggleTactileMode() {
     setState(() {
       _isTactileMode = !_isTactileMode;
     });
   }
-  
+
   void _showTactileQuantityDialog() {
-    final controller = TextEditingController(text: ''); // Campo vacío por defecto
+    final controller =
+        TextEditingController(text: ''); // Campo vacío por defecto
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1084,11 +1487,15 @@ class _PosScreenState extends State<PosScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          controller.text.isEmpty ? 'Ingrese cantidad...' : controller.text,
+                          controller.text.isEmpty
+                              ? 'Ingrese cantidad...'
+                              : controller.text,
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: controller.text.isEmpty ? Colors.grey : Colors.blue,
+                            color: controller.text.isEmpty
+                                ? Colors.grey
+                                : Colors.blue,
                           ),
                         ),
                       ),
@@ -1125,8 +1532,9 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
-  Widget _buildVirtualKeyboard(TextEditingController controller, StateSetter setState) {
+
+  Widget _buildVirtualKeyboard(
+      TextEditingController controller, StateSetter setState) {
     return Container(
       width: double.infinity,
       child: Column(
@@ -1170,14 +1578,17 @@ class _PosScreenState extends State<PosScreen> {
             children: [
               Expanded(child: _buildNumberButton('0', controller, setState)),
               const SizedBox(width: 8),
-              Expanded(child: _buildActionButton('⌫', () {
+              Expanded(
+                  child: _buildActionButton('⌫', () {
                 if (controller.text.isNotEmpty) {
-                  controller.text = controller.text.substring(0, controller.text.length - 1);
+                  controller.text =
+                      controller.text.substring(0, controller.text.length - 1);
                   setState(() {}); // Actualizar la interfaz
                 }
               })),
               const SizedBox(width: 8),
-              Expanded(child: _buildActionButton('✓', () {
+              Expanded(
+                  child: _buildActionButton('✓', () {
                 final quantity = int.tryParse(controller.text) ?? 1;
                 if (quantity > 0) {
                   _addToCart(quantity);
@@ -1190,8 +1601,9 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
-  Widget _buildNumberButton(String number, TextEditingController controller, StateSetter setState) {
+
+  Widget _buildNumberButton(
+      String number, TextEditingController controller, StateSetter setState) {
     return ElevatedButton(
       onPressed: () {
         controller.text += number;
@@ -1212,7 +1624,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   Widget _buildActionButton(String text, VoidCallback onPressed) {
     return ElevatedButton(
       onPressed: onPressed,
@@ -1231,21 +1643,23 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   void _searchProduct(String code) {
     // Primero buscar por código exacto
-    final exactMatch = _products.where((p) => p.code == code || p.shortCode == code).toList();
-    
+    final exactMatch =
+        _products.where((p) => p.code == code || p.shortCode == code).toList();
+
     if (exactMatch.isNotEmpty) {
       _selectProduct(exactMatch.first);
       return;
     }
-    
+
     // Si no hay código exacto, buscar por nombre
-    final nameMatches = _products.where((p) =>
-      quitarTildes(p.name.toLowerCase()).contains(quitarTildes(code.toLowerCase()))
-    ).toList();
-    
+    final nameMatches = _products
+        .where((p) => quitarTildes(p.name.toLowerCase())
+            .contains(quitarTildes(code.toLowerCase())))
+        .toList();
+
     if (nameMatches.isEmpty) {
       // ❌ MENSAJE MOLESTO ELIMINADO - No mostrar nada cuando no encuentre productos
       // Solo limpiar el campo y mantener el focus
@@ -1253,48 +1667,44 @@ class _PosScreenState extends State<PosScreen> {
       _ensureBarcodeFocus();
       return;
     }
-    
+
     if (nameMatches.length == 1) {
       _selectProduct(nameMatches.first);
     } else {
       _showProductSelectionDialog(nameMatches, code);
     }
   }
-  
+
   void _selectProduct(Product product) {
     setState(() {
       _selectedProduct = product;
-      _currentMode = 'quantity'; 
+      _currentMode = 'quantity';
     });
-    
 
-    
     // Configurar el campo de cantidad
     _quantityController.text = '1';
     _quantityController.selection = TextSelection(
       baseOffset: 0,
       extentOffset: _quantityController.text.length,
     );
-    
+
     // Enfocar el campo de cantidad después de un breve delay
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _quantityFocus.requestFocus();
     });
-    
+
     _barcodeController.clear();
-    
+
     // ❌ MENSAJE ELIMINADO - Era innecesario y molesto
     // Solo mostrar mensaje cuando efectivamente se agregue al carrito
   }
-  
+
   void _addToCart(int quantity) {
     if (_selectedProduct == null) {
       Get.snackbar('Error', 'No hay producto seleccionado');
       return;
     }
-    
 
-    
     _posController.addToCart(
       _selectedProduct!.name,
       _selectedProduct!.price,
@@ -1302,7 +1712,7 @@ class _PosScreenState extends State<PosScreen> {
       quantity: quantity,
       availableStock: _selectedProduct!.stock,
     );
-    
+
     Get.snackbar(
       '✅ Agregado',
       '${_selectedProduct!.name} x$quantity',
@@ -1310,26 +1720,23 @@ class _PosScreenState extends State<PosScreen> {
       colorText: Colors.white,
       duration: const Duration(seconds: 1), // ⚡ MÁS RÁPIDO
     );
-    
+
     _cancelSelection();
   }
-  
 
-  
   void _cancelSelection() {
     setState(() {
       _selectedProduct = null;
       _currentMode = 'barcode';
     });
-    
+
     _barcodeController.clear();
     _quantityController.text = '1';
 
-    
     // ✅ Asegurar focus en búsqueda
     _ensureBarcodeFocus();
   }
-  
+
   void _showProductSelectionDialog(List<Product> products, String searchTerm) {
     showDialog(
       context: context,
@@ -1364,7 +1771,6 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   ],
                 ),
-
                 onTap: () {
                   Navigator.of(context).pop();
                   _selectProduct(product);
@@ -1389,7 +1795,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   void _showItemOptions(item, int index) {
     showDialog(
       context: context,
@@ -1439,7 +1845,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   void _showQuantityDialog(item, int index) {
     final controller = TextEditingController(text: item.quantity.toString());
     showDialog(
@@ -1477,8 +1883,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
-  
+
   void _performClearCart() {
     _posController.clearCart();
     Get.snackbar(
@@ -1488,7 +1893,7 @@ class _PosScreenState extends State<PosScreen> {
       colorText: Colors.white,
     );
   }
-  
+
   void _openCashDrawer() {
     Get.snackbar(
       'Cajón abierto',
@@ -1497,11 +1902,9 @@ class _PosScreenState extends State<PosScreen> {
       colorText: Colors.white,
     );
   }
-  
+
   void _finalizeSale() {
     // Bloquear si no hay sesión de caja abierta
-    // Consulta ligera; en caso de error, previene finalizar
-    // Nota: usamos Future.microtask + Get.snackbar para UX consistente
     AccountingService.getOpenCashSession().then((session) {
       if (session == null) {
         Get.snackbar(
@@ -1531,6 +1934,46 @@ class _PosScreenState extends State<PosScreen> {
     });
   }
 
+  /// F3: ir directo a facturación electrónica (sin modal venta normal / electrónica).
+  void _finalizeSaleElectronic() {
+    AccountingService.getOpenCashSession().then((session) {
+      if (session == null) {
+        Get.snackbar(
+          'Caja cerrada',
+          'Debes abrir la caja antes de finalizar una venta',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        Get.dialog(
+          AccountingModal(),
+          barrierDismissible: false,
+        );
+        return;
+      }
+      if (_posController.cartItems.isEmpty) {
+        Get.snackbar(
+          'Carrito vacío',
+          'Agrega productos antes de facturación electrónica',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      _openElectronicInvoiceModal();
+    }).catchError((_) {
+      Get.snackbar(
+        'Caja cerrada',
+        'Debes abrir la caja antes de finalizar una venta',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      Get.dialog(
+        AccountingModal(),
+        barrierDismissible: false,
+      );
+    });
+  }
+
   void _finalizeSaleProceed() {
     if (_posController.cartItems.isEmpty) {
       Get.snackbar(
@@ -1541,26 +1984,25 @@ class _PosScreenState extends State<PosScreen> {
       );
       return;
     }
-    
-    // Mostrar opciones de finalización
-    _showPaymentOptionsDialog();
-  }
-  
 
-  
+    // F6: ir directo a métodos de pago (venta normal)
+    _posController.processPayment();
+  }
+
   void _showPaymentOptionsDialog() {
     // Obtener información del cliente actual si existe
     final currentClient = _posController.currentClient;
-    final clientValidationSummary = currentClient != null 
+    final clientValidationSummary = currentClient != null
         ? ClientValidationService.getClientValidationSummary(currentClient)
         : null;
-    
-    // Verificar si el cliente puede recibir facturación electrónica
-    final canReceiveElectronicInvoice = clientValidationSummary?['canReceiveElectronicInvoice'] as bool? ?? false;
-    final missingFields = clientValidationSummary?['missingFields'] as List<String>? ?? [];
-    
 
-    
+    // Verificar si el cliente puede recibir facturación electrónica
+    final canReceiveElectronicInvoice =
+        clientValidationSummary?['canReceiveElectronicInvoice'] as bool? ??
+            false;
+    final missingFields =
+        clientValidationSummary?['missingFields'] as List<String>? ?? [];
+
     Get.dialog(
       AlertDialog(
         title: const Row(
@@ -1570,7 +2012,7 @@ class _PosScreenState extends State<PosScreen> {
             Text('Finalizar Venta'),
           ],
         ),
-            content: Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1579,7 +2021,7 @@ class _PosScreenState extends State<PosScreen> {
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 16),
-            
+
             // Información del cliente actual
             if (currentClient != null) ...[
               Container(
@@ -1607,22 +2049,26 @@ class _PosScreenState extends State<PosScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('${currentClient.businessName} (${currentClient.documentType} ${currentClient.documentNumber})'),
+                    Text(
+                        '${currentClient.businessName} (${currentClient.documentType} ${currentClient.documentNumber})'),
                     Text('${currentClient.email}'),
                   ],
                 ),
               ),
               const SizedBox(height: 8),
             ],
-            
+
             // Estado de validación del cliente para facturación electrónica
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: canReceiveElectronicInvoice ? Colors.green.shade50 : Colors.red.shade50,
+                color: canReceiveElectronicInvoice
+                    ? Colors.green.shade50
+                    : Colors.red.shade50,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: canReceiveElectronicInvoice ? Colors.green : Colors.red,
+                  color:
+                      canReceiveElectronicInvoice ? Colors.green : Colors.red,
                   width: 1,
                 ),
               ),
@@ -1632,23 +2078,30 @@ class _PosScreenState extends State<PosScreen> {
                   Row(
                     children: [
                       Icon(
-                        canReceiveElectronicInvoice ? Icons.check_circle : Icons.error,
-                        color: canReceiveElectronicInvoice ? Colors.green : Colors.red,
+                        canReceiveElectronicInvoice
+                            ? Icons.check_circle
+                            : Icons.error,
+                        color: canReceiveElectronicInvoice
+                            ? Colors.green
+                            : Colors.red,
                         size: 20,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        canReceiveElectronicInvoice 
+                        canReceiveElectronicInvoice
                             ? '✅ Cliente válido para facturación electrónica'
                             : '❌ Cliente incompleto para facturación electrónica',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: canReceiveElectronicInvoice ? Colors.green.shade800 : Colors.red.shade800,
+                          color: canReceiveElectronicInvoice
+                              ? Colors.green.shade800
+                              : Colors.red.shade800,
                         ),
                       ),
                     ],
                   ),
-                  if (!canReceiveElectronicInvoice && missingFields.isNotEmpty) ...[
+                  if (!canReceiveElectronicInvoice &&
+                      missingFields.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Campos faltantes: ${missingFields.join(', ')}',
@@ -1699,9 +2152,9 @@ class _PosScreenState extends State<PosScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // ✅ NUEVO: Información de configuración del sistema
             FutureBuilder<SystemConfiguration>(
               future: SystemConfigurationService.getConfiguration(),
@@ -1709,7 +2162,7 @@ class _PosScreenState extends State<PosScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
+
                 if (snapshot.hasError || !snapshot.hasData) {
                   return Container(
                     padding: const EdgeInsets.all(12),
@@ -1735,18 +2188,18 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   );
                 }
-                
+
                 final config = snapshot.data!;
                 final hasValidConfig = config.dianResolutionNumber.isNotEmpty &&
-                                    config.softwareId.isNotEmpty &&
-                                    config.softwarePin.isNotEmpty;
-                
+                    config.softwareId.isNotEmpty &&
+                    config.softwarePin.isNotEmpty;
 
-                
                 return Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: hasValidConfig ? Colors.blue.shade50 : Colors.orange.shade50,
+                    color: hasValidConfig
+                        ? Colors.blue.shade50
+                        : Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: hasValidConfig ? Colors.blue : Colors.orange,
@@ -1765,12 +2218,14 @@ class _PosScreenState extends State<PosScreen> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            hasValidConfig 
+                            hasValidConfig
                                 ? '✅ Configuración del sistema válida'
                                 : '⚠️ Configuración del sistema incompleta',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: hasValidConfig ? Colors.blue.shade800 : Colors.orange.shade800,
+                              color: hasValidConfig
+                                  ? Colors.blue.shade800
+                                  : Colors.orange.shade800,
                             ),
                           ),
                         ],
@@ -1823,16 +2278,19 @@ class _PosScreenState extends State<PosScreen> {
           ),
           const SizedBox(width: 8),
           ElevatedButton.icon(
-            onPressed: canReceiveElectronicInvoice ? () {
-              Get.back();
-              _openElectronicInvoiceModal();
-            } : null,
+            onPressed: canReceiveElectronicInvoice
+                ? () {
+                    Get.back();
+                    _openElectronicInvoiceModal();
+                  }
+                : null,
             icon: const Icon(Icons.description),
-            label: Text(canReceiveElectronicInvoice 
-                ? 'Facturación Electrónica' 
+            label: Text(canReceiveElectronicInvoice
+                ? 'Facturación Electrónica'
                 : 'Facturación Electrónica (Cliente Incompleto)'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: canReceiveElectronicInvoice ? Colors.blue : Colors.grey,
+              backgroundColor:
+                  canReceiveElectronicInvoice ? Colors.blue : Colors.grey,
               foregroundColor: Colors.white,
             ),
           ),
@@ -1840,7 +2298,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   void _openElectronicInvoiceModal() {
     // Cargar productos del carrito actual
     final cartProducts = _posController.cartItems.map((item) {
@@ -1851,7 +2309,7 @@ class _PosScreenState extends State<PosScreen> {
         'total': item.quantity * item.price,
       };
     }).toList();
-    
+
     Get.dialog(
       Dialog(
         child: Container(
@@ -1877,12 +2335,12 @@ class _PosScreenState extends State<PosScreen> {
       barrierDismissible: false,
     );
   }
-  
+
   void _handlePayment(String value) {
     // Implementar lógica de pago
     Get.snackbar('Pago', 'Procesando pago: $value');
   }
-  
+
   void _showHelp() {
     Get.dialog(
       AlertDialog(
@@ -1897,9 +2355,10 @@ class _PosScreenState extends State<PosScreen> {
             SizedBox(height: 16),
             Text('F1: Mostrar ayuda'),
             Text('F2: Reimpresión de facturas'),
-            Text('F4: Limpiar carrito'),
+            Text('F3: Facturación electrónica (directo)'),
+            Text('F4: Contabilidad / Caja'),
             Text('F5: Abrir cajón monedero'),
-            Text('F6: Finalizar venta / Facturación electrónica'),
+            Text('F6: Finalizar venta (métodos de pago)'),
             Text('ESC: Cancelar operación actual'),
             Text('ENTER: Confirmar acción'),
             SizedBox(height: 16),
@@ -1907,7 +2366,6 @@ class _PosScreenState extends State<PosScreen> {
             Text('• Usa los botones táctiles'),
             Text('• Selección rápida y fácil'),
             SizedBox(height: 8),
-
           ],
         ),
         actions: [
@@ -1919,7 +2377,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   // ✅ NUEVO: Método para mostrar diálogo de selección de cliente
   void _showClientSelectionDialog() {
     Get.dialog(
@@ -1945,7 +2403,7 @@ class _PosScreenState extends State<PosScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // Campo de búsqueda
               TextField(
                 onChanged: (value) {
@@ -1961,14 +2419,14 @@ class _PosScreenState extends State<PosScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // Lista de resultados
               Expanded(
                 child: Obx(() {
                   if (_posController.isSearchingClient.value) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
+
                   if (_posController.clientSearchResults.isEmpty) {
                     return const Center(
                       child: Text(
@@ -1977,21 +2435,28 @@ class _PosScreenState extends State<PosScreen> {
                       ),
                     );
                   }
-                  
+
                   return ListView.builder(
                     itemCount: _posController.clientSearchResults.length,
                     itemBuilder: (context, index) {
                       final client = _posController.clientSearchResults[index];
-                      final validationSummary = ClientValidationService.getClientValidationSummary(client);
-                      final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
-                      
+                      final validationSummary =
+                          ClientValidationService.getClientValidationSummary(
+                              client);
+                      final canReceiveInvoice =
+                          validationSummary['canReceiveElectronicInvoice']
+                              as bool;
+
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: canReceiveInvoice ? Colors.green : Colors.red,
+                            backgroundColor:
+                                canReceiveInvoice ? Colors.green : Colors.red,
                             child: Icon(
-                              canReceiveInvoice ? Icons.check_circle : Icons.error,
+                              canReceiveInvoice
+                                  ? Icons.check_circle
+                                  : Icons.error,
                               color: Colors.white,
                             ),
                           ),
@@ -2002,20 +2467,29 @@ class _PosScreenState extends State<PosScreen> {
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('${client.documentType} ${client.documentNumber}'),
+                              Text(
+                                  '${client.documentType} ${client.documentNumber}'),
                               Text('${client.email ?? 'Sin email'}'),
-                              if (client.city != null && client.department != null)
+                              if (client.city != null &&
+                                  client.department != null)
                                 Text('${client.city}, ${client.department}'),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: canReceiveInvoice ? Colors.green.shade100 : Colors.red.shade100,
+                                  color: canReceiveInvoice
+                                      ? Colors.green.shade100
+                                      : Colors.red.shade100,
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  canReceiveInvoice ? '✅ Válido' : '❌ Incompleto',
+                                  canReceiveInvoice
+                                      ? '✅ Válido'
+                                      : '❌ Incompleto',
                                   style: TextStyle(
-                                    color: canReceiveInvoice ? Colors.green.shade800 : Colors.red.shade800,
+                                    color: canReceiveInvoice
+                                        ? Colors.green.shade800
+                                        : Colors.red.shade800,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -2040,25 +2514,25 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   // Funciones de autorización
   bool _isAuthorizationValid() {
     if (!_isAuthorized || _authorizationTime == null) {
       return false;
     }
-    
+
     final now = DateTime.now();
     final timeDifference = now.difference(_authorizationTime!);
-    
+
     // Autorización válida por 5 minutos
     if (timeDifference.inMinutes >= 5) {
       _clearAuthorization();
       return false;
     }
-    
+
     return true;
   }
-  
+
   void _clearAuthorization() {
     setState(() {
       _isAuthorized = false;
@@ -2066,7 +2540,7 @@ class _PosScreenState extends State<PosScreen> {
       _authorizedUser = null;
     });
   }
-  
+
   void _showAuthorizationDialog() {
     showDialog(
       context: context,
@@ -2082,7 +2556,7 @@ class _PosScreenState extends State<PosScreen> {
       ),
     );
   }
-  
+
   void _setAuthorization(String user) {
     setState(() {
       _isAuthorized = true;
@@ -2090,19 +2564,19 @@ class _PosScreenState extends State<PosScreen> {
       _authorizedUser = user;
     });
   }
-  
+
   String _getTimeRemaining() {
     if (_authorizationTime == null) return '';
-    
+
     final now = DateTime.now();
     final elapsed = now.difference(_authorizationTime!);
     final remaining = const Duration(minutes: 5) - elapsed;
-    
+
     if (remaining.isNegative) {
       _clearAuthorization();
       return '';
     }
-    
+
     final minutes = remaining.inMinutes;
     final seconds = remaining.inSeconds % 60;
     return '${minutes}m ${seconds}s restantes';
@@ -2147,7 +2621,7 @@ class _PosScreenState extends State<PosScreen> {
 
     Permission? requiredPermission;
     String actionDescription = '';
-    
+
     switch (action) {
       case 'changeCartQuantity':
         requiredPermission = Permission.changeCartQuantity;
@@ -2170,7 +2644,8 @@ class _PosScreenState extends State<PosScreen> {
 
     // Verificar si el usuario actual tiene el permiso
     final permissionsService = PermissionsService.to;
-    if (permissionsService.hasPermission(currentUser.role, requiredPermission)) {
+    if (permissionsService.hasPermission(
+        currentUser.role, requiredPermission)) {
       executeAction();
       return;
     }
@@ -2179,7 +2654,8 @@ class _PosScreenState extends State<PosScreen> {
     _requestAuthorization(action, actionDescription, executeAction);
   }
 
-  void _requestAuthorization(String action, String description, VoidCallback executeAction) {
+  void _requestAuthorization(
+      String action, String description, VoidCallback executeAction) {
     showDialog(
       context: context,
       builder: (context) => AuthorizationModal(
@@ -2217,7 +2693,8 @@ class _PosScreenState extends State<PosScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               decoration: const InputDecoration(
                 labelText: 'Nuevo precio',
@@ -2322,7 +2799,7 @@ class _ProductButton extends StatelessWidget {
         );
       }
     }
-    
+
     // Si no hay imagen, mostrar icono por defecto
     return _buildDefaultIcon();
   }
@@ -2349,7 +2826,7 @@ class _ProductButton extends StatelessWidget {
     final primaryColor = Colors.blue;
     final backgroundColor = Colors.blue[50];
     final iconColor = Colors.blue[700];
-    
+
     return Material(
       color: backgroundColor,
       borderRadius: BorderRadius.circular(12),
@@ -2378,7 +2855,7 @@ class _ProductButton extends StatelessWidget {
                   child: _buildProductImage(),
                 ),
               ),
-              
+
               // Texto y precio en la parte inferior - altura fija
               Container(
                 width: double.infinity, // Ocupa todo el ancho
@@ -2438,14 +2915,15 @@ class _ElectronicInvoiceModalContent extends StatefulWidget {
   });
 
   @override
-  State<_ElectronicInvoiceModalContent> createState() => _ElectronicInvoiceModalContentState();
+  State<_ElectronicInvoiceModalContent> createState() =>
+      _ElectronicInvoiceModalContentState();
 }
 
-class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalContent>
+class _ElectronicInvoiceModalContentState
+    extends State<_ElectronicInvoiceModalContent>
     with SingleTickerProviderStateMixin {
-  
   late TabController _tabController;
-  
+
   // Controladores de formulario
   final _invoiceNumberController = TextEditingController();
   final _clientNitController = TextEditingController();
@@ -2454,30 +2932,31 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
   final _clientPhoneController = TextEditingController();
   final _clientAddressController = TextEditingController();
   final _observationsController = TextEditingController();
-  
+
   // ✅ NUEVOS CONTROLADORES PARA VALIDACIÓN
   final _clientCityController = TextEditingController();
   final _clientDepartmentController = TextEditingController();
-  
+
   String _selectedPaymentMethod = 'Efectivo';
   String _selectedClientType = 'CUANTIAS MENORES';
   String _selectedDocumentType = 'CC'; // ✅ NUEVO: Tipo de documento por defecto
-  
+
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    
+
     // Generar número de factura automático
     final now = DateTime.now();
-    _invoiceNumberController.text = 'FE-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
-    
+    _invoiceNumberController.text =
+        'FE-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+
     // ✅ NUEVO: Agregar listeners para validación en tiempo real
     _addClientFieldListeners();
   }
-  
+
   // ✅ NUEVO: Agregar listeners a los campos del cliente para validación en tiempo real
   void _addClientFieldListeners() {
     _clientNitController.addListener(_onClientFieldChanged);
@@ -2488,7 +2967,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
     _clientCityController.addListener(_onClientFieldChanged);
     _clientDepartmentController.addListener(_onClientFieldChanged);
   }
-  
+
   // ✅ NUEVO: Callback cuando cambian los campos del cliente
   void _onClientFieldChanged() {
     if (mounted) {
@@ -2508,14 +2987,14 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
     _clientPhoneController.dispose();
     _clientAddressController.dispose();
     _observationsController.dispose();
-    
+
     // ✅ DISPOSE DE NUEVOS CONTROLADORES
     _clientCityController.dispose();
     _clientDepartmentController.dispose();
-    
+
     super.dispose();
   }
-  
+
   // ✅ NUEVO: Widget para mostrar estado de validación del cliente
   Widget _buildClientValidationStatus() {
     // Crear un cliente temporal para validación
@@ -2532,12 +3011,14 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    
-    final validationSummary = ClientValidationService.getClientValidationSummary(tempClient);
-    final canReceiveInvoice = validationSummary['canReceiveElectronicInvoice'] as bool;
+
+    final validationSummary =
+        ClientValidationService.getClientValidationSummary(tempClient);
+    final canReceiveInvoice =
+        validationSummary['canReceiveElectronicInvoice'] as bool;
     final missingFields = validationSummary['missingFields'] as List<String>;
     final validationMessage = validationSummary['validationMessage'] as String;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -2561,10 +3042,14 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  canReceiveInvoice ? '✅ Cliente válido para facturación electrónica' : '❌ Cliente incompleto',
+                  canReceiveInvoice
+                      ? '✅ Cliente válido para facturación electrónica'
+                      : '❌ Cliente incompleto',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: canReceiveInvoice ? Colors.green.shade800 : Colors.red.shade800,
+                    color: canReceiveInvoice
+                        ? Colors.green.shade800
+                        : Colors.red.shade800,
                   ),
                 ),
               ),
@@ -2574,7 +3059,9 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
           Text(
             validationMessage,
             style: TextStyle(
-              color: canReceiveInvoice ? Colors.green.shade700 : Colors.red.shade700,
+              color: canReceiveInvoice
+                  ? Colors.green.shade700
+                  : Colors.red.shade700,
             ),
           ),
           if (!canReceiveInvoice && missingFields.isNotEmpty) ...[
@@ -2588,12 +3075,12 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
             ),
             const SizedBox(height: 4),
             ...missingFields.map((field) => Padding(
-              padding: const EdgeInsets.only(left: 16),
-              child: Text(
-                '• $field',
-                style: TextStyle(color: Colors.red.shade600),
-              ),
-            )),
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Text(
+                    '• $field',
+                    style: TextStyle(color: Colors.red.shade600),
+                  ),
+                )),
           ],
         ],
       ),
@@ -2642,13 +3129,16 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                   Expanded(
                     child: Text(
                       'Total a facturar: \$${NumberFormat('#,###').format(widget.cartTotal)} - ${widget.cartProducts.length} productos',
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             // Pestañas
             Container(
               color: Colors.white,
@@ -2664,7 +3154,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                 ],
               ),
             ),
-            
+
             // Contenido de las pestañas
             Expanded(
               child: TabBarView(
@@ -2676,7 +3166,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                 ],
               ),
             ),
-            
+
             // Botones de acción
             Container(
               padding: const EdgeInsets.all(16),
@@ -2706,10 +3196,12 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
                             )
                           : const Icon(Icons.save),
-                      label: Text(_isLoading ? 'Guardando...' : 'Guardar Borrador'),
+                      label: Text(
+                          _isLoading ? 'Guardando...' : 'Guardar Borrador'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,
@@ -2726,7 +3218,8 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
                             )
                           : const Icon(Icons.send),
                       label: Text(_isLoading ? 'Enviando...' : 'Enviar a DIAN'),
@@ -2760,7 +3253,6 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              
               TextFormField(
                 controller: _invoiceNumberController,
                 decoration: const InputDecoration(
@@ -2770,20 +3262,26 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                 ),
               ),
               const SizedBox(height: 16),
-              
               DropdownButtonFormField<String>(
                 value: _selectedPaymentMethod,
-                items: ['Efectivo', 'Tarjeta Débito', 'Tarjeta Crédito', 'Transferencia', 'Cheque']
-                    .map((method) => DropdownMenuItem(value: method, child: Text(method)))
+                items: [
+                  'Efectivo',
+                  'Tarjeta Débito',
+                  'Tarjeta Crédito',
+                  'Transferencia',
+                  'Cheque'
+                ]
+                    .map((method) =>
+                        DropdownMenuItem(value: method, child: Text(method)))
                     .toList(),
-                onChanged: (value) => setState(() => _selectedPaymentMethod = value!),
+                onChanged: (value) =>
+                    setState(() => _selectedPaymentMethod = value!),
                 decoration: const InputDecoration(
                   labelText: 'Método de Pago *',
                   border: OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 16),
-              
               TextFormField(
                 controller: _observationsController,
                 maxLines: 3,
@@ -2828,36 +3326,38 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                 ],
               ),
               const SizedBox(height: 16),
-              
               DropdownButtonFormField<String>(
                 value: _selectedClientType,
                 items: ['CUANTIAS MENORES', 'CLIENTE REGISTRADO']
-                    .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                    .map((type) =>
+                        DropdownMenuItem(value: type, child: Text(type)))
                     .toList(),
-                onChanged: (value) => setState(() => _selectedClientType = value!),
+                onChanged: (value) =>
+                    setState(() => _selectedClientType = value!),
                 decoration: const InputDecoration(
                   labelText: 'Tipo de Cliente *',
                   border: OutlineInputBorder(),
                 ),
               ),
-              
               if (_selectedClientType == 'CLIENTE REGISTRADO') ...[
                 const SizedBox(height: 16),
-                
+
                 // ✅ NUEVO: Tipo de documento
                 DropdownButtonFormField<String>(
                   value: _selectedDocumentType,
                   items: ['CC', 'NIT', 'TI', 'CE', 'PASAPORTE', 'RC', 'OTRO']
-                      .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                      .map((type) =>
+                          DropdownMenuItem(value: type, child: Text(type)))
                       .toList(),
-                  onChanged: (value) => setState(() => _selectedDocumentType = value!),
+                  onChanged: (value) =>
+                      setState(() => _selectedDocumentType = value!),
                   decoration: const InputDecoration(
                     labelText: 'Tipo de Documento *',
                     border: OutlineInputBorder(),
                     helperText: 'Obligatorio para facturación electrónica',
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _clientNitController,
@@ -2908,7 +3408,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                     helperText: 'Obligatorio para facturación electrónica',
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
                 // ✅ NUEVO: Ciudad
                 TextFormField(
@@ -2920,7 +3420,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                     helperText: 'Obligatorio para facturación electrónica',
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
                 // ✅ NUEVO: Departamento
                 TextFormField(
@@ -2932,7 +3432,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                     helperText: 'Obligatorio para facturación electrónica',
                   ),
                 ),
-                
+
                 const SizedBox(height: 16),
                 // ✅ NUEVO: Validación en tiempo real
                 _buildClientValidationStatus(),
@@ -2962,7 +3462,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              
+
               // Lista de productos
               ListView.builder(
                 shrinkWrap: true,
@@ -2978,7 +3478,8 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                         child: Icon(Icons.inventory_2, color: Colors.white),
                       ),
                       title: Text(product['name']),
-                      subtitle: Text('Cantidad: ${product['quantity']} x \$${NumberFormat('#,###').format(product['price'])}'),
+                      subtitle: Text(
+                          'Cantidad: ${product['quantity']} x \$${NumberFormat('#,###').format(product['price'])}'),
                       trailing: Text(
                         '\$${NumberFormat('#,###').format(product['total'])}',
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -2987,10 +3488,10 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                   );
                 },
               ),
-              
+
               const SizedBox(height: 16),
               const Divider(),
-              
+
               // Totales
               Container(
                 padding: const EdgeInsets.all(16),
@@ -3023,11 +3524,13 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                       children: [
                         const Text(
                           'Total:',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         Text(
                           '\$${NumberFormat('#,###').format(total)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                       ],
                     ),
@@ -3105,7 +3608,8 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
           ),
           ElevatedButton(
             onPressed: () {
-              if (nitController.text.isNotEmpty && nameController.text.isNotEmpty) {
+              if (nitController.text.isNotEmpty &&
+                  nameController.text.isNotEmpty) {
                 // Llenar los campos del cliente
                 setState(() {
                   _selectedClientType = 'CLIENTE REGISTRADO';
@@ -3115,7 +3619,7 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                   _clientPhoneController.text = phoneController.text;
                   _clientAddressController.text = addressController.text;
                 });
-                
+
                 Get.back();
                 Get.snackbar(
                   'Cliente Creado',
@@ -3145,11 +3649,11 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
 
   void _saveDraft() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Simular guardado de borrador
       await Future.delayed(const Duration(seconds: 1));
-      
+
       Get.snackbar(
         'Borrador Guardado',
         'La factura se guardó como borrador',
@@ -3167,8 +3671,6 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
       setState(() => _isLoading = false);
     }
   }
-
-
 
   void _sendToDIAN() async {
     // Validaciones básicas
@@ -3193,11 +3695,12 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
-      
+
       // Validar si el cliente puede recibir facturación electrónica
       if (!ClientValidationService.canReceiveElectronicInvoice(tempClient)) {
-        final missingFields = ClientValidationService.getMissingFields(tempClient);
-        
+        final missingFields =
+            ClientValidationService.getMissingFields(tempClient);
+
         Get.dialog(
           AlertDialog(
             title: const Row(
@@ -3222,9 +3725,9 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
                 ),
                 const SizedBox(height: 8),
                 ...missingFields.map((field) => Padding(
-                  padding: const EdgeInsets.only(left: 16),
-                  child: Text('• $field'),
-                )),
+                      padding: const EdgeInsets.only(left: 16),
+                      child: Text('• $field'),
+                    )),
                 const SizedBox(height: 16),
                 Text(
                   'Por favor, complete todos los campos obligatorios antes de continuar.',
@@ -3243,19 +3746,19 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
             ],
           ),
         );
-      return;
+        return;
       }
     }
 
     setState(() => _isLoading = true);
-    
+
     try {
       // Simular envío a DIAN
       await Future.delayed(const Duration(seconds: 2));
-      
+
       Get.back();
       widget.onComplete(true);
-      
+
       Get.snackbar(
         'Éxito',
         'Factura electrónica generada (pendiente de envío)',
@@ -3274,4 +3777,4 @@ class _ElectronicInvoiceModalContentState extends State<_ElectronicInvoiceModalC
       setState(() => _isLoading = false);
     }
   }
-} 
+}
