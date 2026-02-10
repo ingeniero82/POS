@@ -11,7 +11,7 @@ class PermissionsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(PermissionsController());
-    
+
     // Verificar si el usuario tiene permisos para modificar configuración
     if (!AuthService.to.hasPermission(Permission.modifySettings)) {
       return Scaffold(
@@ -63,7 +63,8 @@ class PermissionsScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C47FF),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                   ),
                   child: const Text('Volver'),
                 ),
@@ -73,7 +74,7 @@ class PermissionsScreen extends StatelessWidget {
         ),
       );
     }
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FA),
       appBar: AppBar(
@@ -145,41 +146,49 @@ class PermissionsScreen extends StatelessWidget {
                 Row(
                   children: [
                     Obx(() => ElevatedButton.icon(
-                      onPressed: controller.isLoading.value ? null : controller.resetToDefault,
-                      icon: const Icon(Icons.restore, size: 18),
-                      label: const Text('Restaurar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    )),
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : controller.resetToDefault,
+                          icon: const Icon(Icons.restore, size: 18),
+                          label: const Text('Restaurar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        )),
                     const SizedBox(width: 12),
                     Obx(() => ElevatedButton.icon(
-                      onPressed: controller.isLoading.value ? null : controller.savePermissions,
-                      icon: controller.isLoading.value 
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.save, size: 18),
-                      label: Text(controller.isLoading.value ? 'Guardando...' : 'Guardar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C47FF),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    )),
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : controller.savePermissions,
+                          icon: controller.isLoading.value
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.save, size: 18),
+                          label: Text(controller.isLoading.value
+                              ? 'Guardando...'
+                              : 'Guardar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6C47FF),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                          ),
+                        )),
                   ],
                 ),
               ],
             ),
             const SizedBox(height: 32),
-            
+
             // Información del usuario actual
             Container(
               width: double.infinity,
@@ -211,7 +220,8 @@ class PermissionsScreen extends StatelessWidget {
                   Row(
                     children: [
                       CircleAvatar(
-                        backgroundColor: const Color(0xFF6C47FF).withOpacity(0.1),
+                        backgroundColor:
+                            const Color(0xFF6C47FF).withOpacity(0.1),
                         child: const Icon(
                           Icons.person,
                           color: Color(0xFF6C47FF),
@@ -223,27 +233,29 @@ class PermissionsScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Obx(() => Text(
-                              AuthService.to.currentUserName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )),
+                                  AuthService.to.currentUserName,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )),
                             Obx(() => Text(
-                              AuthService.to.currentUserRole,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            )),
+                                  AuthService.to.currentUserRole,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                )),
                           ],
                         ),
                       ),
                       // Verificar si es admin
                       Obx(() {
-                        final isAdmin = AuthService.to.currentUser?.role == UserRole.admin;
+                        final isAdmin =
+                            AuthService.to.currentUser?.role == UserRole.admin;
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             color: isAdmin ? Colors.green : Colors.grey,
                             borderRadius: BorderRadius.circular(20),
@@ -264,7 +276,7 @@ class PermissionsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Tabla de permisos por rol
             Expanded(
               child: Container(
@@ -297,7 +309,8 @@ class PermissionsScreen extends StatelessWidget {
                         ),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             color: const Color(0xFF6C47FF).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
@@ -324,7 +337,8 @@ class PermissionsScreen extends StatelessWidget {
                     const SizedBox(height: 20),
                     Expanded(
                       child: SingleChildScrollView(
-                        child: _EditablePermissionsTable(controller: controller),
+                        child:
+                            _EditablePermissionsTable(controller: controller),
                       ),
                     ),
                   ],
@@ -338,6 +352,37 @@ class PermissionsScreen extends StatelessWidget {
   }
 }
 
+// Orden de roles en la tabla: Administrador, Gerente, Supervisor, Cajero, Mantenimiento
+const List<UserRole> _tableRoleOrder = [
+  UserRole.admin,
+  UserRole.manager,
+  UserRole.supervisor,
+  UserRole.cashier,
+  UserRole.maintenance,
+];
+
+String _roleDisplayName(UserRole role) {
+  switch (role) {
+    case UserRole.admin:
+      return 'Administrador';
+    case UserRole.manager:
+      return 'Gerente';
+    case UserRole.supervisor:
+      return 'Supervisor';
+    case UserRole.cashier:
+      return 'Cajero';
+    case UserRole.maintenance:
+      return 'Mantenimiento';
+  }
+}
+
+bool _canEditRoleColumn(UserRole? currentRole, UserRole columnRole) {
+  if (currentRole == null) return false;
+  if (currentRole == UserRole.admin) return true;
+  if (currentRole == UserRole.manager) return columnRole != UserRole.admin;
+  return currentRole == columnRole;
+}
+
 class _EditablePermissionsTable extends StatelessWidget {
   final PermissionsController controller;
 
@@ -345,129 +390,91 @@ class _EditablePermissionsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() => Table(
-      border: TableBorder.all(
-        color: Colors.grey.withOpacity(0.2),
-        width: 1,
-      ),
-      columnWidths: const {
-        0: FlexColumnWidth(2.5),
-        1: FlexColumnWidth(1),
-        2: FlexColumnWidth(1),
-        3: FlexColumnWidth(1),
-        4: FlexColumnWidth(1),
-        5: FlexColumnWidth(1),
-      },
-      children: [
-        // Header de la tabla
-        TableRow(
-          decoration: BoxDecoration(
-            color: const Color(0xFF6C47FF).withOpacity(0.1),
-          ),
-          children: const [
-            Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Permiso',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF22315B),
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Admin',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF22315B),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Gerente',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF22315B),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Supervisor',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF22315B),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Cajero',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF22315B),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Mantenimiento',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF22315B),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
+    final currentRole = AuthService.to.currentUser?.role;
+    final isAdmin = currentRole == UserRole.admin;
+
+    return Obx(() {
+      return Table(
+        border: TableBorder.all(
+          color: Colors.grey.withOpacity(0.2),
+          width: 1,
         ),
-        
-        // Filas de permisos
-        ...Permission.values.map((permission) => TableRow(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                RolePermissions.getPermissionDescription(permission),
-                style: const TextStyle(fontSize: 14),
+        columnWidths: const {
+          0: FlexColumnWidth(2.5),
+          1: FlexColumnWidth(1),
+          2: FlexColumnWidth(1),
+          3: FlexColumnWidth(1),
+          4: FlexColumnWidth(1),
+          5: FlexColumnWidth(1),
+        },
+        children: [
+            // Fila de títulos: Permiso + los 5 roles
+            TableRow(
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C47FF).withOpacity(0.1),
               ),
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'Permiso',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF22315B),
+                    ),
+                  ),
+                ),
+                ..._tableRoleOrder.map(
+                  (role) => Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      _roleDisplayName(role),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF22315B),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            _EditablePermissionCell(
-              hasPermission: controller.hasPermission(UserRole.admin, permission),
-              onChanged: (value) => controller.togglePermission(UserRole.admin, permission),
-              isDisabled: true, // Admin siempre tiene todos los permisos
-            ),
-            _EditablePermissionCell(
-              hasPermission: controller.hasPermission(UserRole.manager, permission),
-              onChanged: (value) => controller.togglePermission(UserRole.manager, permission),
-            ),
-            _EditablePermissionCell(
-              hasPermission: controller.hasPermission(UserRole.supervisor, permission),
-              onChanged: (value) => controller.togglePermission(UserRole.supervisor, permission),
-            ),
-            _EditablePermissionCell(
-              hasPermission: controller.hasPermission(UserRole.cashier, permission),
-              onChanged: (value) => controller.togglePermission(UserRole.cashier, permission),
-            ),
-            _EditablePermissionCell(
-              hasPermission: controller.hasPermission(UserRole.maintenance, permission),
-              onChanged: (value) => controller.togglePermission(UserRole.maintenance, permission),
-            ),
-          ],
-        )).toList(),
-      ],
-    ));
+            // Una fila por permiso: nombre + checkbox por rol
+            ...Permission.values.map((permission) {
+              final isDatosEmpresa =
+                  permission == Permission.accessCompanyConfig ||
+                      permission == Permission.modifyCompanyConfig;
+              // Solo el admin puede marcar/desmarcar "Datos de la empresa"; el resto de permisos según el rol
+              final bloqueadoDatosEmpresa =
+                  isDatosEmpresa && !isAdmin;
+              return TableRow(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      RolePermissions.getPermissionDescription(permission),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  ..._tableRoleOrder.map((role) {
+                    final puedeEditarColumna =
+                        _canEditRoleColumn(currentRole, role);
+                    final disabled =
+                        !puedeEditarColumna || bloqueadoDatosEmpresa;
+                    return _EditablePermissionCell(
+                      hasPermission:
+                          controller.hasPermission(role, permission),
+                      onChanged: (value) =>
+                          controller.togglePermission(role, permission),
+                      isDisabled: disabled,
+                    );
+                  }),
+                ],
+              );
+            }).toList(),
+        ],
+      );
+    });
   }
 }
 
@@ -496,4 +503,4 @@ class _EditablePermissionCell extends StatelessWidget {
       ),
     );
   }
-} 
+}

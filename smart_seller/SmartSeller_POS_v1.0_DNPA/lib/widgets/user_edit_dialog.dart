@@ -7,7 +7,7 @@ import '../models/permissions.dart';
 
 class UserEditDialog extends StatefulWidget {
   final User user;
-  
+
   const UserEditDialog({
     super.key,
     required this.user,
@@ -23,7 +23,7 @@ class _UserEditDialogState extends State<UserEditDialog> {
   late final TextEditingController _usernameController;
   late final TextEditingController _passwordController;
   late final TextEditingController _userCodeController;
-  
+
   late UserRole _selectedRole;
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -36,8 +36,13 @@ class _UserEditDialogState extends State<UserEditDialog> {
     _fullNameController = TextEditingController(text: widget.user.fullName);
     _usernameController = TextEditingController(text: widget.user.username);
     _passwordController = TextEditingController();
-    _userCodeController = TextEditingController(text: widget.user.userCode ?? '');
-    _selectedRole = widget.user.role;
+    _userCodeController =
+        TextEditingController(text: widget.user.userCode ?? '');
+    // Solo Admin y Gerente; si el usuario tiene otro rol, mostrarlo como Gerente
+    final role = widget.user.role;
+    _selectedRole = (role == UserRole.admin || role == UserRole.manager)
+        ? role
+        : UserRole.manager;
   }
 
   @override
@@ -59,7 +64,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
       userCode = 'USR-$random';
       attempts++;
       if (attempts > maxAttempts) {
-        userCode = 'USR-${timestamp.toString().substring(timestamp.toString().length - 4)}';
+        userCode =
+            'USR-${timestamp.toString().substring(timestamp.toString().length - 4)}';
         break;
       }
     } while (await SQLiteDatabaseService.userCodeExists(userCode));
@@ -113,7 +119,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
         widget.user.password = _passwordController.text.trim();
       }
       // Manejar código de usuario si el rol tiene permiso
-      final hasUserCodePermission = PermissionsService.to.hasPermission(_selectedRole, Permission.allowUserCode);
+      final hasUserCodePermission = PermissionsService.to
+          .hasPermission(_selectedRole, Permission.allowUserCode);
       if (hasUserCodePermission) {
         final enteredCode = _userCodeController.text.trim();
         if (enteredCode.isNotEmpty) {
@@ -133,7 +140,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
             return;
           }
           // Validar unicidad (excepto para el mismo usuario)
-          final codeExists = await SQLiteDatabaseService.userCodeExists(enteredCode);
+          final codeExists =
+              await SQLiteDatabaseService.userCodeExists(enteredCode);
           if (codeExists && enteredCode != (widget.user.userCode ?? '')) {
             print('DEBUG: Código de usuario ya existe.');
             Get.snackbar(
@@ -217,8 +225,10 @@ class _UserEditDialogState extends State<UserEditDialog> {
   @override
   Widget build(BuildContext context) {
     // Debug prints
-    print('DEBUG UserEditDialog: Rol seleccionado:  [33m [1m [4m [7m$_selectedRole [0m');
-    print('DEBUG UserEditDialog: ¿Tiene permiso allowUserCode?:  [32m${PermissionsService.to.hasPermission(_selectedRole, Permission.allowUserCode)} [0m');
+    print(
+        'DEBUG UserEditDialog: Rol seleccionado:  [33m [1m [4m [7m$_selectedRole [0m');
+    print(
+        'DEBUG UserEditDialog: ¿Tiene permiso allowUserCode?:  [32m${PermissionsService.to.hasPermission(_selectedRole, Permission.allowUserCode)} [0m');
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -298,10 +308,10 @@ class _UserEditDialogState extends State<UserEditDialog> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: widget.user.username == 'admin' 
-                          ? Colors.grey[200] 
+                      fillColor: widget.user.username == 'admin'
+                          ? Colors.grey[200]
                           : const Color(0xFFF6F8FA),
-                      helperText: widget.user.username == 'admin' 
+                      helperText: widget.user.username == 'admin'
                           ? 'No se puede cambiar el usuario admin'
                           : null,
                     ),
@@ -346,7 +356,9 @@ class _UserEditDialogState extends State<UserEditDialog> {
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                           ),
                           onPressed: () {
                             setState(() {
@@ -360,15 +372,17 @@ class _UserEditDialogState extends State<UserEditDialog> {
                         filled: true,
                         fillColor: const Color(0xFFF6F8FA),
                       ),
-                      validator: _changePassword ? (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'La nueva contraseña es obligatoria';
-                        }
-                                    if (value.trim().length < 4) {
-              return 'La contraseña debe tener al menos 4 caracteres';
-                        }
-                        return null;
-                      } : null,
+                      validator: _changePassword
+                          ? (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'La nueva contraseña es obligatoria';
+                              }
+                              if (value.trim().length < 4) {
+                                return 'La contraseña debe tener al menos 4 caracteres';
+                              }
+                              return null;
+                            }
+                          : null,
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -385,7 +399,7 @@ class _UserEditDialogState extends State<UserEditDialog> {
                       filled: true,
                       fillColor: const Color(0xFFF6F8FA),
                     ),
-                    items: UserRole.values.map((role) {
+                    items: [UserRole.admin, UserRole.manager].map((role) {
                       return DropdownMenuItem(
                         value: role,
                         child: Text(_getRoleText(role)),
@@ -401,7 +415,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
                   ),
                   const SizedBox(height: 16),
                   // Campo Código de Usuario (solo si el rol tiene permiso)
-                  if (PermissionsService.to.hasPermission(_selectedRole, Permission.allowUserCode))
+                  if (PermissionsService.to
+                      .hasPermission(_selectedRole, Permission.allowUserCode))
                     TextFormField(
                       controller: _userCodeController,
                       decoration: InputDecoration(
@@ -412,7 +427,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
                         ),
                         filled: true,
                         fillColor: const Color(0xFFF6F8FA),
-                        helperText: 'Puedes escribirlo, escanearlo o dejarlo vacío para generar uno automático',
+                        helperText:
+                            'Puedes escribirlo, escanearlo o dejarlo vacío para generar uno automático',
                       ),
                       validator: (value) {
                         if (value != null && value.trim().isNotEmpty) {
@@ -442,7 +458,8 @@ class _UserEditDialogState extends State<UserEditDialog> {
                   onPressed: _isLoading ? null : _updateUser,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C47FF),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -471,4 +488,4 @@ class _UserEditDialogState extends State<UserEditDialog> {
       ),
     );
   }
-} 
+}

@@ -8,13 +8,13 @@ enum Permission {
   editUsers,
   deleteUsers,
   activateUsers,
-  
+
   // Gestión de productos
   viewProducts,
   createProducts,
   editProducts,
   deleteProducts,
-  
+
   // Punto de venta
   accessPOS,
   processSales,
@@ -22,44 +22,44 @@ enum Permission {
   viewSalesHistory,
   modifyPrice, // Modificar precio temporal en POS
   manualWeight, // Ingresar peso manual cuando balanza no funciona
-  
+
   // Inventario
   viewInventory,
   addInventory,
   removeInventory,
   viewMovements,
-  
+
   // Reportes
   viewReports,
   exportReports,
-  
+
   // Configuración
   accessSettings,
   modifySettings,
-  
+
   // Mantenimiento del sistema
   accessCompanyConfig, // Acceder a configuración de empresa
   modifyCompanyConfig, // Modificar configuración de empresa
   accessSystemConfig, // Acceder a configuración del sistema
   modifySystemConfig, // Modificar configuración del sistema
-  
+
   // Dashboard
   accessDashboard,
-  
+
   // Clientes
   viewClients,
   createClients,
   editClients,
   deleteClients,
-  
+
   // Código de usuario
   allowUserCode, // Puede tener/usar código de usuario
-  
+
   // Acciones específicas del carrito
   changeCartQuantity, // Cambiar cantidad de productos en carrito
   removeCartItem, // Eliminar productos del carrito
   modifyCartPrice, // Modificar precio de productos en carrito
-  
+
   // Reimpresión de facturas
   reprintInvoices, // Reimprimir facturas
 }
@@ -68,7 +68,7 @@ enum Permission {
 class RolePermissions {
   static final Map<UserRole, Set<Permission>> permissions = {
     UserRole.admin: {
-      // Admin tiene todos los permisos
+      // Dueño/Admin tiene TODOS los permisos por defecto
       Permission.viewUsers,
       Permission.createUsers,
       Permission.editUsers,
@@ -92,19 +92,27 @@ class RolePermissions {
       Permission.exportReports,
       Permission.accessSettings,
       Permission.modifySettings,
+      Permission.accessCompanyConfig,
+      Permission.modifyCompanyConfig,
+      Permission.accessSystemConfig,
+      Permission.modifySystemConfig,
       Permission.accessDashboard,
       Permission.viewClients,
       Permission.createClients,
       Permission.editClients,
       Permission.deleteClients,
       Permission.allowUserCode,
+      Permission.changeCartQuantity,
+      Permission.removeCartItem,
+      Permission.modifyCartPrice,
+      Permission.reprintInvoices,
     },
-    
     UserRole.manager: {
-      // Gerente tiene permisos de gestión pero no puede eliminar usuarios
+      // Gerente tiene todo excepto Datos de Empresa (solo el propietario)
       Permission.viewUsers,
       Permission.createUsers,
       Permission.editUsers,
+      Permission.deleteUsers,
       Permission.activateUsers,
       Permission.viewProducts,
       Permission.createProducts,
@@ -123,6 +131,9 @@ class RolePermissions {
       Permission.viewReports,
       Permission.exportReports,
       Permission.accessSettings,
+      Permission.modifySettings,
+      Permission.accessSystemConfig,
+      Permission.modifySystemConfig,
       Permission.accessDashboard,
       Permission.viewClients,
       Permission.createClients,
@@ -132,8 +143,9 @@ class RolePermissions {
       Permission.changeCartQuantity,
       Permission.removeCartItem,
       Permission.modifyCartPrice,
+      Permission.reprintInvoices,
+      // NO accessCompanyConfig ni modifyCompanyConfig
     },
-    
     UserRole.supervisor: {
       // Supervisor tiene permisos intermedios con capacidades de supervisión
       Permission.viewUsers,
@@ -160,7 +172,6 @@ class RolePermissions {
       Permission.modifyCartPrice,
       Permission.reprintInvoices,
     },
-    
     UserRole.cashier: {
       // Cajero tiene permisos limitados
       Permission.viewProducts,
@@ -174,27 +185,24 @@ class RolePermissions {
       Permission.changeCartQuantity, // Puede cambiar cantidad con autorización
       // NO tiene removeCartItem, modifyCartPrice ni reprintInvoices - requiere autorización
     },
-    
     UserRole.maintenance: {
-      // Rol de mantenimiento - Solo acceso a configuración del sistema
-      Permission.accessCompanyConfig,
-      Permission.modifyCompanyConfig,
+      // Mantenimiento - sin Datos de Empresa (solo propietario lo otorga)
       Permission.accessSystemConfig,
       Permission.modifySystemConfig,
-      Permission.accessDashboard, // Para ver el estado del sistema
+      Permission.accessDashboard,
     },
   };
-  
+
   // Verificar si un rol tiene un permiso específico
   static bool hasPermission(UserRole role, Permission permission) {
     return permissions[role]?.contains(permission) ?? false;
   }
-  
+
   // Obtener todos los permisos de un rol
   static Set<Permission> getPermissions(UserRole role) {
     return permissions[role] ?? {};
   }
-  
+
   // Verificar si un rol puede acceder a una sección específica
   static bool canAccessSection(UserRole role, String section) {
     switch (section.toLowerCase()) {
@@ -224,7 +232,7 @@ class RolePermissions {
         return false;
     }
   }
-  
+
   // Obtener descripción de permisos para mostrar al usuario
   static String getPermissionDescription(Permission permission) {
     switch (permission) {
@@ -304,4 +312,4 @@ class RolePermissions {
         return 'Modificar configuración del sistema';
     }
   }
-} 
+}

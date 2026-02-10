@@ -1,59 +1,102 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/permissions.dart';
 import '../models/user.dart';
 import '../services/permissions_service.dart';
 
 class PermissionsController extends GetxController {
   // Permisos editables por rol
-  final RxMap<UserRole, Set<Permission>> editablePermissions = <UserRole, Set<Permission>>{}.obs;
-  
+  final RxMap<UserRole, Set<Permission>> editablePermissions =
+      <UserRole, Set<Permission>>{}.obs;
+
   // Estado de carga
   final RxBool isLoading = false.obs;
-  
+
+  /// Si es true, se muestra la columna Gerente en la tabla. El admin puede quitarla.
+  final RxBool showGerenteColumn = true.obs;
+
+  static const String _keyShowGerente = 'permissions_show_gerente_column';
+
   @override
   void onInit() {
     super.onInit();
     _loadPermissions();
+    _loadShowGerenteColumn();
   }
-  
+
+  Future<void> _loadShowGerenteColumn() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      showGerenteColumn.value = prefs.getBool(_keyShowGerente) ?? true;
+    } catch (_) {
+      showGerenteColumn.value = true;
+    }
+  }
+
+  /// Quitar el rol Gerente de la tabla (solo admin). Persiste la preferencia.
+  Future<void> hideGerenteColumn() async {
+    showGerenteColumn.value = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyShowGerente, false);
+    } catch (_) {}
+    Get.snackbar(
+      'Rol Gerente quitado',
+      'La columna Gerente se ha ocultado. Puedes volver a añadirla con el botón "Añadir rol Gerente".',
+      backgroundColor: Colors.blue,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  /// Volver a mostrar el rol Gerente en la tabla.
+  Future<void> showGerenteColumnAgain() async {
+    showGerenteColumn.value = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyShowGerente, true);
+    } catch (_) {}
+  }
+
   void _loadPermissions() {
     // Cargar los permisos actuales del servicio
     final permissionsService = Get.find<PermissionsService>();
     editablePermissions.value = Map.from(permissionsService.currentPermissions);
   }
-  
+
   // Verificar si un rol tiene un permiso específico
   bool hasPermission(UserRole role, Permission permission) {
     return editablePermissions[role]?.contains(permission) ?? false;
   }
-  
+
   // Cambiar un permiso específico
   void togglePermission(UserRole role, Permission permission) {
     final currentPermissions = editablePermissions[role] ?? {};
     final newPermissions = Set<Permission>.from(currentPermissions);
-    
+
     if (newPermissions.contains(permission)) {
       newPermissions.remove(permission);
     } else {
       newPermissions.add(permission);
     }
-    
+
     editablePermissions[role] = newPermissions;
   }
-  
+
   // Guardar cambios
   Future<bool> savePermissions() async {
     isLoading.value = true;
-    
+
     try {
       // Simular delay de guardado
       await Future.delayed(const Duration(seconds: 1));
-      
+
       // Guardar usando el servicio de permisos
       final permissionsService = Get.find<PermissionsService>();
-      final success = await permissionsService.saveAllPermissions(editablePermissions);
-      
+      final success =
+          await permissionsService.saveAllPermissions(editablePermissions);
+
       if (success) {
         Get.snackbar(
           'Éxito',
@@ -65,7 +108,7 @@ class PermissionsController extends GetxController {
       } else {
         throw Exception('Error al guardar permisos');
       }
-      
+
       return success;
     } catch (e) {
       Get.snackbar(
@@ -80,7 +123,7 @@ class PermissionsController extends GetxController {
       isLoading.value = false;
     }
   }
-  
+
   // Restaurar permisos por defecto
   void resetToDefault() {
     Get.dialog(
@@ -125,16 +168,16 @@ class PermissionsController extends GetxController {
       ),
     );
   }
-  
+
   // Obtener estadísticas de permisos
   Map<String, int> getPermissionStats() {
     final stats = <String, int>{};
-    
+
     for (final role in UserRole.values) {
       final count = editablePermissions[role]?.length ?? 0;
       stats[role.name] = count;
     }
-    
+
     return stats;
   }
-} 
+}

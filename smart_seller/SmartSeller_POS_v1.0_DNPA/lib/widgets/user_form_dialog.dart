@@ -19,8 +19,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _userCodeController = TextEditingController();
-  
-  UserRole _selectedRole = UserRole.cashier;
+
+  UserRole _selectedRole = UserRole.manager;
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -38,21 +38,22 @@ class _UserFormDialogState extends State<UserFormDialog> {
     String userCode;
     int attempts = 0;
     const maxAttempts = 10;
-    
+
     do {
       // Usar timestamp para evitar conflictos
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final random = (timestamp % 9000) + 1000; // Número entre 1000-9999
       userCode = 'USR-$random';
       attempts++;
-      
+
       if (attempts > maxAttempts) {
         // Si no se puede generar un código único, usar timestamp completo
-        userCode = 'USR-${timestamp.toString().substring(timestamp.toString().length - 4)}';
+        userCode =
+            'USR-${timestamp.toString().substring(timestamp.toString().length - 4)}';
         break;
       }
     } while (await SQLiteDatabaseService.userCodeExists(userCode));
-    
+
     return userCode;
   }
 
@@ -70,7 +71,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
     try {
       final username = _usernameController.text.trim();
       print('Verificando si existe el usuario: $username');
-      
+
       // Verificar si el usuario ya existe
       final userExists = await SQLiteDatabaseService.userExists(username);
       print('¿Usuario existe?: $userExists');
@@ -90,10 +91,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
       // Manejar código de usuario
       String? userCode;
       final permissionsService = PermissionsService.to;
-      
-      if (permissionsService.hasPermission(_selectedRole, Permission.allowUserCode)) {
+
+      if (permissionsService.hasPermission(
+          _selectedRole, Permission.allowUserCode)) {
         final enteredCode = _userCodeController.text.trim();
-        
+
         if (enteredCode.isNotEmpty) {
           // Validar formato del código ingresado
           if (!RegExp(r'^[A-Z0-9-]+$').hasMatch(enteredCode)) {
@@ -108,9 +110,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
             });
             return;
           }
-          
+
           // Validar unicidad del código ingresado
-          final codeExists = await SQLiteDatabaseService.userCodeExists(enteredCode);
+          final codeExists =
+              await SQLiteDatabaseService.userCodeExists(enteredCode);
           if (codeExists) {
             Get.snackbar(
               'Error',
@@ -123,7 +126,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
             });
             return;
           }
-          
+
           userCode = enteredCode;
         } else {
           // Generar código automático
@@ -153,12 +156,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
         colorText: Colors.white,
         icon: const Icon(Icons.check_circle, color: Colors.white),
       );
-      
+
       await Future.delayed(const Duration(milliseconds: 400));
       print('Intentando cerrar con Navigator...');
       Navigator.of(context, rootNavigator: true).pop(true);
       print('¿Se cerró el diálogo?');
-
     } catch (e, st) {
       print('Error al crear usuario: $e');
       print(st);
@@ -195,14 +197,16 @@ class _UserFormDialogState extends State<UserFormDialog> {
     // Debug: Verificar permisos del usuario actual
     final currentUser = AuthService.to.currentUser;
     final permissionsService = PermissionsService.to;
-    final hasUserCodePermission = permissionsService.hasPermission(_selectedRole, Permission.allowUserCode);
-    
+    final hasUserCodePermission = permissionsService.hasPermission(
+        _selectedRole, Permission.allowUserCode);
+
     print('🔍 DEBUG - UserFormDialog:');
     print('   Usuario actual: ${currentUser?.username} (${currentUser?.role})');
     print('   Rol seleccionado: $_selectedRole');
     print('   ¿Tiene permiso allowUserCode?: $hasUserCodePermission');
-    print('   Permisos del rol $_selectedRole: ${permissionsService.getRolePermissions(_selectedRole)}');
-    
+    print(
+        '   Permisos del rol $_selectedRole: ${permissionsService.getRolePermissions(_selectedRole)}');
+
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -299,7 +303,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
@@ -317,8 +323,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       if (value == null || value.trim().isEmpty) {
                         return 'La contraseña es obligatoria';
                       }
-                                  if (value.trim().length < 4) {
-              return 'La contraseña debe tener al menos 4 caracteres';
+                      if (value.trim().length < 4) {
+                        return 'La contraseña debe tener al menos 4 caracteres';
                       }
                       return null;
                     },
@@ -354,7 +360,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   const SizedBox(height: 16),
 
                   // Campo Código de Usuario (solo si el rol tiene permiso)
-                  if (PermissionsService.to.hasPermission(_selectedRole, Permission.allowUserCode))
+                  if (PermissionsService.to
+                      .hasPermission(_selectedRole, Permission.allowUserCode))
                     TextFormField(
                       controller: _userCodeController,
                       decoration: InputDecoration(
@@ -365,7 +372,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                         ),
                         filled: true,
                         fillColor: const Color(0xFFF6F8FA),
-                        helperText: 'Puedes escribirlo, escanearlo o dejarlo vacío para generar uno automático',
+                        helperText:
+                            'Puedes escribirlo, escanearlo o dejarlo vacío para generar uno automático',
                       ),
                       validator: (value) {
                         if (value != null && value.trim().isNotEmpty) {
@@ -395,7 +403,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   onPressed: _isLoading ? null : _createUser,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C47FF),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -424,4 +433,4 @@ class _UserFormDialogState extends State<UserFormDialog> {
       ),
     );
   }
-} 
+}

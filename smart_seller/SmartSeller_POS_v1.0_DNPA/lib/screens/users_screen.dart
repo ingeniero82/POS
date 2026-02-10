@@ -41,18 +41,19 @@ class _UsersScreenState extends State<UsersScreen> {
       filteredUsers = users.where((user) {
         // Filtro por texto de búsqueda
         final searchText = _searchController.text.toLowerCase();
-        final matchesSearch = user.fullName.toLowerCase().contains(searchText) ||
-                            user.username.toLowerCase().contains(searchText) ||
-                            _getRoleText(user.role).toLowerCase().contains(searchText);
-        
+        final matchesSearch =
+            user.fullName.toLowerCase().contains(searchText) ||
+                user.username.toLowerCase().contains(searchText) ||
+                _getRoleText(user.role).toLowerCase().contains(searchText);
+
         // Filtro por rol
-        final matchesRole = _selectedRoleFilter == null || 
-                           user.role == _selectedRoleFilter;
-        
+        final matchesRole =
+            _selectedRoleFilter == null || user.role == _selectedRoleFilter;
+
         // Filtro por estado
-        final matchesStatus = _selectedStatusFilter == null || 
-                             user.isActive == _selectedStatusFilter;
-        
+        final matchesStatus = _selectedStatusFilter == null ||
+            user.isActive == _selectedStatusFilter;
+
         return matchesSearch && matchesRole && matchesStatus;
       }).toList();
     });
@@ -160,11 +161,9 @@ class _UsersScreenState extends State<UsersScreen> {
     final confirm = await Get.dialog<bool>(
       AlertDialog(
         title: const Text('Confirmar acción'),
-        content: Text(
-          user.isActive 
+        content: Text(user.isActive
             ? '¿Estás seguro de que quieres desactivar a ${user.fullName}?'
-            : '¿Estás seguro de que quieres activar a ${user.fullName}?'
-        ),
+            : '¿Estás seguro de que quieres activar a ${user.fullName}?'),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
@@ -197,26 +196,26 @@ class _UsersScreenState extends State<UsersScreen> {
         return;
       }
       final success = await SQLiteDatabaseService.toggleUserStatus(user.id!);
-      
+
       if (success) {
         Get.snackbar(
           'Éxito',
-          user.isActive 
-            ? 'Usuario ${user.fullName} desactivado correctamente'
-            : 'Usuario ${user.fullName} activado correctamente',
+          user.isActive
+              ? 'Usuario ${user.fullName} desactivado correctamente'
+              : 'Usuario ${user.fullName} activado correctamente',
           backgroundColor: Colors.green,
           colorText: Colors.white,
           icon: const Icon(Icons.check_circle, color: Colors.white),
         );
-        
+
         // Recargar la lista
         _loadUsers();
       } else {
         Get.snackbar(
           'Error',
-          user.username == 'admin' 
-            ? 'No se puede desactivar al administrador principal'
-            : 'No se pudo cambiar el estado del usuario',
+          user.username == 'admin'
+              ? 'No se puede desactivar al administrador principal'
+              : 'No se pudo cambiar el estado del usuario',
           backgroundColor: Colors.red,
           colorText: Colors.white,
         );
@@ -244,7 +243,7 @@ class _UsersScreenState extends State<UsersScreen> {
       return;
     }
 
-    // No permitir eliminar al admin
+    // No permitir eliminar al administrador principal (username admin)
     if (user.username == 'admin') {
       Get.snackbar(
         'Error',
@@ -317,7 +316,7 @@ class _UsersScreenState extends State<UsersScreen> {
         return;
       }
       final success = await SQLiteDatabaseService.deleteUser(user.id!);
-      
+
       if (success) {
         Get.snackbar(
           'Éxito',
@@ -326,7 +325,7 @@ class _UsersScreenState extends State<UsersScreen> {
           colorText: Colors.white,
           icon: Icon(Icons.check_circle, color: Colors.white),
         );
-        
+
         // Recargar la lista
         _loadUsers();
       } else {
@@ -389,260 +388,265 @@ class _UsersScreenState extends State<UsersScreen> {
         ],
       ),
       body: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 32),
-          decoration: BoxDecoration(
-            color: const Color(0xFF6C47FF),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Gestión de Usuarios',
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C47FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Gestión de Usuarios',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Administra los usuarios del sistema y sus permisos',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: _openCreateUserDialog,
+                  icon: const Icon(Icons.add, color: Color(0xFF6C47FF)),
+                  label: const Text(
+                    'Nuevo Usuario',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
+                      color: Color(0xFF6C47FF),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Administra los usuarios del sistema y sus permisos',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                ],
-              ),
-              ElevatedButton.icon(
-                onPressed: _openCreateUserDialog,
-                icon: const Icon(Icons.add, color: Color(0xFF6C47FF)),
-                label: const Text(
-                  'Nuevo Usuario',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Filtros de búsqueda
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Filtros de Búsqueda',
                   style: TextStyle(
-                    color: Color(0xFF6C47FF),
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: Color(0xFF22315B),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 32),
-        
-        // Filtros de búsqueda
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Filtros de Búsqueda',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF22315B),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  // Campo de búsqueda
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Buscar por nombre, usuario o rol...',
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Filtro por rol
-                  Expanded(
-                    child: DropdownButtonFormField<UserRole?>(
-                      value: _selectedRoleFilter,
-                      decoration: InputDecoration(
-                        labelText: 'Rol',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Todos los roles'),
-                        ),
-                        ...UserRole.values.map((role) => DropdownMenuItem(
-                          value: role,
-                          child: Text(_getRoleText(role)),
-                        )),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedRoleFilter = value;
-                        });
-                        _filterUsers();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Filtro por estado
-                  Expanded(
-                    child: DropdownButtonFormField<bool?>(
-                      value: _selectedStatusFilter,
-                      decoration: InputDecoration(
-                        labelText: 'Estado',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('Todos'),
-                        ),
-                        const DropdownMenuItem(
-                          value: true,
-                          child: Text('Activo'),
-                        ),
-                        const DropdownMenuItem(
-                          value: false,
-                          child: Text('Inactivo'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedStatusFilter = value;
-                        });
-                        _filterUsers();
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Botón limpiar filtros
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _searchController.clear();
-                        _selectedRoleFilter = null;
-                        _selectedStatusFilter = null;
-                      });
-                      _filterUsers();
-                    },
-                    icon: const Icon(Icons.clear),
-                    label: const Text('Limpiar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[600],
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        
-        // Lista de usuarios
-        Expanded(
-          child: isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF6C47FF),
-                  ),
-                )
-              : filteredUsers.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 64,
-                            color: Colors.grey[400],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    // Campo de búsqueda
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar por nombre, usuario o rol...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            users.isEmpty 
-                              ? 'No hay usuarios registrados'
-                              : 'No se encontraron usuarios con los filtros aplicados',
-                        style: TextStyle(
-                          fontSize: 18,
-                              color: Colors.grey[600],
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Filtro por rol
+                    Expanded(
+                      child: DropdownButtonFormField<UserRole?>(
+                        value: _selectedRoleFilter,
+                        decoration: InputDecoration(
+                          labelText: 'Rol',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('Todos los roles'),
+                          ),
+                          ...UserRole.values.map((role) => DropdownMenuItem(
+                                value: role,
+                                child: Text(_getRoleText(role)),
+                              )),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedRoleFilter = value;
+                          });
+                          _filterUsers();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Filtro por estado
+                    Expanded(
+                      child: DropdownButtonFormField<bool?>(
+                        value: _selectedStatusFilter,
+                        decoration: InputDecoration(
+                          labelText: 'Estado',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('Todos'),
+                          ),
+                          const DropdownMenuItem(
+                            value: true,
+                            child: Text('Activo'),
+                          ),
+                          const DropdownMenuItem(
+                            value: false,
+                            child: Text('Inactivo'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedStatusFilter = value;
+                          });
+                          _filterUsers();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Botón limpiar filtros
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _selectedRoleFilter = null;
+                          _selectedStatusFilter = null;
+                        });
+                        _filterUsers();
+                      },
+                      icon: const Icon(Icons.clear),
+                      label: const Text('Limpiar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[600],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Lista de usuarios
+          Expanded(
+            child: isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF6C47FF),
+                    ),
+                  )
+                : filteredUsers.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: Colors.grey[400],
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                          if (users.isNotEmpty) ...[
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 16),
                             Text(
-                              'Intenta cambiar los filtros de búsqueda',
+                              users.isEmpty
+                                  ? 'No hay usuarios registrados'
+                                  : 'No se encontraron usuarios con los filtros aplicados',
                               style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
+                                fontSize: 18,
+                                color: Colors.grey[600],
                               ),
                               textAlign: TextAlign.center,
-                        ),
+                            ),
+                            if (users.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'Intenta cambiar los filtros de búsqueda',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filteredUsers.length,
+                        itemBuilder: (context, index) {
+                          final user = filteredUsers[index];
+                          return _UserCard(
+                            user: user,
+                            onEdit: () {
+                              _openEditUserDialog(user);
+                            },
+                            onToggleStatus: () {
+                              _toggleUserStatus(user);
+                            },
+                            onDelete: () {
+                              _deleteUser(user);
+                            },
+                          );
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: filteredUsers.length,
-                      itemBuilder: (context, index) {
-                        final user = filteredUsers[index];
-                        return _UserCard(
-                          user: user,
-                          onEdit: () {
-                            _openEditUserDialog(user);
-                          },
-                          onToggleStatus: () {
-                            _toggleUserStatus(user);
-                          },
-                          onDelete: () {
-                            _deleteUser(user);
-                          },
-                        );
-                      },
-                    ),
-        ),
-      ],
-    ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -724,7 +728,7 @@ class _UserCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          
+
           // Información del usuario
           Expanded(
             child: Column(
@@ -750,7 +754,8 @@ class _UserCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: _getRoleColor(user.role).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
@@ -766,9 +771,12 @@ class _UserCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: user.isActive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                        color: user.isActive
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.red.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -807,7 +815,7 @@ class _UserCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Botones de acción
           Row(
             children: [
@@ -822,7 +830,8 @@ class _UserCard extends StatelessWidget {
                   user.isActive ? Icons.block : Icons.check_circle,
                   color: user.isActive ? Colors.red : Colors.green,
                 ),
-                tooltip: user.isActive ? 'Desactivar usuario' : 'Activar usuario',
+                tooltip:
+                    user.isActive ? 'Desactivar usuario' : 'Activar usuario',
               ),
               IconButton(
                 onPressed: onDelete,
@@ -835,4 +844,4 @@ class _UserCard extends StatelessWidget {
       ),
     );
   }
-} 
+}
