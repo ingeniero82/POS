@@ -1,5 +1,6 @@
 // Servicio para generar reportes contables
 
+import 'dart:convert';
 import '../../../services/sqlite_database_service.dart';
 import '../models/accounting_reports.dart';
 
@@ -614,6 +615,911 @@ class AccountingReportsService {
     } catch (e) {
       print('❌ Error al generar resumen rápido: $e');
       return {};
+    }
+  }
+
+  /// Datos para imprimir reporte de Cierre de Caja (una sesión).
+  /// Requiere: ventas del período de la sesión, sesión, y movimientos contables de la sesión.
+  static Future<Map<String, dynamic>?> getCierreDeCajaData(int sessionId) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return null;
+
+      final sessionRows = await db.query('cash_sessions', where: 'id = ?', whereArgs: [sessionId]);
+      if (sessionRows.isEmpty) return null;
+      final row = sessionRows.first;
+
+      final openDate = DateTime.parse(row['open_date'] as String);
+      final closeDate = row['close_date'] != null ? DateTime.parse(row['close_date'] as String) : openDate;
+      final initialAmount = (row['initial_amount'] as num?)?.toDouble() ?? 0.0;
+      final finalAmount = (row['final_amount'] as num?)?.toDouble();
+      final userId = row['user_id'] as int?;
+
+      String userName = 'Cajero';
+      if (userId != null) {
+        final userRows = await db.query('users', columns: ['fullName'], where: 'id = ?', whereArgs: [userId]);
+        if (userRows.isNotEmpty && userRows.first['fullName'] != null) {
+          userName = userRows.first['fullName'] as String;
+        }
+      }
+
+      final startDay = DateTime(openDate.year, openDate.month, openDate.day);
+      final endDay = DateTime(closeDate.year, closeDate.month, closeDate.day).add(const Duration(days: 1));
+
+      final salesRows = await db.rawQuery(
+        "SELECT id, date, total, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount FROM sales WHERE date >= ? AND date < ? ORDER BY date",
+        [startDay.toIso8601String(), endDay.toIso8601String()],
+      );
+
+      int numVentas = 0;
+      double ventaBruta = 0, descuentos = 0, devoluciones = 0;
+      final byMethod = <String, Map<String, dynamic>>{}; // method -> { amount, count }
+
+      for (final s in salesRows) {
+        final isReturn = (s['isReturn'] as int? ?? 0) == 1;
+        final total = (s['total'] as num?)?.toDouble() ?? 0;
+        final discount = (s['discount'] as num?)?.toDouble() ?? 0;
+        final returned = (s['returnedAmount'] as num?)?.toDouble();
+
+        if (isReturn) {
+          devoluciones += (returned ?? total);
+          continue;
+        }
+        numVentas++;
+        ventaBruta += total;
+        descuentos += discount;
+
+        final pbStr = s['payment_breakdown'] as String?;
+        if (pbStr != null && pbStr.isNotEmpty) {
+          try {
+            final list = (jsonDecode(pbStr) as List<dynamic>?);
+            if (list != null) {
+              for (final e in list) {
+                final m = e as Map<String, dynamic>;
+                final method = m['method'] as String? ?? 'Efectivo';
+                final amount = (m['amount'] is num) ? (m['amount'] as num).toDouble() : 0.0;
+                byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
+                byMethod[method]!['amount'] = (byMethod[method]!['amount'] as double) + amount;
+                byMethod[method]!['count'] = (byMethod[method]!['count'] as int) + 1;
+              }
+            }
+          } catch (_) {}
+        } else {
+          final method = s['paymentMethod'] as String? ?? 'Efectivo';
+          byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
+          byMethod[method]!['amount'] = (byMethod[method]!['amount'] as double) + total;
+          byMethod[method]!['count'] = (byMethod[method]!['count'] as int) + 1;
+        }
+      }
+
+      final ventaNeta = ventaBruta - descuentos - devoluciones;
+      final ticketPromedio = numVentas > 0 ? ventaBruta / numVentas : 0.0;
+      final ivaIncluido = ventaNeta / 1.19 * 0.19;
+
+      final entries = await db.rawQuery(
+        'SELECT type, category, amount, description, date FROM accounting_entries WHERE cash_session_id = ? ORDER BY date',
+        [sessionId],
+      );
+
+      double otrosIngresos = 0, retiros = 0, gastos = 0, devolucionesEfectivo = 0;
+      final retirosList = <Map<String, dynamic>>[];
+
+      for (final e in entries) {
+        final type = e['type'] as String? ?? '';
+        final category = (e['category'] as String? ?? '').toUpperCase();
+        final amount = (e['amount'] as num?)?.toDouble() ?? 0.0;
+        final desc = e['description'] as String? ?? '';
+        final date = e['date'] != null ? DateTime.parse(e['date'] as String) : null;
+
+        if (type == 'income') {
+          if (category.contains('VENTA') || category.contains('SALES')) continue;
+          otrosIngresos += amount;
+        } else if (type == 'expense') {
+          if (category.contains('RETIRO') || desc.toLowerCase().contains('retiro')) {
+            retiros += amount;
+            retirosList.add({'time': date != null ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}' : '', 'description': desc, 'amount': amount});
+          } else if (category.contains('DEVOLUCIÓN') || category.contains('RETURN')) {
+            devolucionesEfectivo += amount;
+          } else {
+            gastos += amount;
+          }
+        }
+      }
+
+      final ventasEfectivo = (byMethod['Efectivo']?['amount'] as num?)?.toDouble() ?? 0.0;
+      final saldoEsperado = initialAmount + ventasEfectivo + otrosIngresos - retiros - gastos - devolucionesEfectivo;
+      final saldoReal = finalAmount ?? saldoEsperado;
+      final diferencia = (saldoReal - saldoEsperado);
+
+      return {
+        'sessionId': sessionId,
+        'openDate': openDate,
+        'closeDate': closeDate,
+        'userName': userName,
+        'initialAmount': initialAmount,
+        'finalAmount': finalAmount,
+        'numVentas': numVentas,
+        'ticketPromedio': ticketPromedio,
+        'ventaBruta': ventaBruta,
+        'descuentos': descuentos,
+        'devoluciones': devoluciones,
+        'ventaNeta': ventaNeta,
+        'ivaIncluido': ivaIncluido,
+        'byMethod': byMethod,
+        'ventasEfectivo': ventasEfectivo,
+        'otrosIngresos': otrosIngresos,
+        'retiros': retiros,
+        'gastos': gastos,
+        'devolucionesEfectivo': devolucionesEfectivo,
+        'saldoEsperado': saldoEsperado,
+        'saldoReal': saldoReal,
+        'diferencia': diferencia,
+        'retirosList': retirosList,
+      };
+    } catch (e) {
+      print('❌ Error getCierreDeCajaData: $e');
+      return null;
+    }
+  }
+
+  /// Ventas del día (excluye devoluciones): lista de ventas con totales.
+  static Future<Map<String, dynamic>> getVentasDiaData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT id, date, total, paymentMethod, discount, user
+           FROM sales
+           WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)
+           ORDER BY date''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double ventaBruta = 0;
+      double descuentos = 0;
+
+      for (final r in rows) {
+        final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+        final discount = (r['discount'] as num?)?.toDouble() ?? 0.0;
+        ventaBruta += total;
+        descuentos += discount;
+        list.add({
+          'id': r['id'],
+          'date': r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'total': total,
+          'paymentMethod': r['paymentMethod'] as String? ?? 'Efectivo',
+          'discount': discount,
+          'user': r['user'] as String? ?? '',
+        });
+      }
+
+      final ventaNeta = ventaBruta - descuentos;
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'ventas': list,
+        'cantidad': list.length,
+        'ventaBruta': ventaBruta,
+        'descuentos': descuentos,
+        'ventaNeta': ventaNeta,
+      };
+    } catch (e) {
+      print('❌ Error getVentasDiaData: $e');
+      return {
+        'ventas': <Map<String, dynamic>>[],
+        'cantidad': 0,
+        'ventaBruta': 0.0,
+        'descuentos': 0.0,
+        'ventaNeta': 0.0,
+      };
+    }
+  }
+
+  /// Movimientos del día: entradas contables (ingresos y egresos).
+  static Future<Map<String, dynamic>> getMovimientosDiaData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT ae.id, ae.type, ae.amount, ae.description, ae.category, ae.date, ae.payment_method, ae.user_id
+           FROM accounting_entries ae
+           WHERE ae.date >= ? AND ae.date < ?
+           ORDER BY ae.date''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double totalIngresos = 0;
+      double totalEgresos = 0;
+
+      for (final r in rows) {
+        final amount = (r['amount'] as num?)?.toDouble() ?? 0.0;
+        final type = r['type'] as String? ?? '';
+        if (type == 'income') totalIngresos += amount;
+        else if (type == 'expense') totalEgresos += amount;
+
+        String userName = '';
+        if (r['user_id'] != null) {
+          final u = await db.query(
+            'users',
+            columns: ['fullName'],
+            where: 'id = ?',
+            whereArgs: [r['user_id']],
+          );
+          if (u.isNotEmpty && u.first['fullName'] != null) {
+            userName = u.first['fullName'] as String;
+          }
+        }
+
+        list.add({
+          'id': r['id'],
+          'type': type,
+          'amount': amount,
+          'description': r['description'] as String? ?? '',
+          'category': _translateCategory(r['category'] as String? ?? ''),
+          'date': r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'paymentMethod': _translatePaymentMethod(
+              r['payment_method'] as String? ?? 'N/A'),
+          'userName': userName,
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'movimientos': list,
+        'totalIngresos': totalIngresos,
+        'totalEgresos': totalEgresos,
+        'saldo': totalIngresos - totalEgresos,
+      };
+    } catch (e) {
+      print('❌ Error getMovimientosDiaData: $e');
+      return {
+        'movimientos': <Map<String, dynamic>>[],
+        'totalIngresos': 0.0,
+        'totalEgresos': 0.0,
+        'saldo': 0.0,
+      };
+    }
+  }
+
+  /// Movimientos del día (transacciones): todas las ventas y devoluciones del período para el reporte tipo ticket.
+  static Future<Map<String, dynamic>> getTransaccionesDiaData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day).add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT id, date, total, paymentMethod, user, isReturn
+           FROM sales
+           WHERE date >= ? AND date < ?
+           ORDER BY date''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double totalVentas = 0;
+      double totalDevoluciones = 0;
+      int countVentas = 0;
+      int countDevoluciones = 0;
+
+      for (final r in rows) {
+        final isReturn = (r['isReturn'] as int?) == 1;
+        final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+        final amount = isReturn ? -total.abs() : total;
+        if (isReturn) {
+          countDevoluciones++;
+          totalDevoluciones += total.abs();
+        } else {
+          countVentas++;
+          totalVentas += total;
+        }
+        final payRaw = r['paymentMethod'] as String? ?? 'Efectivo';
+        final paymentMethod = _translatePaymentMethod(payRaw);
+        list.add({
+          'id': r['id'],
+          'date': r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'tipo': isReturn ? 'Devolución' : 'Venta',
+          'userName': r['user'] as String? ?? '',
+          'paymentMethod': paymentMethod,
+          'amount': amount,
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'transacciones': list,
+        'totalVentas': totalVentas,
+        'totalDevoluciones': totalDevoluciones,
+        'neto': totalVentas - totalDevoluciones,
+        'countVentas': countVentas,
+        'countDevoluciones': countDevoluciones,
+      };
+    } catch (e) {
+      print('❌ Error getTransaccionesDiaData: $e');
+      return {
+        'transacciones': <Map<String, dynamic>>[],
+        'totalVentas': 0.0,
+        'totalDevoluciones': 0.0,
+        'neto': 0.0,
+        'countVentas': 0,
+        'countDevoluciones': 0,
+      };
+    }
+  }
+
+  /// Devoluciones: ventas con isReturn = 1.
+  static Future<Map<String, dynamic>> getDevolucionesData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT id, date, total, returnedAmount, user, originalSaleId
+           FROM sales
+           WHERE date >= ? AND date < ? AND isReturn = 1
+           ORDER BY date DESC''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double totalDevoluciones = 0;
+
+      for (final r in rows) {
+        final amount = (r['returnedAmount'] as num?)?.toDouble() ??
+            (r['total'] as num?)?.toDouble() ?? 0.0;
+        totalDevoluciones += amount;
+        list.add({
+          'id': r['id'],
+          'date': r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'amount': amount,
+          'user': r['user'] as String? ?? '',
+          'originalSaleId': r['originalSaleId'],
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'devoluciones': list,
+        'cantidad': list.length,
+        'totalDevoluciones': totalDevoluciones,
+      };
+    } catch (e) {
+      print('❌ Error getDevolucionesData: $e');
+      return {
+        'devoluciones': <Map<String, dynamic>>[],
+        'cantidad': 0,
+        'totalDevoluciones': 0.0,
+      };
+    }
+  }
+
+  /// Gastos: entradas contables tipo expense.
+  static Future<Map<String, dynamic>> getGastosData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT ae.id, ae.amount, ae.description, ae.category, ae.date, ae.payment_method, ae.user_id
+           FROM accounting_entries ae
+           WHERE ae.type = 'expense' AND ae.date >= ? AND ae.date < ?
+           ORDER BY ae.date DESC''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double total = 0;
+
+      for (final r in rows) {
+        final amount = (r['amount'] as num?)?.toDouble() ?? 0.0;
+        total += amount;
+
+        String userName = '';
+        if (r['user_id'] != null) {
+          final u = await db.query(
+            'users',
+            columns: ['fullName'],
+            where: 'id = ?',
+            whereArgs: [r['user_id']],
+          );
+          if (u.isNotEmpty && u.first['fullName'] != null) {
+            userName = u.first['fullName'] as String;
+          }
+        }
+
+        list.add({
+          'id': r['id'],
+          'amount': amount,
+          'description': r['description'] as String? ?? '',
+          'category': _translateCategory(r['category'] as String? ?? ''),
+          'date': r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'paymentMethod': _translatePaymentMethod(
+              r['payment_method'] as String? ?? 'N/A'),
+          'userName': userName,
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'gastos': list,
+        'cantidad': list.length,
+        'total': total,
+      };
+    } catch (e) {
+      print('❌ Error getGastosData: $e');
+      return {
+        'gastos': <Map<String, dynamic>>[],
+        'cantidad': 0,
+        'total': 0.0,
+      };
+    }
+  }
+
+  // ==================== REPORTES DE VENTAS ====================
+
+  /// Ventas por producto: agrupa ítems de ventas por nombre+unidad e incluye código del producto.
+  static Future<Map<String, dynamic>> getVentasPorProductoData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day).add(const Duration(days: 1));
+
+      // Mapa nombre|unidad -> código del producto (desde products)
+      final productRows = await db.query('products', columns: ['name', 'unit', 'code']);
+      final nameUnitToCode = <String, String>{};
+      for (final r in productRows) {
+        final name = r['name'] as String? ?? '';
+        final unit = r['unit'] as String? ?? 'und';
+        nameUnitToCode['$name|$unit'] = r['code'] as String? ?? '';
+      }
+
+      final rows = await db.rawQuery(
+        '''SELECT items FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final map = <String, Map<String, dynamic>>{}; // key: name|unit -> {code, name, unit, quantity, revenue}
+      for (final r in rows) {
+        final itemsStr = r['items'] as String?;
+        if (itemsStr == null || itemsStr.isEmpty || !itemsStr.contains('[')) continue;
+        try {
+          final list = jsonDecode(itemsStr) as List<dynamic>?;
+          if (list == null) continue;
+          for (final e in list) {
+            final m = e as Map<String, dynamic>;
+            final name = m['name'] as String? ?? '';
+            final unit = m['unit'] as String? ?? 'und';
+            final qty = (m['quantity'] is int) ? (m['quantity'] as int) : ((m['quantity'] as num?)?.toInt() ?? 0);
+            final price = (m['price'] is num) ? (m['price'] as num).toDouble() : 0.0;
+            final revenue = qty * price;
+            final key = '$name|$unit';
+            map.putIfAbsent(key, () => {
+              'code': nameUnitToCode[key] ?? '',
+              'productName': name,
+              'unit': unit,
+              'quantity': 0,
+              'revenue': 0.0,
+            });
+            map[key]!['quantity'] = (map[key]!['quantity'] as int) + qty;
+            map[key]!['revenue'] = (map[key]!['revenue'] as double) + revenue;
+          }
+        } catch (_) {}
+      }
+
+      final list = map.values.toList();
+      list.sort((a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double));
+      final totalRevenue = list.fold<double>(0, (s, e) => s + (e['revenue'] as double));
+      final totalQuantity = list.fold<int>(0, (s, e) => s + (e['quantity'] as int));
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'porProducto': list,
+        'totalRevenue': totalRevenue,
+        'totalQuantity': totalQuantity,
+      };
+    } catch (e) {
+      print('❌ Error getVentasPorProductoData: $e');
+      return {'porProducto': <Map<String, dynamic>>[], 'totalRevenue': 0.0, 'totalQuantity': 0};
+    }
+  }
+
+  /// Ventas por categoría: agrupa por categoría del producto (nombre+unidad -> products.category).
+  static Future<Map<String, dynamic>> getVentasPorCategoriaData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final productRows = await db.query('products', columns: ['name', 'unit', 'category']);
+      final nameToCategory = <String, String>{};
+      for (final r in productRows) {
+        final name = r['name'] as String? ?? '';
+        final unit = r['unit'] as String? ?? 'und';
+        nameToCategory['$name|$unit'] = r['category'] as String? ?? 'Sin categoría';
+      }
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day).add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT items FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final map = <String, Map<String, dynamic>>{}; // category -> {quantity, revenue}
+      for (final r in rows) {
+        final itemsStr = r['items'] as String?;
+        if (itemsStr == null || !itemsStr.contains('[')) continue;
+        try {
+          final list = jsonDecode(itemsStr) as List<dynamic>?;
+          if (list == null) continue;
+          for (final e in list) {
+            final m = e as Map<String, dynamic>;
+            final name = m['name'] as String? ?? '';
+            final unit = m['unit'] as String? ?? 'und';
+            final qty = (m['quantity'] is int) ? (m['quantity'] as int) : ((m['quantity'] as num?)?.toInt() ?? 0);
+            final price = (m['price'] is num) ? (m['price'] as num).toDouble() : 0.0;
+            final revenue = qty * price;
+            final cat = nameToCategory['$name|$unit'] ?? 'Sin categoría';
+            map.putIfAbsent(cat, () => {'category': cat, 'quantity': 0, 'revenue': 0.0});
+            map[cat]!['quantity'] = (map[cat]!['quantity'] as int) + qty;
+            map[cat]!['revenue'] = (map[cat]!['revenue'] as double) + revenue;
+          }
+        } catch (_) {}
+      }
+
+      final list = map.values.toList();
+      list.sort((a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double));
+      final totalRevenue = list.fold<double>(0, (s, e) => s + (e['revenue'] as double));
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'porCategoria': list,
+        'totalRevenue': totalRevenue,
+      };
+    } catch (e) {
+      print('❌ Error getVentasPorCategoriaData: $e');
+      return {'porCategoria': <Map<String, dynamic>>[], 'totalRevenue': 0.0};
+    }
+  }
+
+  /// Ventas por hora: cantidad y monto por hora del día (0-23).
+  static Future<Map<String, dynamic>> getVentasPorHoraData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day).add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT date, total FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final porHora = List<Map<String, dynamic>>.generate(24, (i) => {'hour': i, 'count': 0, 'revenue': 0.0});
+      for (final r in rows) {
+        final dateStr = r['date'] as String?;
+        if (dateStr == null) continue;
+        final dt = DateTime.parse(dateStr);
+        final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+        porHora[dt.hour]['count'] = (porHora[dt.hour]['count'] as int) + 1;
+        porHora[dt.hour]['revenue'] = (porHora[dt.hour]['revenue'] as double) + total;
+      }
+
+      final totalVentas = porHora.fold<int>(0, (s, e) => s + (e['count'] as int));
+      final totalRevenue = porHora.fold<double>(0, (s, e) => s + (e['revenue'] as double));
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'porHora': porHora,
+        'totalVentas': totalVentas,
+        'totalRevenue': totalRevenue,
+      };
+    } catch (e) {
+      print('❌ Error getVentasPorHoraData: $e');
+      return {
+        'porHora': List<Map<String, dynamic>>.generate(24, (i) => {'hour': i, 'count': 0, 'revenue': 0.0}),
+        'totalVentas': 0,
+        'totalRevenue': 0.0,
+      };
+    }
+  }
+
+  /// Top productos más vendidos (por cantidad, límite 30).
+  static Future<Map<String, dynamic>> getTopProductosData(
+      DateTime fromDate, DateTime toDate, {int limit = 30}) async {
+    final data = await getVentasPorProductoData(fromDate, toDate);
+    final list = data['porProducto'] as List<dynamic>? ?? [];
+    list.sort((a, b) => (b['quantity'] as int).compareTo(a['quantity'] as int));
+    final top = list.take(limit).toList();
+    return {
+      'fromDate': data['fromDate'],
+      'toDate': data['toDate'],
+      'top': top,
+      'totalRevenue': data['totalRevenue'],
+      'totalQuantity': data['totalQuantity'],
+    };
+  }
+
+  /// Productos sin movimiento (no vendidos en el período).
+  static Future<Map<String, dynamic>> getProductosSinMovimientoData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day).add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT items FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final soldKeys = <String>{};
+      for (final r in rows) {
+        final itemsStr = r['items'] as String?;
+        if (itemsStr == null || !itemsStr.contains('[')) continue;
+        try {
+          final list = jsonDecode(itemsStr) as List<dynamic>?;
+          if (list == null) continue;
+          for (final e in list) {
+            final m = e as Map<String, dynamic>;
+            final name = m['name'] as String? ?? '';
+            final unit = m['unit'] as String? ?? 'und';
+            soldKeys.add('$name|$unit');
+          }
+        } catch (_) {}
+      }
+
+      final productRows = await db.query(
+        'products',
+        columns: ['id', 'name', 'code', 'unit', 'category', 'stock'],
+        where: 'isActive = 1',
+      );
+
+      final list = <Map<String, dynamic>>[];
+      for (final r in productRows) {
+        final name = r['name'] as String? ?? '';
+        final unit = r['unit'] as String? ?? 'und';
+        if (soldKeys.contains('$name|$unit')) continue;
+        list.add({
+          'id': r['id'],
+          'name': name,
+          'code': r['code'] as String? ?? '',
+          'unit': unit,
+          'category': r['category'] as String? ?? '',
+          'stock': r['stock'] as int? ?? 0,
+        });
+      }
+
+      list.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'productos': list,
+        'cantidad': list.length,
+      };
+    } catch (e) {
+      print('❌ Error getProductosSinMovimientoData: $e');
+      return {'productos': <Map<String, dynamic>>[], 'cantidad': 0};
+    }
+  }
+
+  // ==================== REPORTES DE PAGOS ====================
+
+  /// Ventas por forma de pago en el período (agregado desde sales).
+  static Future<Map<String, dynamic>> getVentasPorFormaDePagoData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day).add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT total, paymentMethod, payment_breakdown FROM sales
+           WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final byMethod = <String, Map<String, dynamic>>{};
+      int totalVentas = 0;
+
+      for (final r in rows) {
+        final total = (r['total'] as num?)?.toDouble() ?? 0.0;
+        totalVentas++;
+
+        final pbStr = r['payment_breakdown'] as String?;
+        if (pbStr != null && pbStr.isNotEmpty && pbStr.contains('[')) {
+          try {
+            final list = jsonDecode(pbStr) as List<dynamic>?;
+            if (list != null) {
+              for (final e in list) {
+                final m = e as Map<String, dynamic>;
+                final method = m['method'] as String? ?? 'Efectivo';
+                final amount = (m['amount'] is num) ? (m['amount'] as num).toDouble() : 0.0;
+                byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
+                byMethod[method]!['amount'] = (byMethod[method]!['amount'] as double) + amount;
+                byMethod[method]!['count'] = (byMethod[method]!['count'] as int) + 1;
+              }
+            }
+          } catch (_) {}
+        } else {
+          final method = r['paymentMethod'] as String? ?? 'Efectivo';
+          byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
+          byMethod[method]!['amount'] = (byMethod[method]!['amount'] as double) + total;
+          byMethod[method]!['count'] = (byMethod[method]!['count'] as int) + 1;
+        }
+      }
+
+      final list = byMethod.entries.map((e) => {
+        'method': e.key,
+        'amount': e.value['amount'],
+        'count': e.value['count'],
+      }).toList();
+      list.sort((a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
+      final totalCobrado = list.fold<double>(0, (s, e) => s + (e['amount'] as double));
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'porFormaPago': list,
+        'totalVentas': totalVentas,
+        'totalCobrado': totalCobrado,
+      };
+    } catch (e) {
+      print('❌ Error getVentasPorFormaDePagoData: $e');
+      return {'porFormaPago': <Map<String, dynamic>>[], 'totalVentas': 0, 'totalCobrado': 0.0};
+    }
+  }
+
+  /// Movimientos de efectivo: entradas contables del período (ingresos y egresos) con método de pago.
+  static Future<Map<String, dynamic>> getMovimientosDeEfectivoData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day).add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT ae.id, ae.type, ae.amount, ae.description, ae.category, ae.date, ae.payment_method, ae.user_id
+           FROM accounting_entries ae
+           WHERE ae.date >= ? AND ae.date < ?
+           ORDER BY ae.date''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double totalIngresos = 0;
+      double totalEgresos = 0;
+
+      for (final r in rows) {
+        final amount = (r['amount'] as num?)?.toDouble() ?? 0.0;
+        final type = r['type'] as String? ?? '';
+        final method = _translatePaymentMethod(r['payment_method'] as String? ?? 'N/A');
+        if (type == 'income') totalIngresos += amount;
+        else if (type == 'expense') totalEgresos += amount;
+
+        String userName = '';
+        if (r['user_id'] != null) {
+          final u = await db.query('users', columns: ['fullName'], where: 'id = ?', whereArgs: [r['user_id']]);
+          if (u.isNotEmpty && u.first['fullName'] != null) userName = u.first['fullName'] as String;
+        }
+
+        list.add({
+          'id': r['id'],
+          'type': type,
+          'amount': amount,
+          'description': r['description'] as String? ?? '',
+          'category': _translateCategory(r['category'] as String? ?? ''),
+          'date': r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'paymentMethod': method,
+          'userName': userName,
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'movimientos': list,
+        'totalIngresos': totalIngresos,
+        'totalEgresos': totalEgresos,
+        'saldo': totalIngresos - totalEgresos,
+      };
+    } catch (e) {
+      print('❌ Error getMovimientosDeEfectivoData: $e');
+      return {
+        'movimientos': <Map<String, dynamic>>[],
+        'totalIngresos': 0.0,
+        'totalEgresos': 0.0,
+        'saldo': 0.0,
+      };
+    }
+  }
+
+  /// Arqueo de caja: resumen de sesiones de caja en el período (fondo, cierre, diferencia).
+  static Future<Map<String, dynamic>> getArqueoDeCajaData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final report = await generateCashSessionReport(fromDate, toDate);
+      final sesiones = report.sessions.map((s) => {
+        'sessionId': s.sessionId,
+        'userName': s.userName,
+        'openDate': s.openDate,
+        'closeDate': s.closeDate,
+        'initialAmount': s.initialAmount,
+        'finalAmount': s.finalAmount,
+        'totalIncome': s.totalIncome,
+        'totalExpenses': s.totalExpenses,
+        'difference': s.difference,
+        'status': s.status,
+        'transactionCount': s.transactionCount,
+      }).toList();
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'sesiones': sesiones,
+        'totalSesiones': sesiones.length,
+        'totalInicial': report.totalInitialCash,
+        'totalFinal': report.totalFinalCash,
+        'totalIngresos': report.totalIncome,
+        'totalEgresos': report.totalExpenses,
+      };
+    } catch (e) {
+      print('❌ Error getArqueoDeCajaData: $e');
+      return {
+        'sesiones': <Map<String, dynamic>>[],
+        'totalSesiones': 0,
+        'totalInicial': 0.0,
+        'totalFinal': 0.0,
+        'totalIngresos': 0.0,
+        'totalEgresos': 0.0,
+      };
     }
   }
 }
