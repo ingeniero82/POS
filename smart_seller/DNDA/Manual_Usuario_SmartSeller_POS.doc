@@ -1,0 +1,69 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+\viewkind4\uc1
+\pard\sa200\sl276\slmult1\qc\f0\fs30\b MANUAL DE USUARIO\\Sistema de Punto de Venta SmartSeller POS v1.0\b0\fs22\par
+\pard\sa200\sl276\slmult1\par
+\b 1. Introducción\b0\par
+Sistema de Punto de Venta SmartSeller POS v1.0 es una solución de escritorio para Windows diseñada para pequeñas y medianas empresas. Este manual describe las operaciones diarias para cajeros, administradores y personal de soporte.
+\par
+\b 2. Acceso al sistema\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Ejecutar el archivo `smart_seller.exe`.\par
+\bullet Ingresar usuario y contraseña asignados.\par
+\bullet Solicitar restablecimiento al administrador en caso de olvidar las credenciales.\par
+\bullet Tras iniciar sesión, el sistema abre el panel principal (Dashboard).\par
+\pard\sa200\sl276\slmult1\par
+\b 3. Panel principal\b0\par
+El Dashboard ofrece accesos a los módulos habilitados según el rol (POS, Inventario, Clientes, Reportes, Configuración, etc.).\par
+\b 4. Módulo Punto de Venta (POS)\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Buscar productos por nombre o código de barras.\par
+\bullet Agregar productos al carrito; para productos por peso se usa la balanza integrada.\par
+\bullet Aplicar descuentos si el rol lo permite.\par
+\bullet Seleccionar método de pago (efectivo, tarjeta, transferencia).\par
+\bullet Confirmar la venta para emitir el ticket y actualizar inventario.\par
+\bullet Para devoluciones, usar la opción “Venta en reversa”.\par
+\pard\sa200\sl276\slmult1\par
+\b 5. Módulo de Inventario\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Crear/editar productos con datos de unidad/peso, precios y stock mínimo.\par
+\bullet Registrar movimientos: entradas, salidas, ajustes.\par
+\bullet Importar catálogos desde Excel/CSV.\par
+\bullet Revisar alertas de stock bajo y generar reportes.\par
+\pard\sa200\sl276\slmult1\par
+\b 6. Módulo de Clientes\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Registrar clientes con validación de documento (Cédula, NIT, RUT).\par
+\bullet Actualizar información de contacto y dirección.\par
+\bullet Consultar historial de compras y segmentación.\par
+\bullet Usar filtros por nombre, documento o teléfono.\par
+\pard\sa200\sl276\slmult1\par
+\b 7. Módulo de Reportes\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Generar reportes de ventas, inventario, rentabilidad y clientes.\par
+\bullet Aplicar filtros por fechas, usuario o producto.\par
+\bullet Exportar resultados a PDF o Excel.\par
+\pard\sa200\sl276\slmult1\par
+\b 8. Facturación electrónica (modo simulado)\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Crear facturas con validación fiscal y guardar en borrador o enviar en modo simulado.\par
+\bullet Revisar la cola de facturas y sus estados mientras se completa la integración DIAN.\par
+\pard\sa200\sl276\slmult1\par
+\b 9. Módulo de Usuarios y permisos\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Crear usuarios y asignar roles (Admin, Gerente, Supervisor, Cajero, Mantenimiento).\par
+\bullet Configurar permisos específicos y restablecer contraseñas.\par
+\bullet Consultar auditoría de acciones.\par
+\pard\sa200\sl276\slmult1\par
+\b 10. Configuración y datos de empresa\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Registrar datos corporativos y fiscales.\par
+\bullet Personalizar textos en tickets y facturas.\par
+\bullet Configurar periféricos (impresoras y balanza).\par
+\bullet Realizar respaldos manuales de la carpeta `data`.\par
+\pard\sa200\sl276\slmult1\par
+\b 11. Buenas prácticas\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Cerrar sesión al terminar el turno.\par
+\bullet Revisar reportes críticos diariamente.\par
+\bullet Mantener datos de productos y clientes al día.\par
+\bullet Reportar incidencias al equipo de soporte.\par
+\pard\sa200\sl276\slmult1\par
+\b 12. Soporte\b0\par
+\pard\li720\sa200\sl276\slmult1\bullet Responsable: Oscar Mauricio González Montenegro.\par
+\bullet Correo de soporte: [actualizar correo de contacto].\par
+\bullet Canal interno: [indicar chat o línea telefónica].\par
+\pard\sa200\sl276\slmult1\par
+\i Nota:\i0  Manual correspondiente a Sistema de Punto de Venta SmartSeller POS v1.0. Actualizar junto con cada nueva versión y acompañar con capturas o videos si es necesario.
+\par}

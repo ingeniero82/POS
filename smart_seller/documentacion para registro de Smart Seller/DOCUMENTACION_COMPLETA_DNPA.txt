@@ -1,0 +1,320 @@
+═══════════════════════════════════════════════════════════════════
+DOCUMENTACIÓN COMPLETA PARA REGISTRO DNPA
+SmartSeller POS v1.0 - Sistema de Punto de Venta Profesional
+═══════════════════════════════════════════════════════════════════
+
+TÍTULO DE LA OBRA:
+"Sistema de Punto de Venta SmartSeller POS v1.0"
+
+AUTOR:
+Oscar Mauricio González
+
+FECHA:
+Septiembre 2025
+
+VERSIÓN:
+1.0
+
+───────────────────────────────────────────────────────────────────
+
+DESCRIPCIÓN DE LA OBRA:
+
+SmartSeller POS v2.0 es un sistema integral de punto de venta diseñado 
+para pequeñas y medianas empresas que requieren una solución completa 
+para la gestión de ventas, inventario, clientes y facturación electrónica 
+según los estándares de la DIAN (Colombia).
+
+───────────────────────────────────────────────────────────────────
+
+FUNCIONES TÉCNICAS REALIZADAS POR EL SOPORTE LÓGICO:
+
+El software SmartSeller POS v2.0 realiza las siguientes funciones técnicas:
+
+1. ✅ PROCESA TRANSACCIONES
+   - Registra y procesa ventas en tiempo real
+   - Procesa múltiples métodos de pago
+
+2. ✅ ALMACENA DATOS
+   - Mantiene información en base de datos SQLite local
+   - Almacena productos, clientes, ventas, usuarios, configuración
+
+3. ✅ CALCULA TOTALES AUTOMÁTICAMENTE
+   - Calcula subtotales de ventas
+   - Calcula impuestos IVA (19%)
+   - Calcula totales finales
+
+4. ✅ ACTUALIZA INVENTARIO
+   - Descuenta stock automáticamente al realizar ventas
+   - Controla niveles de inventario
+
+5. ✅ GENERA REPORTES
+   - Produce reportes en formato PDF y Excel
+   - Genera reportes de ventas, inventario, rentabilidad
+   - Genera estadísticas y gráficos
+
+6. ✅ GESTIONA USUARIOS
+   - Crea, actualiza y controla acceso de usuarios
+   - Maneja autenticación y roles
+
+7. ✅ VALIDA DATOS
+   - Verifica integridad de información ingresada
+   - Valida datos fiscales según normativa DIAN
+
+8. ✅ REGISTRA OPERACIONES
+   - Guarda histórico de todas las operaciones
+   - Registra ventas, items, métodos de pago
+
+9. ✅ BUSCA Y CONSULTA
+   - Permite búsqueda de productos y clientes en tiempo real
+   - Búsqueda por nombre, código, documento
+
+10. ✅ COMPILA DATOS
+    - Consolida información para reportes
+    - Calcula totales y estadísticas
+
+11. ✅ CONTROL DE ACCESO
+    - Controla qué usuarios pueden acceder a cada módulo
+    - Sistema de roles y permisos
+
+12. ✅ GESTIONA PERMISOS
+    - Administra permisos granulares por módulo
+    - Asigna permisos específicos a cada rol
+
+13. ✅ ENCRIPTA CONTRASEÑAS
+    - Protege contraseñas con algoritmo SHA-256
+    - Convierte contraseñas a hash antes de almacenar
+
+14. ✅ MIGRA SEGURIDAD AUTOMÁTICAMENTE
+    - Migra contraseñas antiguas a formato seguro
+    - Migración automática y transparente
+
+───────────────────────────────────────────────────────────────────
+
+MÓDULOS PRINCIPALES DEL SISTEMA:
+
+1. MÓDULO DE PUNTO DE VENTA (POS)
+   - Interfaz de venta rápida e intuitiva
+   - Búsqueda de productos por nombre o código de barras
+   - Carrito de compras dinámico
+   - Integración con balanzas electrónicas
+   - Cálculo automático de totales e impuestos
+   - Múltiples métodos de pago (efectivo, tarjeta, transferencia)
+   - Impresión automática de tickets
+
+2. MÓDULO DE GESTIÓN DE INVENTARIO
+   - Control completo de productos (unidad y peso)
+   - Control automático de stock con alertas
+   - Categorías y grupos de productos
+   - Movimientos de inventario
+   - Importación desde Excel/CSV
+
+3. MÓDULO DE GESTIÓN DE CLIENTES
+   - Base de datos completa de clientes
+   - Validación de documentos (Cédula, NIT, RUT)
+   - Historial de compras por cliente
+   - Búsqueda avanzada
+
+4. MÓDULO DE FACTURACIÓN ELECTRÓNICA DIAN
+   - Generación de facturas electrónicas según normativa DIAN
+   - Validación de datos fiscales
+   - Cálculo automático de IVA
+   - Estados de facturación (borrador, enviado, autorizado)
+
+5. MÓDULO DE REPORTES Y CONTABILIDAD
+   - Reportes de ventas por período
+   - Reportes de inventario y valorización
+   - Reportes de rentabilidad
+   - Exportación a PDF y Excel
+   - Gráficos y estadísticas
+
+6. MÓDULO DE GESTION DE USUARIOS
+   - Sistema de autenticación seguro
+   - Contraseñas encriptadas SHA-256
+   - Tres roles: Administrador, Vendedor, Mantenimiento
+   - Permisos granulares por módulo
+   - Auditoría de actividades
+
+7. MÓDULO DE CONFIGURACION
+   - Configuración de datos de la empresa
+   - Configuración fiscal para DIAN
+   - Configuración de impresoras
+   - Sistema de respaldo automático
+
+───────────────────────────────────────────────────────────────────
+
+ARQUITECTURA DEL SISTEMA:
+
+PATRÓN: Model-View-Controller (MVC)
+
+CAPA 1: INTERFAZ DE USUARIO (View)
+- Pantallas principales (Login, POS, Inventario, Clientes)
+- Widgets personalizados
+- Sistema de navegación fluida
+
+CAPA 2: LÓGICA DE NEGOCIO (Controller)
+- Controladores de estado con GetX
+- Servicios especializados (autenticación, impresión, BD)
+- Middleware de seguridad
+
+CAPA 3: ACCESO A DATOS (Model)
+- Base de datos SQLite local
+- Modelos de datos estructurados
+- Operaciones CRUD optimizadas
+
+───────────────────────────────────────────────────────────────────
+
+TECNOLOGÍAS UTILIZADAS:
+
+DESARROLLO:
+- Flutter 3.16.0+
+- Dart 3.0+
+- GetX (gestión de estado)
+- Material Design 3
+
+BASE DE DATOS:
+- SQLite (base de datos local)
+- sqflite
+- sqlite3_flutter_libs
+
+SEGURIDAD:
+- Encriptación SHA-256 de contraseñas
+- Autenticación de usuarios
+- Sistema de permisos granular
+- Validación de datos
+
+INTEGRACIONES:
+- libserialport (balanzas electrónicas)
+- PDF (generación de documentos)
+- Excel (exportación de datos)
+
+───────────────────────────────────────────────────────────────────
+
+PLATAFORMAS SOPORTADAS:
+
+- Windows 10/11 (64-bit) - Plataforma principal
+- Android 7.0+ (Tablets POS)
+- Web (navegadores modernos)
+
+REQUISITOS MÍNIMOS:
+- RAM: 4GB (8GB recomendado)
+- Disco: 2GB espacio libre
+- Procesador: Intel i3 o equivalente
+- Sistema Operativo: Windows 10 (64-bit) o superior
+
+───────────────────────────────────────────────────────────────────
+
+CARACTERÍSTICAS DE SEGURIDAD:
+
+✅ ENCRIPTACIÓN SHA-256
+- Todas las contraseñas se almacenan hasheadas
+- Protección contra acceso no autorizado
+- Cumple estándares de seguridad profesional
+
+✅ AUTENTICACIÓN
+- Sistema de login seguro
+- Contraseñas encriptadas en base de datos
+- Sesiones de usuario controladas
+
+✅ AUTORIZACIÓN
+- Sistema granular de permisos
+- Roles predefinidos (Administrador, Vendedor, Mantenimiento)
+- Control de acceso por módulo
+
+✅ AUDITORÍA
+- Registro de actividades importantes
+- Logs de acceso y modificaciones
+- Trazabilidad completa
+
+───────────────────────────────────────────────────────────────────
+
+BASE DE DATOS:
+
+TECNOLOGÍA: SQLite
+UBICACIÓN: Almacenamiento local del sistema
+BACKUP: Automático diario
+
+TABLAS PRINCIPALES:
+- users (usuarios del sistema)
+- products (productos e inventario)
+- customers (clientes)
+- sales (ventas realizadas)
+- sale_items (items de cada venta)
+- groups (grupos de productos)
+- company_config (configuración de empresa)
+- electronic_documents (facturas electrónicas)
+
+───────────────────────────────────────────────────────────────────
+
+CREDENCIALES POR DEFECTO:
+
+Usuario Administrador:
+- Username: admin
+- Contraseña: 123456
+- Rol: Administrador
+
+Usuario Supervisor:
+- Username: supervisor
+- Contraseña: 123456
+- Rol: Supervisor
+
+⚠️ IMPORTANTE: Cambiar contraseñas en primera sesión
+
+───────────────────────────────────────────────────────────────────
+
+FUNCIONALIDADES DESTACADAS:
+
+✓ Punto de venta rápido e intuitivo
+✓ Control automático de inventario
+✓ Facturación electrónica DIAN
+✓ Reportes profesionales en PDF
+✓ Sistema de usuarios con permisos
+✓ Integración con balanzas electrónicas
+✓ Múltiples métodos de pago
+✓ Gestión completa de clientes
+✓ Exportación a Excel
+✓ Respaldo automático de datos
+✓ Interfaz moderna Material Design 3
+
+───────────────────────────────────────────────────────────────────
+
+SEGURIDAD Y CALIDAD:
+
+✓ Contraseñas encriptadas SHA-256
+✓ Sistema de autenticación robusto
+✓ Validación de datos en tiempo real
+✓ Código bien estructurado y documentado
+✓ Pruebas de funcionalidad completas
+✓ Compatibilidad multiplataforma
+✓ Optimizado para rendimiento
+
+───────────────────────────────────────────────────────────────────
+
+CONCLUSIÓN:
+
+SmartSeller POS v2.0 es un sistema de punto de venta profesional que 
+cumple con los estándares de seguridad y calidad requeridos para 
+aplicaciones comerciales de producción.
+
+El sistema está diseñado para ser:
+- Seguro (contraseñas encriptadas SHA-256)
+- Confiable (base de datos local con respaldo)
+- Escalable (arquitectura modular)
+- Fácil de usar (interfaz intuitiva)
+- Profesional (cumple normas DIAN)
+
+LISTO PARA PRODUCCIÓN Y COMERCIALIZACIÓN
+
+───────────────────────────────────────────────────────────────────
+
+INFORMACIÓN DE CONTACTO:
+
+Desarrollador: Oscar Mauricio González
+Fecha de Desarrollo: Septiembre 2025
+Versión: 1.0
+Licencia: Propietaria
+Arquitectura: MVC + GetX + SQLite
+
+═══════════════════════════════════════════════════════════════════
+Fin del Documento
+═══════════════════════════════════════════════════════════════════
+

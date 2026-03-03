@@ -1,0 +1,151 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+\viewkind4\uc1
+\pard\sa200\sl276\slmult1\f0\fs28\b DOCUMENTACIÓN TÉCNICA - SmartSeller POS v1.0\b0\fs22\par
+\pard\sa200\sl276\slmult1\par
+\b CONTENIDO\b0\par
+1. Descripción técnica detallada\par
+2. Propósito del software\par
+3. Objetivos del sistema\par
+4. Arquitectura del sistema\par
+5. Componentes principales\par
+6. Base de datos y persistencia\par
+7. Seguridad y auditoría\par
+8. Integraciones externas\par
+9. Algoritmos y procesos clave\par
+10. Instalación y configuración\par
+11. Mantenimiento y soporte\par
+12. Métricas y pruebas\par
+13. Anexos técnicos\par
+\pard\sa200\sl276\slmult1\par
+\b 1. DESCRIPCIÓN TÉCNICA DETALLADA\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Nombre: SmartSeller POS (Point of Sale)\par
+\bullet Versión: 1.0 Final\par
+\bullet Fecha de desarrollo: septiembre 2025\par
+\bullet Desarrollador: Oscar Mauricio González Montenegro\par
+\bullet Tipo de software: Sistema de punto de venta profesional\par
+\bullet Categoría: Software de gestión comercial\par
+\bullet Plataforma objetivo: Escritorio (Windows 10/11 – 64 bits)\par
+\pard\sa200\sl276\slmult1\par
+\b 2. PROPÓSITO DEL SOFTWARE\b0\par
+SmartSeller POS v1.0 es un sistema integral de punto de venta diseñado para pequeñas y medianas empresas en Colombia. Permite gestionar ventas, inventario, clientes y reportes, mientras prepara la infraestructura para facturación electrónica acorde con estándares DIAN.\par
+\pard\sa200\sl276\slmult1\par
+\b 3. OBJETIVOS DEL SISTEMA\b0\par
+\pard\sa200\sl276\slmult1\b 3.1 Objetivo principal\b0\par
+Automatizar y optimizar los procesos de venta, inventario y facturación mediante una interfaz intuitiva y funcionalidades avanzadas.\par
+\pard\sa200\sl276\slmult1\b 3.2 Objetivos específicos\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Procesar ventas con cálculo automático de impuestos y múltiples métodos de pago.\par
+\bullet Mantener control sobre productos (unidad/peso) y alertas de stock bajo.\par
+\bullet Registrar clientes con validación de documentos y seguimiento de compras.\par
+\bullet Generar reportes detallados de ventas, inventario y rentabilidad.\par
+\bullet Preparar los procesos para facturación electrónica según DIAN (modo simulado).\par
+\bullet Administrar usuarios y permisos con auditoría de acciones.\par
+\pard\sa200\sl276\slmult1\par
+\b 4. ARQUITECTURA DEL SISTEMA\b0\par
+\pard\sa200\sl276\slmult1\b 4.1 Arquitectura general\b0\par
+El sistema adopta el patrón Model-View-Controller (MVC) con una arquitectura modular:\par
+\pard\sa200\sl276\slmult1\li720\bullet Capa de presentación (View): Pantallas Flutter y widgets personalizados, navegación por rutas con GetX.\par
+\bullet Capa de lógica de negocio (Controller): Controladores GetX, servicios especializados, middleware de seguridad.\par
+\bullet Capa de datos (Model): Persistencia local en SQLite, modelos tipados, operaciones CRUD optimizadas.\par
+\pard\sa200\sl276\slmult1\par
+\b 4.2 Patrones de diseño\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Singleton: Servicios únicos (autenticación, base de datos, configuración).\par
+\bullet Repository/Service: Abstracción del acceso a datos y lógica.\par
+\bullet Observer/Reactive: Reactividad mediante GetX.\par
+\bullet Strategy: Tratamiento de productos según unidad o peso.\par
+\pard\sa200\sl276\slmult1\par
+\b 5. COMPONENTES PRINCIPALES\b0\par
+\pard\sa200\sl276\slmult1\b 5.1 Módulo de autenticación (`lib/services/auth_service.dart`)\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Validación de credenciales en SQLite.\par
+\bullet Contraseñas con hash SHA-256.\par
+\bullet Gestión de sesión mediante middleware (sin tokens externos).\par
+\bullet Registro de accesos y cierres de sesión.\par
+\pard\sa200\sl276\slmult1\par
+\b 5.2 Módulo de productos (`lib/screens/products_screen.dart`)\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet CRUD de productos con categorías y grupos.\par
+\bullet Soporte para inventario por unidad y peso.\par
+\bullet Alertas de stock y cálculo de rotación.\par
+\bullet Importación desde Excel/CSV.\par
+\pard\sa200\sl276\slmult1\par
+\b 5.3 Módulo POS (`lib/screens/pos_screen.dart`)\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Interfaz de venta rápida con carrito dinámico.\par
+\bullet Integración con balanzas electrónicas (modo real/simulado).\par
+\bullet Cálculo de subtotales, impuestos y totales.\par
+\bullet Procesamiento de pagos y generación de tickets.\par
+\pard\sa200\sl276\slmult1\par
+\b 5.4 Módulo de clientes (`lib/screens/customers_screen.dart`)\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Registro de clientes con validación de documento.\par
+\bullet Historial de compras y segmentación.\par
+\bullet Búsqueda avanzada por múltiples criterios.\par
+\pard\sa200\sl276\slmult1\par
+\b 5.5 Módulo de facturación electrónica (`lib/modules/electronic_invoicing/`)\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Generación de facturas en modo simulado según lineamientos DIAN.\par
+\bullet Validación fiscal (NIT, responsabilidades, ubicación).\par
+\bullet Gestión de estados (borrador, simulado).\par
+\bullet Cola de facturas pendientes y registro de auditoría.\par
+\pard\sa200\sl276\slmult1\par
+\b 5.6 Módulo de reportes (`lib/screens/reports_screen.dart`)\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Ventas por período, inventario, rentabilidad, clientes.\par
+\bullet Filtros avanzados y exportación a PDF/Excel.\par
+\pard\sa200\sl276\slmult1\par
+\b 5.7 Módulo de usuarios (`lib/screens/users_screen.dart`)\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet CRUD de usuarios, asignación de roles (Admin, Gerente, Supervisor, Cajero, Mantenimiento).\par
+\bullet Configuración de permisos granulares y auditoría.\par
+\pard\sa200\sl276\slmult1\par
+\b 6. BASE DE DATOS Y PERSISTENCIA\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet `users`: credenciales, roles, estado.\par
+\bullet `products`: catálogo con stock, precios y categorización.\par
+\bullet `customers`: datos fiscales y contacto.\par
+\bullet `sales`: ventas y detalle de ítems en JSON.\par
+\bullet `inventory_movements`: entradas, salidas y ajustes.\par
+\bullet `accounts_receivable`: cuentas por cobrar (cliente, factura, balance, estado).\par
+\bullet `company_config`: datos de la empresa y parámetros fiscales.\par
+\bullet `accounting_entries`, `cash_sessions`, `suppliers`, entre otras tablas de soporte contable.\par
+\pard\sa200\sl276\slmult1\par
+Los esquemas se crean mediante `sqlite_database_service.dart` utilizando consultas parametrizadas. No se usa una tabla `sale_items`; los ítems se guardan en JSON dentro de `sales`.\par
+\pard\sa200\sl276\slmult1\par
+\b 7. SEGURIDAD Y AUDITORÍA\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Autenticación: contraseñas con SHA-256, middleware para proteger rutas.\par
+\bullet Autorización: roles predefinidos y permisos por módulo; validación en tiempo real.\par
+\bullet Auditoría: registro de operaciones sensibles (ventas, inventario, usuarios).\par
+\bullet Validación de datos: sanitización, verificación de formatos fiscales, consultas parametrizadas para prevenir inyección SQL.\par
+\pard\sa200\sl276\slmult1\par
+\b 8. INTEGRACIONES EXTERNAS\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Impresoras térmicas y láser (`print_service.dart`).\par
+\bullet Balanzas electrónicas vía puerto serial (`scale_service_real.dart`).\par
+\bullet Servicios DIAN: módulo en modo simulado, preparado para integración oficial.\par
+\pard\sa200\sl276\slmult1\par
+\b 9. ALGORITMOS Y PROCESOS CLAVE\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Cálculo de totales: subtotal + IVA 19 %.\par
+\bullet Actualización de inventario tras ventas y ajustes.\par
+\bullet Validación de NIT con algoritmo de dígito verificador.\par
+\bullet Generación de reportes con agregaciones y filtros dinámicos.\par
+\pard\sa200\sl276\slmult1\par
+\b 10. INSTALACIÓN Y CONFIGURACIÓN\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Requisitos: Windows 10/11 (64 bits), 4 GB RAM (8 GB recomendado), 2 GB libres en disco.\par
+\bullet Instalación del cliente: copiar carpeta `SmartSellerPOS_Cliente_v3`, ejecutar scripts `INSTALAR.bat`/`INSTALAR_DEPENDENCIAS.bat` y abrir `smart_seller.exe`.\par
+\bullet Configuración inicial: datos de empresa, usuarios, productos, periféricos.\par
+\bullet Documentos de apoyo: `PRUEBA_IMPRESION.md`, `TEST_IMPRESORA.md`, guías de balanza.\par
+\pard\sa200\sl276\slmult1\par
+\b 11. MANTENIMIENTO Y SOPORTE\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Respaldos manuales de la carpeta `data`; se planifica automatización en versiones futuras.\par
+\bullet Actualizaciones supervisadas con respaldo previo.\par
+\bullet Monitoreo manual de logs y recursos (según procedimientos internos).\par
+\pard\sa200\sl276\slmult1\par
+\b 12. MÉTRICAS Y PRUEBAS\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Pruebas automatizadas: `flutter test` (unitarias y widgets) en módulos clave.\par
+\bullet Pruebas manuales: plan documentado en `TESTING_PLAN.md`.\par
+\bullet Métricas objetivo: respuesta < 200 ms en consultas comunes, capacidad para 10.000 productos y 100.000 ventas en SQLite, hasta 5 usuarios concurrentes.\par
+\pard\sa200\sl276\slmult1\par
+\b 13. ANEXOS TÉCNICOS\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Diagramas de arquitectura, base de datos y casos de uso (archivos `drawio/png` proporcionados).\par
+\bullet Guías internas: `MODULO_FACTURACION_ELECTRONICA.md`, `POS_OPTIMIZADO_GUIA.md`, `SISTEMA_AUTORIZACION_PROFESIONAL.md`.\par
+\bullet Documentos de soporte: `SOLUCION_PROBLEMAS_EJECUTABLE.md`, `RESPUESTA_ELEMENTO_SOPORTE.txt`.\par
+\pard\sa200\sl276\slmult1\par
+\b Datos finales\b0\par
+SmartSeller POS v1.0 – Sistema de Punto de Venta Profesional\par
+Fecha de documentación: septiembre 2025\par
+Desarrollador: Oscar Mauricio González Montenegro\par
+Licencia: Propietaria\par
+\pard\sa200\sl276\slmult1\par
+}

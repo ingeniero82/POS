@@ -1,0 +1,28 @@
+CÓMO CREAR EL INSTALADOR (setup.exe)
+=====================================
+
+1. COMPILAR EL PROGRAMA (si no lo has hecho)
+   En la carpeta del proyecto ejecuta:
+   flutter build windows --release
+
+2. INSTALAR INNO SETUP (gratis, una sola vez)
+   - Descarga: https://jrsoftware.org/isdl.php
+   - Instala Inno Setup 6 en tu PC.
+
+3. CREAR EL INSTALADOR
+   - Abre Inno Setup Compiler.
+   - File → Open → busca esta carpeta "installer" y abre:
+     SmartSeller_Setup.iss
+   - Build → Compile (o F9).
+   - Listo. El instalador quedará en:
+     SmartSeller_POS_v1.0_DNPA\output\SmartSeller_POS_Setup_v1.0.0.exe
+
+4. ENTREGAR AL CLIENTE
+   Envía solo el archivo: SmartSeller_POS_Setup_v1.0.0.exe
+   El cliente lo ejecuta, sigue el asistente, y el programa queda instalado
+   en "Programas" con icono en el menú Inicio (y opcional en el escritorio).
+   Puede desinstalar desde "Agregar o quitar programas" si quiere.
+
+NOTA: La base de datos (smart_seller.db) sigue guardándose en Documentos
+del usuario al usar el programa; el instalador no toca eso. Si desinstalan,
+los datos siguen en Documentos por si vuelven a instalar.

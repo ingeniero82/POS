@@ -1,0 +1,73 @@
+========================================
+   GARANTIA: NO SE BORRAN DATOS
+========================================
+
+MANTENIMIENTO AUTOMATICO - GARANTIAS:
+
+1. SOLO OPTIMIZA (VACUUM + ANALYZE)
+   --------------------------------
+   - VACUUM: Reorganiza datos, NO borra
+   - ANALYZE: Mejora rendimiento, NO borra
+   - Es como desfragmentar un disco duro
+   - NO elimina registros de ninguna tabla
+
+2. FUNCIONES QUE NUNCA SE EJECUTAN AUTOMATICAMENTE:
+   -------------------------------------------------
+   ❌ cleanOldSales() - NO se ejecuta automáticamente
+   ❌ cleanOldInventoryMovements() - NO se ejecuta automáticamente
+   ❌ Cualquier función que borre datos - NO se ejecuta automáticamente
+
+3. QUE DATOS ESTAN PROTEGIDOS:
+   ---------------------------
+   ✅ Productos - NUNCA se borran
+   ✅ Clientes - NUNCA se borran
+   ✅ Ventas - NUNCA se borran
+   ✅ Inventario - NUNCA se borran
+   ✅ Usuarios - NUNCA se borran
+   ✅ Configuración - NUNCA se borra
+   ✅ Facturas - NUNCA se borran
+
+4. CODIGO VERIFICADO:
+   -------------------
+   El código solo ejecuta:
+   - optimizeDatabase() que solo hace VACUUM + ANALYZE
+   - NO ejecuta funciones de limpieza
+   - NO ejecuta funciones que borren datos
+
+========================================
+
+EXPLICACION TECNICA:
+--------------------
+
+VACUUM (SQLite):
+- Reorganiza las páginas de la base de datos
+- Elimina espacio vacío dejado por DELETE
+- NO borra registros activos
+- Es 100% seguro
+
+ANALYZE (SQLite):
+- Actualiza estadísticas de índices
+- Mejora velocidad de consultas
+- NO modifica datos
+- Es 100% seguro
+
+========================================
+
+GARANTIA LEGAL:
+---------------
+- El mantenimiento automático NO borra datos
+- Solo optimiza y reorganiza
+- Todas las funciones de borrado están DESACTIVADAS
+- El código está verificado y documentado
+
+========================================
+
+SI EL CLIENTE PIERDE DATOS:
+---------------------------
+- NO será por el mantenimiento automático
+- El mantenimiento solo optimiza, no borra
+- Cualquier pérdida sería por otra causa
+- El mantenimiento está diseñado para ser 100% seguro
+
+========================================
+

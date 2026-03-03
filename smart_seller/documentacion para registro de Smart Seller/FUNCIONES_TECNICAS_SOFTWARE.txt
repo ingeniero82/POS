@@ -1,0 +1,169 @@
+FUNCIONES TÉCNICAS DEL SOPORTE LÓGICO (SOFTWARE)
+SmartSeller POS v2.0
+
+─────────────────────────────────────────────────────────────────
+
+ALMACENAR Y ORGANIZAR DATOS
+- Almacena información de productos, precios, stock y categorías
+- Almacena datos de clientes, proveedores y usuarios
+- Almacena transacciones de ventas e inventario
+- Organiza datos en base de datos SQLite estructurada
+- Mantiene histórico de movimientos y operaciones
+
+─────────────────────────────────────────────────────────────────
+
+GENERAR REPORTES
+- Genera reportes de ventas por período (PDF y Excel)
+- Genera reportes de inventario y valorización
+- Genera reportes de rentabilidad por producto
+- Genera reportes de cuentas por cobrar y pagar
+- Genera reportes de clientes y estadísticas
+- Genera tickets de venta en formato estándar
+- Genera facturas electrónicas según normativa DIAN
+- Produce gráficos y análisis visuales de datos
+
+─────────────────────────────────────────────────────────────────
+
+AUTOMATIZAR OPERACIONES
+- Automatiza el cálculo de totales, subtotales e impuestos
+- Automatiza el descuento de stock al realizar ventas
+- Automatiza la generación de consecutivos de factura
+- Automatiza el respaldo diario de la base de datos
+- Automatiza la detección de stock bajo con alertas
+- Automatiza la validación de documentos fiscales
+- Automatiza el cálculo de precios por peso en productos pesados
+
+─────────────────────────────────────────────────────────────────
+
+PROCESAR Y REGISTRAR TRANSACCIONES
+- Procesa ventas con validación de datos en tiempo real
+- Registra transacciones en base de datos con timestamps
+- Registra movimientos de inventario automáticamente
+- Registra actividades de usuarios para auditoría
+- Procesa métodos de pago (efectivo, tarjeta, transferencia)
+- Registra facturas electrónicas con datos fiscales
+
+─────────────────────────────────────────────────────────────────
+
+CONTROLAR Y GESTIONAR OPERACIONES
+- Controla el acceso de usuarios mediante autenticación
+- Gestiona permisos y roles de usuarios del sistema
+- Controla niveles de inventario con alertas automáticas
+- Gestiona sesiones de usuarios con seguridad
+- Controla flujo de operaciones mediante autorizaciones
+- Gestiona estados de facturación (borrador, enviado, autorizado)
+- Controla integridad de datos con validaciones
+
+─────────────────────────────────────────────────────────────────
+
+COMPILAR Y CONVERTIR DATOS
+- Compila información de ventas en reportes consolidados
+- Compila datos de inventario en valorizaciones
+- Convierte datos de ventas a formatos PDF y Excel
+- Compila información fiscal para facturación DIAN
+- Convierte textos a códigos QR para facturas
+- Compila estadísticas de operaciones del sistema
+
+─────────────────────────────────────────────────────────────────
+
+COMUNICAR E INTEGRAR DISPOSITIVOS
+- Comunica con balanzas electrónicas vía puerto serial
+- Comunica con impresoras térmicas para tickets
+- Comunica con impresoras láser para facturas
+- Integra dispositivos de código de barras
+- Transmite comandos de impresión en tiempo real
+- Sincroniza datos entre módulos del sistema
+
+─────────────────────────────────────────────────────────────────
+
+VALIDAR Y VERIFICAR INFORMACIÓN
+- Valida credenciales de usuarios en cada acceso
+- Verifica documentos fiscales según normativa colombiana
+- Valida datos de facturación antes de emitir
+- Verifica disponibilidad de stock antes de vender
+- Valida integridad de cálculos aritméticos
+- Verifica formatos de datos ingresados
+- Valida permisos para operaciones sensibles
+
+─────────────────────────────────────────────────────────────────
+
+ENCRIPTAR Y PROTEGER DATOS
+- Encripta contraseñas con algoritmo SHA-256
+- Protege acceso mediante autenticación
+- Protege datos sensibles con permisos granulares
+- Encripta información de acceso a base de datos
+- Protege contra acceso no autorizado
+- Gestiona tokens de sesión con expiración
+
+─────────────────────────────────────────────────────────────────
+
+BÚSQUEDA Y CONSULTA DE DATOS
+- Busca productos por nombre o código en tiempo real
+- Consulta histórico de ventas con filtros avanzados
+- Busca clientes por múltiples criterios
+- Consulta inventario con filtros de categoría
+- Busca transacciones por fecha, cliente o producto
+- Consulta reportes con múltiples parámetros
+- Genera búsqueda en tiempo real con autocompletado
+
+─────────────────────────────────────────────────────────────────
+
+IMPORTAR Y EXPORTAR DATOS
+- Importa productos desde archivos Excel/CSV
+- Exporta reportes a formatos PDF profesional
+- Exporta datos a Excel para análisis externo
+- Exporta listas de clientes en CSV
+- Importa configuraciones de empresa
+- Exporta respaldo completo de base de datos
+
+─────────────────────────────────────────────────────────────────
+
+CALCULAR Y COMPUTAR OPERACIONES
+- Calcula totales de ventas automáticamente
+- Computa impuestos IVA del 19%
+- Calcula precios por peso dinámicamente
+- Computa margen de ganancia por producto
+- Calcula cuentas por cobrar y pagar
+- Computa estadísticas de ventas y rendimiento
+- Calcula rotación de inventario
+
+─────────────────────────────────────────────────────────────────
+
+GESTIONAR INTERFAZ Y PRESENTACIÓN
+- Renderiza interfaz de usuario con Material Design 3
+- Gestiona navegación entre pantallas y módulos
+- Presenta datos en formato tabular y gráficos
+- Gestiona formularios con validación en tiempo real
+- Renderiza widgets personalizados reutilizables
+- Gestiona estados de la interfaz reactivamente
+- Presenta notificaciones y mensajes al usuario
+
+─────────────────────────────────────────────────────────────────
+
+GESTIONAR MEMORIA Y RECURSOS
+- Gestiona memoria para optimización de rendimiento
+- Gestiona conexión a base de datos SQLite
+- Libera recursos no utilizados automáticamente
+- Gestiona cache de imágenes y datos frecuentes
+- Optimiza consultas a base de datos con índices
+- Gestiona sesiones de usuario en memoria
+- Implementa lazy loading para carga eficiente
+
+─────────────────────────────────────────────────────────────────
+
+GENERAR Y PRODUCIR DOCUMENTOS
+- Genera tickets de venta en formato térmico
+- Produce facturas electrónicas según estándar DIAN
+- Genera reportes PDF con formato profesional
+- Produce códigos QR para facturas electrónicas
+- Genera comprobantes de pago
+- Produce documentos XML para DIAN
+- Genera listados de inventario impresos
+
+─────────────────────────────────────────────────────────────────
+
+SYSTEM: SmartSeller POS v2.0
+AUTHOR: Oscar Mauricio González
+TYPE: Software de Aplicación - Sistema de Punto de Venta
+DATE: Diciembre 2024
+

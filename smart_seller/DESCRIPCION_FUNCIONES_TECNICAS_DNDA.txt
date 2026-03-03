@@ -1,0 +1,42 @@
+═══════════════════════════════════════════════════════════════════
+BREVE DESCRIPCIÓN DE LAS FUNCIONES TÉCNICAS DEL PROGRAMA
+═══════════════════════════════════════════════════════════════════
+
+Sistema de Punto de Venta SmartSeller POS v1.0
+
+═══════════════════════════════════════════════════════════════════
+FUNCIONES TÉCNICAS REALIZADAS POR EL SOFTWARE
+═══════════════════════════════════════════════════════════════════
+
+El software realiza las siguientes funciones técnicas:
+
+1. ALMACENA datos estructurados en base de datos SQLite local, incluyendo información de productos, clientes, usuarios, ventas, inventario y configuraciones del sistema.
+
+2. PROCESA datos mediante algoritmos de cálculo automático de totales, subtotales, impuestos, descuentos y márgenes de ganancia en operaciones de venta.
+
+3. GENERA reportes en formato PDF y Excel con análisis de ventas, inventario, rentabilidad y movimientos contables, incluyendo gráficos y tablas estructuradas.
+
+4. AUTOMATIZA operaciones mediante la ejecución de cálculos en tiempo real, control automático de stock, validación de datos de entrada y gestión de sesiones de usuario.
+
+5. ORGANIZA datos mediante estructuración relacional en tablas normalizadas, índices para consultas optimizadas y relaciones entre entidades (productos, clientes, ventas, usuarios).
+
+6. GESTIONA Y REGISTRA transacciones comerciales, movimientos de inventario, sesiones de caja, documentos electrónicos y auditoría de operaciones del sistema.
+
+7. CONTROLA el acceso mediante sistema de autenticación con encriptación SHA-256, gestión de permisos por rol de usuario y middleware de seguridad en rutas protegidas.
+
+8. VALIDA datos de entrada mediante verificación de formatos de documentos (cédula, NIT), validación de permisos, sanitización de inputs y verificación de integridad referencial.
+
+9. PRODUCE documentos electrónicos preparados para integración con estándares DIAN (Colombia), generando archivos XML, PDF de facturas y estructuras JSON para integración con servicios fiscales (en fase de pruebas).
+
+10. CREA reportes personalizados mediante consultas SQL optimizadas, agregación de datos por períodos, filtrado por criterios múltiples y exportación a formatos estándar.
+
+═══════════════════════════════════════════════════════════════════
+NOTA IMPORTANTE
+═══════════════════════════════════════════════════════════════════
+
+Esta descripción contiene ÚNICAMENTE funciones técnicas realizadas por el 
+soporte lógico software, tal como lo requiere la DNDA. No incluye 
+características de negocio ni descripciones de funcionalidades de usuario.
+
+═══════════════════════════════════════════════════════════════════
+

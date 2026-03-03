@@ -1,0 +1,82 @@
+PROMPT PARA CONTINUAR EL PROYECTO SMART SELLER POS
+
+---
+
+CONTEXTO:
+
+Soy un desarrollador migrando un sistema POS de Flutter Desktop a React + Node.js + PostgreSQL.
+
+PROYECTO ORIGINAL:
+- Nombre: Smart Seller POS v2.0
+- Tecnología: Flutter Desktop + SQLite
+- Problema: Flutter Desktop es inmaduro, ejecutable no funciona en clientes
+- Decisión: Migrar a React + Node.js + PostgreSQL
+
+NUEVO PROYECTO:
+- Tecnología: React + TypeScript + Node.js + Express + PostgreSQL
+- Arquitectura: Cliente-Servidor (3 capas)
+- Modelo: Web App (PWA) - Funciona en navegador, offline con Service Workers
+- Enfoque: Aprendizaje paso a paso, no crear todo de una vez
+
+ARQUITECTURA ACTUAL (Flutter - a migrar):
+- 9 tablas: users, products, sales, sale_items, customers, groups, inventory_movements, company_config, clients
+- 5 roles: admin, manager, supervisor, cashier, maintenance
+- 30+ permisos granulares
+- Sistema de impuestos: IVA (0%, 5%, 19%), IpoConsumo, Bolsas plásticas
+- Productos por unidad y peso (balanzas)
+- Servicios: Auth, Permissions, Tax Calculation, Reports, Print, Scale
+
+ARQUITECTURA NUEVA (React + Node.js):
+- Frontend: React 18 + TypeScript + React Router + React Query + Material-UI
+- Backend: Node.js + Express + TypeScript + Prisma ORM
+- Base de Datos: PostgreSQL
+- Autenticación: JWT
+- Offline: Service Workers + IndexedDB
+
+METODOLOGÍA:
+- Paso a paso, no todo de una vez
+- Explicación antes de código
+- Práctica guiada e independiente
+- No avanzar sin entender
+- Ritmo adaptativo
+
+ESTADO ACTUAL:
+- Análisis completo realizado
+- Arquitectura diseñada
+- Plan de aprendizaje creado
+- Lección 1.1 en progreso: ¿Qué es Node.js?
+
+DOCUMENTOS DISPONIBLES:
+- CONTEXTO_COMPLETO_PROYECTO.md (resumen completo)
+- ARQUITECTURA_NUEVO_PROYECTO.md
+- PLAN_APRENDIZAJE_PASO_A_PASO.md
+- GUIA_ESTUDIANTE.md
+- LECCION_1.1_QUE_ES_NODEJS.md
+
+IMPORTANTE:
+- No crear todo de una vez
+- Explicar conceptos antes de código
+- Guiar paso a paso
+- Permitir preguntas
+- Adaptar ritmo al aprendizaje
+- Regla de oro: "No avanzamos hasta que entiendas"
+
+---
+
+INSTRUCCIONES PARA EL ASISTENTE:
+
+1. Leer CONTEXTO_COMPLETO_PROYECTO.md para contexto completo
+2. Verificar en qué lección estamos
+3. Continuar desde donde quedamos
+4. Seguir metodología paso a paso
+5. Explicar antes de codificar
+6. No crear todo de una vez
+7. Permitir preguntas y dudas
+8. Adaptar ritmo al aprendizaje del usuario
+
+---
+
+ÚLTIMA SESIÓN:
+- Lección: 1.1 - ¿Qué es Node.js?
+- Estado: Verificando instalación de Node.js
+- Próximo paso: Continuar con Lección 1.1

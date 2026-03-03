@@ -1,0 +1,1835 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../models/product.dart';
+import '../models/group.dart';
+import '../services/sqlite_database_service.dart';
+import '../services/image_service.dart';
+import '../utils/puntos_miles_input_formatter.dart';
+import 'dart:io';
+
+class ProductFormDialog extends StatefulWidget {
+  final Product? product;
+
+  const ProductFormDialog({super.key, this.product});
+
+  @override
+  State<ProductFormDialog> createState() => _ProductFormDialogState();
+}
+
+// ✅ NUEVO: Enum para modos de cálculo de precios
+enum PriceCalculationMode {
+  fixedPrice, // Precio fijo (comportamiento actual)
+  fixedMargin // Utilidad fija (nueva funcionalidad)
+}
+
+class _ProductFormDialogState extends State<ProductFormDialog>
+    with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+  final _codeController = TextEditingController();
+  final _shortCodeController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _costController = TextEditingController();
+  final _stockController = TextEditingController();
+  final _minStockController = TextEditingController();
+
+  /// Al editar: cantidad a sumar al stock actual (no reemplaza el stock).
+  final _ingresoController = TextEditingController();
+  final _unitController = TextEditingController();
+  final _groupController = TextEditingController();
+
+  // ✅ NUEVO: Controlador para % de utilidad
+  final _profitMarginController = TextEditingController();
+
+  // ✅ NUEVO: Variables para manejo de imagen
+  String? _currentImagePath;
+  bool _isImageLoading = false;
+
+  String? _selectedGroup;
+  List<Group> _availableGroups = [];
+  bool _isActive = true;
+
+  bool _isLoading = false;
+
+  // ✅ NUEVO: Modo de cálculo de precios (por defecto mantiene comportamiento actual)
+  PriceCalculationMode _priceMode = PriceCalculationMode.fixedPrice;
+
+  /// Producto exento de IVA (0%); si false, aplica 19%.
+  bool _exentoIva = false;
+
+  /// IVA configurado para facturación electrónica: 0, 5 o 19 (%). Se guarda en BD.
+  int _ivaPercentage = 19;
+
+  // Controlador para las pestañas
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadGroups();
+    if (widget.product != null) {
+      _codeController.text = widget.product!.code;
+      _shortCodeController.text = widget.product!.shortCode;
+      _nameController.text = widget.product!.name;
+      _descriptionController.text = widget.product!.description;
+      _priceController.text = formatMontoPuntosMiles(widget.product!.price);
+      _costController.text = formatMontoPuntosMiles(widget.product!.cost);
+      _stockController.text = widget.product!.stock.toString();
+      _minStockController.text = widget.product!.minStock.toString();
+      _ingresoController.text = '0';
+      _unitController.text = widget.product!.unit;
+      _selectedGroup = widget.product!.category;
+      _groupController.text = _selectedGroup ?? '';
+      _isActive = widget.product!.isActive;
+
+      // ✅ NUEVO: Inicializar imagen del producto
+      _currentImagePath = widget.product!.imageUrl;
+
+      // ✅ NUEVO: Calcular % de utilidad inicial
+      _calculateProfitMargin();
+      _exentoIva = widget.product!.ivaPercentage == 0;
+      // Cargar IVA de facturación electrónica (0, 5 o 19) para el dropdown "IVA *"
+      final p = widget.product!.ivaPercentage;
+      _ivaPercentage = (p == 0 || p == 5 || p == 19) ? p : 19;
+    }
+
+    // ✅ NUEVO: Agregar listeners para cálculo automático
+    _priceController.addListener(_onPriceChanged);
+    _costController.addListener(_onCostChanged);
+    _profitMarginController.addListener(_onProfitMarginChanged);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _ingresoController.dispose();
+    // ✅ NUEVO: Dispose de los nuevos controladores
+    _profitMarginController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadGroups() async {
+    try {
+      final groups = await SQLiteDatabaseService.getAllGroups();
+      setState(() {
+        _availableGroups = groups;
+
+        // Si estamos editando un producto y su grupo no existe en la lista actual,
+        // lo agregamos temporalmente para evitar errores
+        if (widget.product != null && _selectedGroup != null) {
+          final groupExists =
+              groups.any((group) => group.name == _selectedGroup);
+          if (!groupExists) {
+            // Crear un grupo temporal para el producto existente
+            final tempGroup = Group(
+              name: _selectedGroup!,
+              description: 'Grupo temporal para producto existente',
+              color: '#9E9E9E',
+              icon: 'category',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            _availableGroups.add(tempGroup);
+          }
+        }
+      });
+    } catch (e) {
+      print('Error cargando grupos: $e');
+    }
+  }
+
+  void _showGroupManager() {
+    Get.toNamed('/grupos')?.then((_) {
+      // Recargar grupos cuando regrese de la pantalla de gestión
+      _loadGroups();
+    });
+  }
+
+  // ✅ NUEVO: Funciones de cálculo automático
+  void _calculateProfitMargin() {
+    final cost = parseMontoPuntosMiles(_costController.text);
+    final price = parseMontoPuntosMiles(_priceController.text);
+
+    if (cost != null && price != null && price > 0) {
+      // ✅ CORREGIDO: Fórmula estándar de POS: (Precio de venta - Costo) / Precio de venta × 100
+      final margin = ((price - cost) / price) * 100;
+      _profitMarginController.text = margin.toStringAsFixed(1);
+    } else {
+      _profitMarginController.text = '0.0';
+    }
+  }
+
+  void _calculatePriceFromMargin() {
+    final cost = parseMontoPuntosMiles(_costController.text);
+    final margin = double.tryParse(
+        _profitMarginController.text.trim().replaceAll(',', '.'));
+
+    if (cost != null && margin != null && cost > 0) {
+      // ✅ CORREGIDO: Fórmula inversa estándar de POS: Costo / (1 - Margen/100)
+      final price = cost / (1 - margin / 100);
+      _priceController.text = formatMontoPuntosMiles(price);
+    }
+  }
+
+  void _onPriceChanged() {
+    if (_priceMode == PriceCalculationMode.fixedPrice) {
+      _calculateProfitMargin();
+    }
+  }
+
+  void _onCostChanged() {
+    if (_priceMode == PriceCalculationMode.fixedPrice) {
+      _calculateProfitMargin();
+    } else if (_priceMode == PriceCalculationMode.fixedMargin) {
+      _calculatePriceFromMargin();
+    }
+  }
+
+  void _onProfitMarginChanged() {
+    if (_priceMode == PriceCalculationMode.fixedMargin) {
+      _calculatePriceFromMargin();
+    }
+  }
+
+  void _changePriceMode(PriceCalculationMode newMode) {
+    setState(() {
+      _priceMode = newMode;
+    });
+
+    // Recalcular según el nuevo modo
+    if (newMode == PriceCalculationMode.fixedPrice) {
+      _calculateProfitMargin();
+    } else if (newMode == PriceCalculationMode.fixedMargin) {
+      _calculatePriceFromMargin();
+    }
+  }
+
+  Future<void> _saveProduct() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // ✅ NUEVO: Validar y sincronizar datos según el modo
+      if (_priceMode == PriceCalculationMode.fixedMargin) {
+        // En modo utilidad fija, recalcular precio antes de guardar
+        _calculatePriceFromMargin();
+      } else {
+        // En modo precio fijo, recalcular utilidad antes de guardar
+        _calculateProfitMargin();
+      }
+
+      final code = _codeController.text.trim();
+      final rawShortCode = _shortCodeController.text.trim();
+      final shortCode = rawShortCode.isEmpty ? code : rawShortCode;
+      final excludeId = widget.product?.id;
+
+      // Validar código de barras único
+      final exists = await SQLiteDatabaseService.existsProductCode(code,
+          excludeId: excludeId);
+      if (exists) {
+        setState(() {
+          _isLoading = false;
+        });
+        Get.snackbar(
+          'Error',
+          'Ya existe un producto con ese código de barras.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+
+      // Validar código corto único solo si el usuario ingresó uno
+      if (rawShortCode.isNotEmpty) {
+        final existsShort = await SQLiteDatabaseService.getAllProducts();
+        if (existsShort
+            .any((p) => p.shortCode == shortCode && p.id != excludeId)) {
+          setState(() {
+            _isLoading = false;
+          });
+          Get.snackbar(
+            'Error',
+            'Ya existe un producto con ese código corto.',
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+          );
+          return;
+        }
+      }
+
+      // Al editar: stock = stock actual + ingreso (no reemplazar). Al crear: stock = valor del campo.
+      final int newStock = widget.product != null
+          ? (widget.product!.stock +
+                  (int.tryParse(_ingresoController.text.trim()) ?? 0))
+              .clamp(0, 0x7fffffff)
+          : int.parse(_stockController.text);
+
+      final product = Product(
+        code: code,
+        shortCode: shortCode,
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        price: parseMontoPuntosMiles(_priceController.text) ?? 0,
+        cost: parseMontoPuntosMiles(_costController.text) ?? 0,
+        stock: newStock,
+        minStock: int.parse(_minStockController.text),
+        unit: _unitController.text.trim(),
+        category: _selectedGroup ?? 'Sin grupo',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        isActive: _isActive,
+        imageUrl: _currentImagePath,
+        ivaPercentage: _ivaPercentage,
+      );
+
+      if (widget.product == null) {
+        // Nuevo producto
+        product.createdAt = DateTime.now();
+        await SQLiteDatabaseService.createProduct(product);
+        setState(() {
+          _isLoading = false;
+        });
+        Get.snackbar(
+          '✅ Producto Creado',
+          'El producto "${product.name}" ha sido creado correctamente\n'
+              'Modo: ${_priceMode == PriceCalculationMode.fixedPrice ? "Precio Fijo" : "Utilidad Fija"}',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+          snackPosition: SnackPosition.TOP,
+        );
+        // Preguntar si desea ingresar otro producto
+        Future.delayed(const Duration(milliseconds: 300), () {
+          Get.defaultDialog(
+            title: '¿Ingresar otro producto?',
+            middleText: '¿Deseas registrar otro producto nuevo?',
+            textCancel: 'No',
+            textConfirm: 'Sí',
+            onCancel: () {
+              Get.back(); // Cierra el diálogo de confirmación
+              Get.back(); // Cierra el formulario
+            },
+            onConfirm: () {
+              Get.back(); // Cierra el diálogo de confirmación
+              _formKey.currentState?.reset();
+              _codeController.clear();
+              _shortCodeController.clear();
+              _nameController.clear();
+              _descriptionController.clear();
+              _priceController.clear();
+              _costController.clear();
+              _stockController.clear();
+              _minStockController.clear();
+              _unitController.clear();
+
+              setState(() {
+                _selectedGroup = null;
+                _groupController.text = '';
+                _isActive = true;
+              });
+            },
+            barrierDismissible: false,
+          );
+        });
+      } else {
+        // Actualizar producto existente
+        product.id = widget.product!.id;
+        product.createdAt = widget.product!.createdAt;
+        await SQLiteDatabaseService.updateProduct(product);
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Cerrar el modal inmediatamente y mostrar confirmación
+        Get.back(); // Cierra el modal primero
+
+        // Mostrar confirmación después de cerrar el modal
+        Future.delayed(const Duration(milliseconds: 100), () {
+          Get.snackbar(
+            '✅ Producto Actualizado',
+            'El producto "${product.name}" ha sido actualizado correctamente\n'
+                'Modo: ${_priceMode == PriceCalculationMode.fixedPrice ? "Precio Fijo" : "Utilidad Fija"}',
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+            snackPosition: SnackPosition.TOP,
+          );
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      Get.snackbar(
+        'Error',
+        'Error al guardar producto: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  // ✅ NUEVO: Método para seleccionar imagen del producto
+  Future<void> _selectProductImage() async {
+    setState(() {
+      _isImageLoading = true;
+    });
+
+    try {
+      final String? imagePath = await ImageService.pickProductImage(context);
+
+      if (imagePath != null) {
+        setState(() {
+          _currentImagePath = imagePath;
+        });
+
+        Get.snackbar(
+          '✅ Imagen Seleccionada',
+          'La imagen del producto ha sido seleccionada correctamente',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        '❌ Error',
+        'Error al seleccionar imagen: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    } finally {
+      setState(() {
+        _isImageLoading = false;
+      });
+    }
+  }
+
+  // ✅ NUEVO: Método para eliminar imagen del producto
+  Future<void> _removeProductImage() async {
+    if (_currentImagePath == null) return;
+
+    try {
+      await ImageService.deleteProductImage(_currentImagePath);
+      setState(() {
+        _currentImagePath = null;
+      });
+
+      Get.snackbar(
+        '✅ Imagen Eliminada',
+        'La imagen del producto ha sido eliminada',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      Get.snackbar(
+        '❌ Error',
+        'Error al eliminar imagen: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  // ✅ NUEVO: Widget para la sección de imagen del producto
+  Widget _buildImageSection() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.image, color: Colors.blue),
+                SizedBox(width: 8),
+                Text(
+                  'Imagen del Producto',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Vista previa de la imagen
+            Center(
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: _currentImagePath != null
+                      ? Image.file(
+                          File(_currentImagePath!),
+                          width: 120,
+                          height: 120,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return _buildImagePlaceholder();
+                          },
+                        )
+                      : _buildImagePlaceholder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Botones de acción
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _isImageLoading ? null : _selectProductImage,
+                  icon: _isImageLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add_photo_alternate),
+                  label: Text(
+                      _isImageLoading ? 'Cargando...' : 'Seleccionar Imagen'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                if (_currentImagePath != null) ...[
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
+                    onPressed: _removeProductImage,
+                    icon: const Icon(Icons.delete),
+                    label: const Text('Eliminar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ NUEVO: Widget placeholder para cuando no hay imagen
+  Widget _buildImagePlaceholder() {
+    return Container(
+      width: 120,
+      height: 120,
+      color: Colors.grey.shade100,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image,
+            size: 40,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sin imagen',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: 700,
+        height: 600,
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Título
+              Text(
+                widget.product == null ? 'Nuevo Producto' : 'Editar Producto',
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 24),
+
+              // Pestañas
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade300),
+                  ),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: Colors.blue[700],
+                  unselectedLabelColor: Colors.grey[600],
+                  indicatorColor: Colors.blue[700],
+                  tabs: const [
+                    Tab(text: 'Información Básica'),
+                    Tab(text: 'Facturación Electrónica'),
+                    Tab(text: 'Inventario'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Contenido de las pestañas
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildBasicInfoTab(),
+                    _buildElectronicInvoicingTab(),
+                    _buildInventoryTab(),
+                  ],
+                ),
+              ),
+
+              // Botones de acción
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text('Cancelar'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : _saveProduct,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(widget.product == null
+                            ? 'Crear Producto'
+                            : 'Actualizar'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Pestaña de Información Básica
+  Widget _buildBasicInfoTab() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          // Primera fila - Código de Barras y Código Corto
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _codeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Código de Barras *',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: 1234567890123',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El código es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _shortCodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Código Corto (opcional)',
+                    border: OutlineInputBorder(),
+                    hintText:
+                        'Ej: PROD001 - si no lo ingresas se usará el código de barras',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // ✅ NUEVO: Sección de imagen del producto
+          _buildImageSection(),
+          const SizedBox(height: 16),
+
+          // Segunda fila - Nombre del Producto y Grupo
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del Producto *',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Papas Fritas Margarita 150g',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El nombre es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 1,
+                child: _availableGroups.isEmpty
+                    ? TextFormField(
+                        controller: _groupController,
+                        decoration: const InputDecoration(
+                          labelText: 'Grupo',
+                          border: OutlineInputBorder(),
+                          hintText: 'Escribe el nombre del grupo',
+                        ),
+                      )
+                    : DropdownButtonFormField<String>(
+                        initialValue: _selectedGroup != null &&
+                                _availableGroups.any(
+                                    (group) => group.name == _selectedGroup)
+                            ? _selectedGroup
+                            : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Grupo',
+                          border: OutlineInputBorder(),
+                          hintText: 'Seleccionar grupo',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('Seleccionar grupo'),
+                          ),
+                          ..._availableGroups.map((group) {
+                            return DropdownMenuItem(
+                              value: group.name,
+                              child: Text(group.name),
+                            );
+                          }),
+                          // ✅ NUEVO: Opción para crear nuevo grupo
+                          const DropdownMenuItem(
+                            value: 'CREATE_NEW_GROUP',
+                            child: Row(
+                              children: [
+                                Icon(Icons.add, color: Colors.blue),
+                                SizedBox(width: 8),
+                                Text('Nuevo grupo',
+                                    style: TextStyle(color: Colors.blue)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == 'CREATE_NEW_GROUP') {
+                            // ✅ NUEVO: Mostrar modal para crear nuevo grupo
+                            _showCreateGroupDialog();
+                          } else {
+                            setState(() {
+                              _selectedGroup = value;
+                            });
+                          }
+                        },
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Tercera fila - Marca y Precio de Venta
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller:
+                      _groupController, // Usamos el mismo controlador para marca
+                  decoration: const InputDecoration(
+                    labelText: 'Marca',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Margarita',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Precio de Venta *',
+                    border: OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: 'Ej: 15.000',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [PuntosMilesInputFormatter()],
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El precio es obligatorio';
+                    }
+                    if (parseMontoPuntosMiles(value) == null) {
+                      return 'Precio inválido';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // ✅ NUEVO: Selector de modo de cálculo de precios
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Modo de Cálculo de Precios',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<PriceCalculationMode>(
+                        title: const Text('Precio Fijo'),
+                        subtitle: const Text('Ingresa precio de venta y costo'),
+                        value: PriceCalculationMode.fixedPrice,
+                        groupValue: _priceMode,
+                        onChanged: (value) => _changePriceMode(value!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<PriceCalculationMode>(
+                        title: const Text('Utilidad Fija'),
+                        subtitle: const Text('Ingresa costo y % de utilidad'),
+                        value: PriceCalculationMode.fixedMargin,
+                        groupValue: _priceMode,
+                        onChanged: (value) => _changePriceMode(value!),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Producto exento de IVA (visible al crear/editar)
+          CheckboxListTile(
+            value: _exentoIva,
+            onChanged: (value) => setState(() => _exentoIva = value ?? false),
+            title: const Text('Producto exento de IVA'),
+            subtitle: const Text(
+                'Marcar si el producto no lleva IVA (0%). Si no marca, se aplica 19%.'),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+          const SizedBox(height: 16),
+
+          // Cuarta fila - Precio de Costo
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _costController,
+                  decoration: const InputDecoration(
+                    labelText: 'Precio de Costo',
+                    border: OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: 'Ej: 10.000',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [PuntosMilesInputFormatter()],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: Container()), // Espacio vacío para mantener el layout
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Descripción
+          TextFormField(
+            controller: _descriptionController,
+            decoration: const InputDecoration(
+              labelText: 'Descripción',
+              border: OutlineInputBorder(),
+              hintText: 'Descripción detallada del producto...',
+            ),
+            maxLines: 3,
+          ),
+          const SizedBox(height: 24),
+
+          // Checkboxes
+          Row(
+            children: [
+              Checkbox(
+                value: _isActive,
+                onChanged: (value) {
+                  setState(() {
+                    _isActive = value ?? true;
+                  });
+                },
+              ),
+              const Text('Producto activo'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Pestaña de Facturación Electrónica
+  Widget _buildElectronicInvoicingTab() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Configuración DIAN',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          // Primera fila - Clasificación Fiscal e IVA
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Clasificación Fiscal *',
+                    border: OutlineInputBorder(),
+                    helperText: 'Según normativa DIAN',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'GRAVADO', child: Text('Gravado')),
+                    DropdownMenuItem(value: 'EXENTO', child: Text('Exento')),
+                    DropdownMenuItem(
+                        value: 'EXCLUIDO', child: Text('Excluido')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'IVA *',
+                    border: OutlineInputBorder(),
+                    helperText: 'Se guarda al dar Actualizar',
+                  ),
+                  value: _ivaPercentage == 0 ? '0' : (_ivaPercentage == 5 ? '5' : '19'),
+                  items: const [
+                    DropdownMenuItem(value: '19', child: Text('19%')),
+                    DropdownMenuItem(value: '5', child: Text('5%')),
+                    DropdownMenuItem(value: '0', child: Text('0% (Exento)')),
+                    DropdownMenuItem(value: 'EXCLUIDO', child: Text('Excluido')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        if (value == '19') _ivaPercentage = 19;
+                        else if (value == '5') _ivaPercentage = 5;
+                        else _ivaPercentage = 0; // 0% o Excluido
+                        _exentoIva = (_ivaPercentage == 0);
+                      });
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Segunda fila - Indicador de Producto y Unidad de Medida DIAN
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Indicador de Producto *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'NORMAL', child: Text('Normal')),
+                    DropdownMenuItem(value: 'COMBO', child: Text('Combo')),
+                    DropdownMenuItem(
+                        value: 'SERVICIO', child: Text('Servicio')),
+                    DropdownMenuItem(
+                        value: 'PESADO', child: Text('Pesado (Báscula)')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Unidad de Medida DIAN *',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'unidad', child: Text('Unidad')),
+                    DropdownMenuItem(
+                        value: 'kilogramo', child: Text('Kilogramo')),
+                    DropdownMenuItem(value: 'litro', child: Text('Litro')),
+                    DropdownMenuItem(value: 'paquete', child: Text('Paquete')),
+                    DropdownMenuItem(value: 'metro', child: Text('Metro')),
+                    DropdownMenuItem(value: 'gramo', child: Text('Gramo')),
+                    DropdownMenuItem(
+                        value: 'centimetro', child: Text('Centímetro')),
+                    DropdownMenuItem(
+                        value: 'mililitro', child: Text('Mililitro')),
+                    DropdownMenuItem(value: 'docena', child: Text('Docena')),
+                    DropdownMenuItem(value: 'caja', child: Text('Caja')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Tercera fila - Impuestos Adicionales y Marca
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Impuestos Adicionales',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'NINGUNO',
+                        child: Text('Sin impuestos adicionales')),
+                    DropdownMenuItem(
+                        value: 'IMPUESTO_BOLSA', child: Text('Impuesto Bolsa')),
+                    DropdownMenuItem(
+                        value: 'RETEFUENTE_2_5',
+                        child: Text('Retefuente 2.5%')),
+                    DropdownMenuItem(
+                        value: 'RETEIVA_15', child: Text('ReteIVA 15%')),
+                    DropdownMenuItem(
+                        value: 'IMPUESTO_CONSUMO',
+                        child: Text('Impuesto al Consumo')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Marca',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Coca-Cola',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Cuarta fila - Modelo y Código EAN/UPC
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Modelo',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: 2024',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Código EAN/UPC',
+                    border: OutlineInputBorder(),
+                    hintText: '1234567890123',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Quinta fila - Fabricante y País de origen
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Fabricante',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Coca-Cola Company',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'País de Origen',
+                    border: OutlineInputBorder(),
+                    hintText: 'CO',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Sexta fila - Código arancelario y Peso neto
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Código Arancelario',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: 2202.10.00.00',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Peso Neto (kg)',
+                    border: OutlineInputBorder(),
+                    hintText: '0.5',
+                    suffixText: 'kg',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Séptima fila - Peso bruto y Dimensiones
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Peso Bruto (kg)',
+                    border: OutlineInputBorder(),
+                    hintText: '0.6',
+                    suffixText: 'kg',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Dimensiones',
+                    border: OutlineInputBorder(),
+                    hintText: '10x5x2 cm',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Octava fila - Material y Garantía
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Material',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Plástico, Vidrio',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Garantía',
+                    border: OutlineInputBorder(),
+                    hintText: '1 año',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Novena fila - Fecha de vencimiento y SKU
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Fecha de Vencimiento',
+                    border: OutlineInputBorder(),
+                    hintText: 'DD/MM/YYYY',
+                    prefixIcon: Icon(Icons.calendar_today),
+                  ),
+                  readOnly: true,
+                  onTap: () {
+                    // TODO: Implementar selector de fecha
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'SKU',
+                    border: OutlineInputBorder(),
+                    hintText: 'Código interno del producto',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Checkboxes
+          Row(
+            children: [
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Exento de impuestos'),
+              const SizedBox(width: 32),
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Es un servicio'),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Información adicional
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Estos campos son requeridos para la facturación electrónica según normativa DIAN. Los campos marcados con * son obligatorios.',
+                    style: TextStyle(fontSize: 12, color: Colors.blue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Pestaña de Inventario
+  Widget _buildInventoryTab() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Configuración de Inventario',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          // ✅ NUEVO: Indicador del modo actual
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _priceMode == PriceCalculationMode.fixedPrice
+                  ? Colors.green.shade50
+                  : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _priceMode == PriceCalculationMode.fixedPrice
+                    ? Colors.green.shade200
+                    : Colors.orange.shade200,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _priceMode == PriceCalculationMode.fixedPrice
+                      ? Icons.calculate
+                      : Icons.percent,
+                  color: _priceMode == PriceCalculationMode.fixedPrice
+                      ? Colors.green
+                      : Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _priceMode == PriceCalculationMode.fixedPrice
+                        ? 'Modo Precio Fijo: El % de utilidad se calcula automáticamente'
+                        : 'Modo Utilidad Fija: El precio de venta se calcula automáticamente',
+                    style: TextStyle(
+                      color: _priceMode == PriceCalculationMode.fixedPrice
+                          ? Colors.green.shade700
+                          : Colors.orange.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Primera fila - Al editar: Stock actual (solo lectura) + Ingreso. Al crear: Stock actual editable.
+          Row(
+            children: [
+              Expanded(
+                child: widget.product != null
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Stock actual',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Colors.grey.shade700),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 16),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade400),
+                              borderRadius: BorderRadius.circular(4),
+                              color: Colors.grey.shade100,
+                            ),
+                            child: Text(
+                              '${widget.product!.stock} unidades',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _ingresoController,
+                            decoration: const InputDecoration(
+                              labelText:
+                                  'Ingreso (unidades a agregar o quitar)',
+                              border: OutlineInputBorder(),
+                              hintText: '0',
+                              suffixText: 'unidades',
+                              helperText:
+                                  'Ej: 10 para sumar 10 al stock actual',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty)
+                                return null;
+                              if (int.tryParse(value) == null)
+                                return 'Ingrese un número';
+                              return null;
+                            },
+                          ),
+                        ],
+                      )
+                    : TextFormField(
+                        controller: _stockController,
+                        decoration: const InputDecoration(
+                          labelText: 'Stock Actual *',
+                          border: OutlineInputBorder(),
+                          hintText: '0',
+                          suffixText: 'unidades',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'El stock es obligatorio';
+                          }
+                          if (int.tryParse(value) == null) {
+                            return 'Stock inválido';
+                          }
+                          return null;
+                        },
+                      ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _minStockController,
+                  decoration: const InputDecoration(
+                    labelText: 'Stock Mínimo *',
+                    border: OutlineInputBorder(),
+                    hintText: '5',
+                    suffixText: 'unidades',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El stock mínimo es obligatorio';
+                    }
+                    if (int.tryParse(value) == null) {
+                      return 'Stock mínimo inválido';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Segunda fila - Precio mínimo y % de utilidad
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Precio Mínimo Permitido',
+                    border: OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: '0.00',
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  controller: _profitMarginController,
+                  decoration: InputDecoration(
+                    labelText: '% de Utilidad',
+                    border: const OutlineInputBorder(),
+                    suffixText: '%',
+                    hintText: '30',
+                    // ✅ NUEVO: Indicar si el campo es editable según el modo
+                    filled: _priceMode == PriceCalculationMode.fixedPrice,
+                    fillColor: _priceMode == PriceCalculationMode.fixedPrice
+                        ? Colors.grey.shade100
+                        : null,
+                    helperText: _priceMode == PriceCalculationMode.fixedPrice
+                        ? 'Calculado automáticamente: (Precio - Costo) / Precio × 100'
+                        : 'Ingresa el % de utilidad deseado (sobre precio de venta)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  readOnly: _priceMode == PriceCalculationMode.fixedPrice,
+                  validator: (value) {
+                    if (_priceMode == PriceCalculationMode.fixedMargin) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'El % de utilidad es obligatorio';
+                      }
+                      final margin = double.tryParse(value);
+                      if (margin == null || margin < 0) {
+                        return 'Utilidad inválida';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Tercera fila - Precio sin IVA (calculado) y Costo total
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: InputDecoration(
+                    labelText: 'Precio sin IVA (Calculado)',
+                    border: const OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: '0.00',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                  ),
+                  readOnly: true,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: InputDecoration(
+                    labelText: 'Costo Total (Costo × Stock)',
+                    border: const OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: '0.00',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                  ),
+                  readOnly: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Cuarta fila - Manejo de decimales y Estado
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Manejo de Decimales',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'NO', child: Text('No (Productos enteros)')),
+                    DropdownMenuItem(
+                        value: 'SI',
+                        child: Text('Sí (Productos fraccionables)')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Estado del Producto',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'ACTIVO', child: Text('Activo')),
+                    DropdownMenuItem(
+                        value: 'INACTIVO', child: Text('Inactivo')),
+                    DropdownMenuItem(
+                        value: 'DESCONTINUADO', child: Text('Descontinuado')),
+                  ],
+                  onChanged: (value) {
+                    // TODO: Implementar lógica
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Quinta fila - Proveedor principal y Código del proveedor
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Proveedor Principal',
+                    border: OutlineInputBorder(),
+                    hintText: 'Nombre del proveedor',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Código del Proveedor',
+                    border: OutlineInputBorder(),
+                    hintText: 'Código interno del proveedor',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Sexta fila - Cuenta contable y Ubicación
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Cuenta Contable',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: 1405 - Inventarios',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextFormField(
+                  decoration: const InputDecoration(
+                    labelText: 'Ubicación en Almacén',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Estante A, Nivel 2',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Checkboxes
+          Row(
+            children: [
+              const SizedBox(width: 32),
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Combustible'),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Control de lotes'),
+              const SizedBox(width: 32),
+              Checkbox(
+                value: false, // TODO: Implementar estado
+                onChanged: (value) {
+                  // TODO: Implementar lógica
+                },
+              ),
+              const Text('Control de vencimiento'),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Información adicional
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.green),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Los campos marcados con * son obligatorios. Los precios calculados se actualizan automáticamente.',
+                    style: TextStyle(fontSize: 12, color: Colors.green),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NUEVO: Mostrar modal para crear nuevo grupo
+  void _showCreateGroupDialog() {
+    final nameController = TextEditingController();
+    String selectedColor = '#FF5722'; // Color por defecto
+
+    final List<Map<String, String>> availableColors = [
+      {'name': 'Rojo', 'value': '#FF5722'},
+      {'name': 'Verde', 'value': '#4CAF50'},
+      {'name': 'Azul', 'value': '#2196F3'},
+      {'name': 'Naranja', 'value': '#FF9800'},
+      {'name': 'Morado', 'value': '#9C27B0'},
+      {'name': 'Marrón', 'value': '#795548'},
+      {'name': 'Gris', 'value': '#9E9E9E'},
+      {'name': 'Amarillo', 'value': '#FFEB3B'},
+    ];
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Crear Nuevo Grupo'),
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del Grupo *',
+                    border: OutlineInputBorder(),
+                    hintText: 'Ej: Frutas y Verduras',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'El nombre es obligatorio';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                const Text('Color del grupo:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: availableColors.map((color) {
+                    final isSelected = selectedColor == color['value'];
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedColor = color['value']!;
+                        });
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Color(int.parse(
+                              color['value']!.replaceAll('#', '0xFF'))),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? Colors.black : Colors.grey,
+                            width: isSelected ? 3 : 1,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.trim().isNotEmpty) {
+                try {
+                  // Crear el nuevo grupo
+                  final newGroup = Group(
+                    name: nameController.text.trim(),
+                    description: 'Grupo creado por el usuario',
+                    color: selectedColor,
+                    icon: 'category', // Icono por defecto
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
+                  );
+
+                  await SQLiteDatabaseService.createGroup(newGroup);
+
+                  // Recargar grupos y seleccionar el nuevo
+                  await _loadGroups();
+                  setState(() {
+                    _selectedGroup = newGroup.name;
+                  });
+
+                  Get.back(); // Cerrar modal
+                  Get.snackbar(
+                    '✅ Grupo Creado',
+                    'El grupo "${newGroup.name}" ha sido creado exitosamente',
+                    backgroundColor: Colors.green,
+                    colorText: Colors.white,
+                    duration: const Duration(seconds: 2),
+                  );
+                } catch (e) {
+                  Get.snackbar(
+                    '❌ Error',
+                    'Error creando grupo: $e',
+                    backgroundColor: Colors.red,
+                    colorText: Colors.white,
+                  );
+                }
+              } else {
+                Get.snackbar(
+                  '⚠️ Campo requerido',
+                  'El nombre del grupo es obligatorio',
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Crear'),
+          ),
+        ],
+      ),
+    );
+  }
+}

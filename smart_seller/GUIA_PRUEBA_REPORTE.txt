@@ -1,0 +1,149 @@
+═══════════════════════════════════════════════════════════════════
+          GUÍA DE PRUEBA - REPORTE PROFESIONAL MEJORADO
+═══════════════════════════════════════════════════════════════════
+
+🎯 CÓMO PROBAR EL NUEVO REPORTE PROFESIONAL
+
+───────────────────────────────────────────────────────────────────
+
+PASO 1: INICIAR SESIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Usuario: admin
+✅ Contraseña: 123456
+
+───────────────────────────────────────────────────────────────────
+
+PASO 2: HACER ALGUNAS VENTAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Ir al módulo Punto de Venta
+2. Realizar 3-5 ventas de prueba
+3. Usar diferentes métodos de pago (efectivo, tarjeta)
+
+✅ Esto creará datos de ventas para el reporte
+
+───────────────────────────────────────────────────────────────────
+
+PASO 3: IR AL MÓDULO DE REPORTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Desde el Dashboard, ir a "Reportes"
+2. Se abrirá la pantalla de reportes
+
+───────────────────────────────────────────────────────────────────
+
+PASO 4: GENERAR REPORTE DE VENTAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Tipo de Reporte: Ventas
+✅ Período: Hoy
+✅ Click en "Generar"
+
+✅ Deberías ver el reporte con los datos de ventas
+
+───────────────────────────────────────────────────────────────────
+
+PASO 5: PROBAR EXPORTACIÓN PDF (LO MÁS IMPORTANTE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Click en el botón de descarga (icono download)
+2. Se abrirá el diálogo para guardar
+3. Escribir nombre: "reporte_ventas" (SIN .pdf)
+4. Guardar
+
+✅ VERIFICAR:
+   - ¿Se guardó el archivo como .pdf?
+   - ¿El archivo es legible al abrir?
+   - ¿El PDF contiene el reporte completo?
+
+───────────────────────────────────────────────────────────────────
+
+PASO 6: VERIFICAR CONTENIDO DEL PDF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Abrir el PDF y verificar que contenga:
+
+✅ Encabezado con nombre de empresa
+✅ Resumen Ejecutivo con:
+   - Total de ventas
+   - Número de transacciones
+   - Ticket promedio
+
+✅ Si hay datos contables, debería mostrar:
+   - Otros Ingresos
+   - Total Egresos
+   - Utilidad Neta
+   - Arqueo de Caja (saldo inicial, teórico, real, diferencia)
+
+✅ Ventas por hora
+✅ Métodos de pago
+✅ Top productos
+✅ Transacciones detalladas
+
+───────────────────────────────────────────────────────────────────
+
+🔍 QUÉ VERIFICAR ESPECÍFICAMENTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ✅ El archivo PDF se guarda correctamente
+2. ✅ Siempre tiene extensión .pdf (aunque no lo escribas)
+3. ✅ El archivo es legible al abrir
+4. ✅ Muestra datos de ventas
+5. ✅ Si hay ingresos/egresos, los muestra
+6. ✅ Si hay arqueo de caja, lo calcula correctamente
+
+───────────────────────────────────────────────────────────────────
+
+❌ POSIBLES PROBLEMAS Y SOLUCIONES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROBLEMA: El PDF no se genera
+SOLUCIÓN: Verificar que haya ventas registradas para el período
+
+PROBLEMA: Archivo no legible
+SOLUCIÓN: Verificar que el archivo tenga extensión .pdf
+
+PROBLEMA: Datos profesionales no aparecen
+SOLUCIÓN: Normal si no hay ingresos/egresos registrados
+          El reporte funciona igual con solo ventas
+
+───────────────────────────────────────────────────────────────────
+
+📊 DATOS ESPERADOS EN EL REPORTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SI HAY VENTAS (siempre):
+✅ Total de ventas
+✅ Número de transacciones
+✅ Ticket promedio
+✅ Ventas por hora
+✅ Métodos de pago
+✅ Top productos
+✅ Transacciones detalladas
+
+SI HAY INGRESOS CONTABLES (opcional):
+✅ Otros Ingresos
+✅ Sección detallada de ingresos adicionales
+
+SI HAY EGRESOS CONTABLES (opcional):
+✅ Total Egresos
+✅ Sección detallada de egresos
+✅ Utilidad Neta
+✅ Margen de Ganancia
+
+SI HAY ARQUEO DE CAJA (opcional):
+✅ Saldo Inicial
+✅ Saldo Teórico
+✅ Saldo Real
+✅ Diferencia
+
+───────────────────────────────────────────────────────────────────
+
+✅ BENEFICIOS DEL NUEVO SISTEMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Un solo módulo de reportes (más ético)
+✅ PDF automático con extensión .pdf
+✅ Reporte profesional completo
+✅ Incluye ingresos, egresos y arqueo de caja
+✅ Muestra utilidad y rentabilidad
+✅ Retrocompatible
+✅ No rompe funcionalidad existente
+
+═══════════════════════════════════════════════════════════════════
+

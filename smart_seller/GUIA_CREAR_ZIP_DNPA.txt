@@ -1,0 +1,177 @@
+═══════════════════════════════════════════════════════════════════
+GUÍA PASO A PASO: CREAR EL ARCHIVO .ZIP PARA SUBIR A DNPA
+═══════════════════════════════════════════════════════════════════
+
+Este documento te explica EXACTAMENTE cómo crear el archivo ZIP que 
+debes subir como "COPIA DE LA OBRA" a la plataforma DNPA.
+
+═══════════════════════════════════════════════════════════════════
+⚠️ IMPORTANTE: RECUERDA ESTO
+═══════════════════════════════════════════════════════════════════
+
+✅ El TÍTULO que pongas en el formulario web DEBE ser EXACTAMENTE:
+   "Sistema de Punto de Venta SmartSeller POS v1.0"
+
+✅ El TÍTULO dentro del ZIP (en el archivo TITULO_OFICIAL_OBRA.txt) 
+   DEBE ser EXACTAMENTE el mismo.
+
+✅ Si los títulos no coinciden → motivo de devolución
+
+═══════════════════════════════════════════════════════════════════
+PASO 1: CREAR UNA CARPETA TEMPORAL
+═══════════════════════════════════════════════════════════════════
+
+1. Ve a tu escritorio (o donde quieras)
+2. Crea una carpeta nueva con nombre:
+   "SmartSeller_POS_v1.0_DNPA"
+
+═══════════════════════════════════════════════════════════════════
+PASO 2: COPIAR EL CÓDIGO FUENTE
+═══════════════════════════════════════════════════════════════════
+
+1. Ve a tu proyecto: D:\losoft\DEMOV2\smart_seller
+2. Copia la carpeta completa "lib" (todo el código fuente)
+3. Pégalo dentro de la carpeta temporal que creaste
+
+La estructura debería quedar así:
+SmartSeller_POS_v1.0_DNPA/
+  └── lib/
+      ├── controllers/
+      ├── main.dart
+      ├── middleware/
+      ├── models/
+      ├── modules/
+      ├── screens/
+      ├── services/
+      ├── utils/
+      └── widgets/
+
+═══════════════════════════════════════════════════════════════════
+PASO 3: COPIAR ARCHIVO DE CONFIGURACIÓN
+═══════════════════════════════════════════════════════════════════
+
+1. Desde la raíz de tu proyecto (D:\losoft\DEMOV2\smart_seller)
+2. Copia el archivo: pubspec.yaml
+3. Pégalo dentro de la carpeta temporal
+
+Ahora la estructura es:
+SmartSeller_POS_v1.0_DNPA/
+  ├── lib/
+  │   └── (todo el código fuente)
+  └── pubspec.yaml
+
+═══════════════════════════════════════════════════════════════════
+PASO 4: AGREGAR DOCUMENTO CON TÍTULO OFICIAL
+═══════════════════════════════════════════════════════════════════
+
+1. El archivo "TITULO_OFICIAL_OBRA.txt" ya está creado en tu proyecto
+2. Cópialo y pégalo en la carpeta temporal
+
+Ahora la estructura es:
+SmartSeller_POS_v1.0_DNPA/
+  ├── lib/
+  │   └── (todo el código fuente)
+  ├── pubspec.yaml
+  └── TITULO_OFICIAL_OBRA.txt  ← ⚠️ IMPORTANTE: Este archivo contiene el título
+
+═══════════════════════════════════════════════════════════════════
+PASO 5: CREAR EL ARCHIVO ZIP
+═══════════════════════════════════════════════════════════════════
+
+OPCIÓN A: CON EXPLORADOR DE WINDOWS (MÁS FÁCIL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Abre la carpeta: SmartSeller_POS_v1.0_DNPA
+2. Selecciona TODOS los archivos y carpetas (Ctrl + A)
+3. Clic derecho → "Enviar a" → "Carpeta comprimida (en ZIP)"
+4. Windows creará un archivo: SmartSeller_POS_v1.0_DNPA.zip
+5. Renombra el archivo a: "SmartSeller_POS_v1.0_CopiaObra_DNPA.zip"
+
+OPCIÓN B: CON WINRAR O 7-ZIP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Selecciona la carpeta: SmartSeller_POS_v1.0_DNPA
+2. Clic derecho → "Añadir al archivo..." (WinRAR) o "7-Zip → Añadir al archivo"
+3. Nombre del archivo: SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+4. Formato: ZIP
+5. Clic en "Aceptar"
+
+═══════════════════════════════════════════════════════════════════
+PASO 6: VERIFICAR EL CONTENIDO DEL ZIP
+═══════════════════════════════════════════════════════════════════
+
+ANTES DE SUBIR, VERIFICA QUE EL ZIP CONTIENE:
+
+✅ Carpeta "lib" completa (con todo el código fuente)
+✅ Archivo "pubspec.yaml"
+✅ Archivo "TITULO_OFICIAL_OBRA.txt" (con el título exacto)
+
+Para verificar:
+1. Haz doble clic en el ZIP
+2. Revisa que estén los 3 elementos principales
+3. Abre "TITULO_OFICIAL_OBRA.txt" y verifica que el título sea:
+   "Sistema de Punto de Venta SmartSeller POS v1.0"
+
+═══════════════════════════════════════════════════════════════════
+PASO 7: LISTO PARA SUBIR
+═══════════════════════════════════════════════════════════════════
+
+✅ Tienes el archivo ZIP creado
+✅ El título dentro del ZIP coincide con el del formulario
+✅ El ZIP contiene el código fuente completo
+
+AHORA PUEDES:
+1. Ir a www.registroenlinea.com.co
+2. Llenar el formulario
+3. En el paso final, cuando te pida "Copia de la obra"
+4. Subir el archivo: SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+
+═══════════════════════════════════════════════════════════════════
+ESTRUCTURA FINAL DEL ZIP (Ejemplo)
+═══════════════════════════════════════════════════════════════════
+
+SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+│
+├── lib/
+│   ├── controllers/
+│   ├── main.dart
+│   ├── middleware/
+│   ├── models/
+│   ├── modules/
+│   ├── screens/
+│   ├── services/
+│   ├── utils/
+│   └── widgets/
+│
+├── pubspec.yaml
+│
+└── TITULO_OFICIAL_OBRA.txt  ← Contiene el título exacto
+
+═══════════════════════════════════════════════════════════════════
+NOTAS IMPORTANTES
+═══════════════════════════════════════════════════════════════════
+
+⚠️ NO incluyas carpetas como:
+   - build/
+   - android/
+   - ios/
+   - windows/
+   - .git/
+   - node_modules/
+   Solo necesitas el código fuente (lib/) y configuración básica.
+
+⚠️ NO incluyas ejecutables (.exe) ni compilados
+   Solo código fuente es suficiente.
+
+⚠️ Verifica que el ZIP no sea muy grande
+   Si es mayor a 100MB, considera usar solo los archivos principales
+
+⚠️ El título debe ser EXACTAMENTE igual en:
+   1. El campo del formulario web
+   2. El archivo TITULO_OFICIAL_OBRA.txt dentro del ZIP
+
+═══════════════════════════════════════════════════════════════════
+Fin del Documento
+═══════════════════════════════════════════════════════════════════
+
+

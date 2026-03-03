@@ -1,0 +1,85 @@
+═══════════════════════════════════════════════════════════════════
+  EVIDENCIA DE DESARROLLO - SMARTSELLER POS v1.0
+  Para incluir en Hoja de Vida / CV
+═══════════════════════════════════════════════════════════════════
+
+📌 INFORMACIÓN DEL PROYECTO
+───────────────────────────────────────────────────────────────────
+Nombre del Proyecto: SmartSeller POS v1.0
+Tipo: Sistema de Punto de Venta (POS) para Windows
+Tecnología: Flutter / Dart
+Repositorio GitHub: https://github.com/ingeniero82/POS
+
+📋 CÓMO PRESENTARLO EN TU HOJA DE VIDA
+───────────────────────────────────────────────────────────────────
+
+OPCIÓN 1: En la sección "Proyectos" o "Portafolio"
+───────────────────────────────────────────────────────────────────
+• SmartSeller POS v1.0
+  Sistema de Punto de Venta desarrollado en Flutter/Dart para Windows.
+  Incluye módulos de ventas, inventario, facturación electrónica, 
+  reportes contables y gestión de clientes.
+  Repositorio: https://github.com/ingeniero82/POS
+
+OPCIÓN 2: En la sección "Experiencia" o "Desarrollos"
+───────────────────────────────────────────────────────────────────
+• Desarrollo de Sistema POS Completo
+  - Tecnologías: Flutter, Dart, SQLite, GetX
+  - Funcionalidades: Gestión de ventas, inventario, facturación 
+    electrónica (DIAN), reportes PDF, control contable
+  - Repositorio público: https://github.com/ingeniero82/POS
+
+OPCIÓN 3: Formato más técnico
+───────────────────────────────────────────────────────────────────
+• SmartSeller POS v1.0 | Flutter/Dart
+  Desarrollo completo de sistema de punto de venta con:
+  ✓ Módulo de ventas con múltiples métodos de pago
+  ✓ Gestión de inventario y productos
+  ✓ Facturación electrónica (integración DIAN)
+  ✓ Sistema de reportes contables con exportación PDF
+  ✓ Control de caja y sesiones de trabajo
+  ✓ Gestión de clientes con sistema de puntos
+  GitHub: https://github.com/ingeniero82/POS
+
+🔗 ENLACE DIRECTO AL REPOSITORIO
+───────────────────────────────────────────────────────────────────
+https://github.com/ingeniero82/POS
+
+💡 RECOMENDACIONES
+───────────────────────────────────────────────────────────────────
+1. Asegúrate de que tu repositorio esté público (o al menos visible)
+2. Puedes agregar un README.md descriptivo en el repositorio
+3. Si tienes commits recientes, eso muestra actividad continua
+4. Puedes mencionar tecnologías específicas que usaste:
+   - Flutter (Framework multiplataforma)
+   - Dart (Lenguaje de programación)
+   - SQLite (Base de datos)
+   - GetX (Gestión de estado)
+   - Integración con APIs DIAN (Facturación electrónica)
+
+📝 NOTA ADICIONAL
+───────────────────────────────────────────────────────────────────
+Si quieres mostrar más detalles técnicos, puedes mencionar:
+- Arquitectura MVC/MVVM
+- Gestión de estado reactiva con GetX
+- Base de datos local SQLite
+- Generación de reportes PDF
+- Integración con sistemas de facturación electrónica
+- Sistema de roles y permisos
+- Exportación de datos a Excel
+
+═══════════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+
+
+
+
+
+

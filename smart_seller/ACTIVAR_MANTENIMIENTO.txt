@@ -1,0 +1,47 @@
+========================================
+   ACTIVAR MANTENIMIENTO AUTOMATICO
+========================================
+
+El mantenimiento automático YA ESTA ACTIVADO en el código.
+
+Para que funcione, solo necesitas:
+
+1. RECOMPILAR EL PROGRAMA:
+   -----------------------
+   Ejecutar en la terminal:
+   
+   flutter clean
+   flutter pub get
+   flutter build windows --release
+
+2. PREPARAR PARA CLIENTE:
+   -----------------------
+   Ejecutar:
+   
+   D:\losoft\PREPARAR_PARA_CLIENTE.bat
+
+3. LISTO:
+   ------
+   El mantenimiento automático funcionará automáticamente
+   cada vez que el cliente inicie el programa.
+
+========================================
+
+QUE HACE AUTOMATICAMENTE:
+-------------------------
+- Se ejecuta al iniciar el programa (después de 5 segundos)
+- Solo si la base de datos tiene más de 5MB
+- Optimiza la base de datos (VACUUM + ANALYZE)
+- NO borra datos, solo reorganiza y mejora rendimiento
+- Se ejecuta en segundo plano, no bloquea el inicio
+
+========================================
+
+NO NECESITAS HACER NADA MAS:
+-----------------------------
+- Ya está en el código
+- Solo recompila y listo
+- Funciona automáticamente
+
+========================================
+

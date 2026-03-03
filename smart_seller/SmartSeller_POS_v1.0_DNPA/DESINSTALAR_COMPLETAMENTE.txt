@@ -1,0 +1,67 @@
+===============================================
+ DESINSTALAR SMART SELLER POS POR COMPLETO
+ (Dejar el equipo como si nunca se hubiera instalado)
+===============================================
+
+Sigue estos pasos EN EL EQUIPO DEL VENDEDOR (o del cliente).
+
+--- PASO 1: Cerrar el programa ---
+  - Cierra Smart Seller POS si está abierto (incluida cualquier ventana de actualización).
+
+--- PASO 2: Desinstalar la aplicación ---
+  - Abre "Agregar o quitar programas" (Windows 10/11: Configuración → Aplicaciones → Aplicaciones instaladas).
+  - Busca "Smart Seller POS" (o "Smart Seller").
+  - Haz clic en los tres puntos o en el nombre y elige "Desinstalar".
+  - Sigue el asistente hasta terminar.
+
+  Si NO aparece en "Agregar o quitar programas" (por ejemplo, si solo copiaste la carpeta):
+  - Borra manualmente la carpeta donde está instalado (ej.: C:\Program Files\SmartSellerPOS o la carpeta donde descomprimiste el ZIP).
+
+--- PASO 3: Borrar los datos del programa ---
+
+  El desinstalador NO borra los datos. Para dejar el equipo "como recién instalado" hay que borrarlos a mano.
+
+  3.1 Base de datos (ubicación actual del programa)
+      La base de datos está en la carpeta de datos de la aplicación (no en Documentos), para evitar borrados por error.
+      - Presiona Win + R, escribe: %LocalAppData%
+      - Entra en la carpeta "smart_seller" (o "SmartSellerPOS" / similar).
+      - Borra el archivo smart_seller.db (y si existen: smart_seller.db-journal, smart_seller.db-wal).
+      - Si quieres, borra toda la carpeta "smart_seller" de ahí.
+
+  3.2 Si el equipo tenía una versión antigua (base en Documentos)
+      - Abre: C:\Users\<NombreDelUsuario>\Documents
+      - Borra si existen: smart_seller.db, smart_seller.db-journal, smart_seller.db-wal
+
+  3.3 Preferencias (opcional, para limpieza total)
+      - En %AppData% (Win + R → %AppData%) revisa si hay carpeta "Smart Seller" o "smart_seller" y bórrala.
+
+--- PASO 4: (Opcional) Borrar iconos del escritorio ---
+  - Si quedó un icono en el escritorio o en el menú Inicio, elimínalo con clic derecho → Eliminar.
+
+===============================================
+ RESUMEN RÁPIDO
+===============================================
+1. Cerrar Smart Seller POS.
+2. Desinstalar desde "Agregar o quitar programas" (o borrar la carpeta de instalación).
+3. Win + R → %LocalAppData% → entrar en carpeta "smart_seller" (o similar) → borrar smart_seller.db y archivos .db-journal, .db-wal.
+4. (Si había versión antigua) En Documentos del usuario, borrar smart_seller.db si existe.
+5. (Opcional) En %AppData%, borrar carpetas "smart_seller" o "Smart Seller" si aparecen.
+
+Después de esto puedes instalar la versión nueva; el programa arrancará como si fuera la primera vez (sin productos, ventas ni usuarios previos).
+
+===============================================
+ DÓNDE QUEDA AHORA LA BASE DE DATOS (versión nueva)
+===============================================
+En la carpeta de datos de la aplicación, NO en Documentos:
+  %LocalAppData%\smart_seller\smart_seller.db
+(La carpeta AppData suele estar oculta; Win + R → %LocalAppData% para abrirla.)
+Así se evita que alguien borre la base por error al abrir Documentos.
+
+===============================================
+ SI QUIERES CONSERVAR LOS DATOS (solo actualizar)
+===============================================
+- Desinstala solo la aplicación (Paso 1 y 2).
+- NO borres la carpeta en %LocalAppData% ni los archivos de Documentos (Paso 3).
+- Instala la versión nueva: seguirá usando la misma base de datos (productos, ventas, clientes, usuarios).
+
+===============================================

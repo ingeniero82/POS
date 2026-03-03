@@ -1,0 +1,80 @@
+═══════════════════════════════════════════════════════════════════
+INSTRUCCIONES PARA CREAR EL ZIP FINAL
+═══════════════════════════════════════════════════════════════════
+
+✅ La carpeta ya está lista con todos los archivos necesarios.
+
+═══════════════════════════════════════════════════════════════════
+CONTENIDO ACTUAL DE ESTA CARPETA:
+═══════════════════════════════════════════════════════════════════
+
+✅ lib/                          (Código fuente completo)
+✅ pubspec.yaml                  (Configuración del proyecto)
+✅ TITULO_OFICIAL_OBRA.txt       (Título oficial - IMPORTANTE)
+✅ README_COPIA_OBRA.txt         (Documentación del contenido)
+
+═══════════════════════════════════════════════════════════════════
+PASO 1: CREAR EL ARCHIVO ZIP
+═══════════════════════════════════════════════════════════════════
+
+OPCIÓN A: CON EXPLORADOR DE WINDOWS (RECOMENDADO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Abre esta carpeta: SmartSeller_POS_v1.0_DNPA
+2. Selecciona TODOS los archivos y carpetas (Ctrl + A)
+3. Clic derecho → "Enviar a" → "Carpeta educomprimida (en ZIP)"
+4. Se creará: SmartSeller_POS_v1.0_DNPA.zip
+5. Renombra el archivo a: SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+
+OPCIÓN B: CON WINRAR O 7-ZIP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Selecciona la carpeta: SmartSeller_POS_v1.0_DNPA
+2. Clic derecho → "Añadir al archivo..." (WinRAR) o "7-Zip → Añadir al archivo"
+3. Nombre: SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+4. Formato: ZIP
+5. Clic en "Aceptar"
+
+═══════════════════════════════════════════════════════════════════
+PASO 2: VERIFICAR EL CONTENIDO DEL ZIP
+═══════════════════════════════════════════════════════════════════
+
+Antes de subir a DNPA, verifica que el ZIP contenga:
+
+✅ Carpeta "lib" completa
+✅ Archivo "pubspec.yaml"
+✅ Archivo "TITULO_OFICIAL_OBRA.txt"
+✅ Archivo "README_COPIA_OBRA.txt" (opcional pero recomendado)
+
+Para verificar:
+1. Haz doble clic en el ZIP
+2. Revisa que estén todos los elementos
+3. Abre "TITULO_OFICIAL_OBRA.txt" y confirma que el título sea:
+   "Sistema de Punto de Venta SmartSeller POS v1.0"
+
+═══════════════════════════════════════════════════════════════════
+PASO 3: SUBIR A LA PLATAFORMA DNPA
+═══════════════════════════════════════════════════════════════════
+
+1. Ve a: www.registroenlinea.com.co
+2. Inicia sesión (o crea cuenta si es primera vez)
+3. Selecciona categoría: SOFTWARE
+4. Completa todos los pasos del formulario
+5. En el campo "Título de la obra" escribe EXACTAMENTE:
+   "Sistema de Punto de Venta SmartSeller POS v1.0"
+6. Al final, en "Copia de la obra", sube el archivo:
+   SmartSeller_POS_v1.0_CopiaObra_DNPA.zip
+
+═══════════════════════════════════════════════════════════════════
+⚠️ RECORDATORIO IMPORTANTE
+═══════════════════════════════════════════════════════════════════
+
+El título en el formulario web DEBE ser EXACTAMENTE igual al título 
+en el archivo TITULO_OFICIAL_OBRA.txt:
+
+"Sistema de Punto de Venta SmartSeller POS v1.0"
+
+Si no coinciden → motivo de devolución
+
+═══════════════════════════════════════════════════════════════════
+

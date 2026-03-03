@@ -1,0 +1,58 @@
+===============================================
+ ACTUALIZAR EJECUTABLE E INSTALAR EN EL CLIENTE
+===============================================
+
+--- PASO 1: EN TU PC (donde desarrollas) ---
+
+1. Compilar el programa actualizado (ejecutable):
+   - Abre terminal en la carpeta del proyecto.
+   - Ejecuta:
+     cd d:\losoft\DEMOV2\smart_seller\SmartSeller_POS_v1.0_DNPA
+     flutter build windows --release
+
+   El ejecutable queda en:
+   build\windows\x64\runner\Release\smart_seller.exe
+   (y toda la carpeta Release hay que entregarla si no usas instalador)
+
+
+2. Crear el instalador (opcional pero recomendado):
+   - Abre Inno Setup.
+   - File → Open → esta ruta:
+     d:\losoft\DEMOV2\smart_seller\SmartSeller_POS_v1.0_DNPA\installer\SmartSeller_Setup.iss
+   - Build → Compile (F9).
+
+   El instalador queda en:
+   d:\losoft\DEMOV2\smart_seller\SmartSeller_POS_v1.0_DNPA\output\SmartSeller_POS_Setup_v1.0.0.exe
+
+
+--- PASO 2: LLEVAR AL CLIENTE ---
+
+Opción A – Con instalador (recomendado):
+  - Lleva el archivo: SmartSeller_POS_Setup_v1.0.0.exe (de la carpeta output).
+  - El cliente lo ejecuta y sigue el asistente.
+  - Si ya tenía una versión anterior instalada, puede "Reparar" o "Desinstalar" y luego instalar de nuevo con este .exe.
+
+Opción B – Sin instalador (solo carpeta):
+  - Comprime la carpeta Release completa:
+    build\windows\x64\runner\Release
+  - Envía el ZIP al cliente. El cliente descomprime y ejecuta smart_seller.exe (puede reemplazar la carpeta vieja si la tenía).
+
+
+--- PASO 3: EN EL PC DEL CLIENTE ---
+
+Si ya tenía el programa instalado:
+  - Cerrar Smart Seller si está abierto.
+  - Ejecutar el nuevo SmartSeller_POS_Setup_v1.0.0.exe.
+  - Elegir "Reemplazar" o "Reparar" si el instalador lo pregunta, o desinstalar la versión anterior desde "Agregar o quitar programas" y luego instalar de nuevo.
+
+La base de datos (smart_seller.db) está en Documentos del usuario; el instalador NO la borra. Al reinstalar, el programa seguirá usando los mismos datos (productos, ventas, clientes).
+
+===============================================
+
+RESUMEN RÁPIDO (solo comandos en tu PC):
+
+  cd d:\losoft\DEMOV2\smart_seller\SmartSeller_POS_v1.0_DNPA
+  flutter build windows --release
+
+Luego abre Inno Setup → SmartSeller_Setup.iss → Compile.
+Entrega al cliente: output\SmartSeller_POS_Setup_v1.0.0.exe

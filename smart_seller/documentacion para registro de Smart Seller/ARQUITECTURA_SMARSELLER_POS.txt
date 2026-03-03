@@ -1,0 +1,307 @@
+DOCUMENTACION DE ARQUITECTURA - SmartSeller POS v2.0
+
+INFORMACION GENERAL
+
+Identificacion del Sistema:
+- Nombre: SmartSeller POS (Point of Sale)
+- Version: 2.0 Final
+- Arquitectura: Cliente-Servidor (Local)
+- Patron: Model-View-Controller (MVC)
+- Tecnologia: Flutter/Dart + SQLite
+- Fecha: Diciembre 2024
+
+ARQUITECTURA GENERAL DEL SISTEMA
+
+El sistema SmartSeller POS v2.0 utiliza una arquitectura de tres capas principales:
+
+CAPA 1: INTERFAZ DE USUARIO
+Esta capa contiene todas las pantallas y componentes visuales del sistema.
+- Pantallas principales (Login, POS, Inventario, Clientes, etc.)
+- Widgets personalizados (botones, campos de texto, tarjetas)
+- Sistema de navegacion entre pantallas
+
+CAPA 2: LOGICA DE NEGOCIO
+Esta capa maneja toda la logica y reglas del sistema.
+- Controladores que gestionan el estado de cada pantalla
+- Servicios especializados (autenticacion, impresion, base de datos)
+- Middleware de seguridad y validacion
+
+CAPA 3: ACCESO A DATOS
+Esta capa se encarga de almacenar y recuperar informacion.
+- Base de datos SQLite local
+- Modelos de datos estructurados
+- Operaciones de lectura y escritura
+
+COMPONENTES PRINCIPALES
+
+PANTALLAS DEL SISTEMA:
+- login_screen.dart: Pantalla de inicio de sesion
+- dashboard_screen.dart: Panel principal del sistema
+- pos_screen.dart: Punto de venta principal
+- products_screen.dart: Gestion de productos e inventario
+- customers_screen.dart: Gestion de clientes
+- users_screen.dart: Gestion de usuarios del sistema
+- reports_screen.dart: Generacion de reportes
+- company_config_screen.dart: Configuracion de empresa
+
+SERVICIOS PRINCIPALES:
+- auth_service.dart: Autenticacion de usuarios
+- sqlite_database_service.dart: Gestion de base de datos
+- print_service.dart: Servicio de impresion
+- permissions_service.dart: Control de permisos
+- company_config_service.dart: Configuracion de empresa
+
+MODELOS DE DATOS:
+- user.dart: Usuarios del sistema
+- product.dart: Productos e inventario
+- customer.dart: Clientes
+- sale.dart: Ventas realizadas
+- company.dart: Datos de la empresa
+
+BASE DE DATOS
+
+TABLAS PRINCIPALES:
+
+Tabla Users (Usuarios):
+- id: Identificador unico
+- username: Nombre de usuario
+- password: Contrasena encriptada
+- full_name: Nombre completo
+- role: Rol del usuario (admin, vendedor, mantenimiento)
+- is_active: Estado activo/inactivo
+
+Tabla Products (Productos):
+- id: Identificador unico
+- name: Nombre del producto
+- price: Precio de venta
+- cost: Precio de costo
+- stock: Cantidad en inventario
+- type: Tipo (unidad o peso)
+- category_id: Categoria del producto
+
+Tabla Customers (Clientes):
+- id: Identificador unico
+- document_type: Tipo de documento
+- document_number: Numero de documento
+- full_name: Nombre completo
+- email: Correo electronico
+- phone: Telefono
+
+Tabla Sales (Ventas):
+- id: Identificador unico
+- customer_id: Cliente asociado
+- user_id: Usuario que realizo la venta
+- total: Total de la venta
+- subtotal: Subtotal sin impuestos
+- tax: Impuestos aplicados
+- payment_method: Metodo de pago
+- sale_date: Fecha de la venta
+
+FUNCIONALIDADES PRINCIPALES
+
+MODULO DE PUNTO DE VENTA:
+- Busqueda rapida de productos
+- Carrito de compras dinamico
+- Calculo automatico de totales
+- Múltiples metodos de pago
+- Impresion de tickets
+
+MODULO DE INVENTARIO:
+- Gestion de productos por unidad y peso
+- Control automatico de stock
+- Alertas de stock bajo
+- Categorizacion de productos
+
+MODULO DE CLIENTES:
+- Base de datos completa de clientes
+- Validacion de documentos
+- Historial de compras
+
+MODULO DE REPORTES:
+- Reportes de ventas por periodo
+- Reportes de inventario
+- Reportes de rentabilidad
+- Exportacion a PDF
+
+MODULO DE FACTURACION ELECTRONICA:
+- Generacion de facturas segun estandares DIAN
+- Validacion de datos fiscales
+- Envio a servicios DIAN
+- Gestion de estados de factura
+
+SISTEMA DE SEGURIDAD
+
+AUTENTICACION:
+- Login con usuario y contrasena
+- Encriptacion SHA-256 de contrasenas
+- Tokens de sesion con expiracion
+- Middleware de autenticacion en rutas protegidas
+
+AUTORIZACION:
+- Sistema granular de permisos
+- Roles predefinidos (Administrador, Vendedor, Mantenimiento)
+- Control de acceso por modulo
+- Validacion de permisos en tiempo real
+
+AUDITORIA:
+- Registro de todas las actividades importantes
+- Logs de acceso y modificaciones
+- Trazabilidad completa de cambios
+- Alertas por actividades sospechosas
+
+INTEGRACIONES EXTERNAS
+
+SERVICIO DE IMPRESION:
+- Soporte para impresoras termicas (tickets)
+- Soporte para impresoras laser (facturas)
+- Configuracion automatica de puertos
+- Manejo de errores de impresion
+
+INTEGRACION CON BALANZAS:
+- Comunicacion por puerto serial
+- Protocolos estandar de balanzas
+- Lectura automatica de peso
+- Integracion con productos por peso
+
+SERVICIOS DIAN:
+- Generacion de facturas electronicas
+- Validacion de datos fiscales
+- Envio a servicios DIAN
+- Gestion de estados de facturacion
+
+TECNOLOGIAS UTILIZADAS
+
+DESARROLLO:
+- Flutter 3.0+: Framework de desarrollo
+- Dart: Lenguaje de programacion
+- GetX: Gestion de estado y navegacion
+- Material Design 3: Sistema de diseno
+
+BASE DE DATOS:
+- SQLite: Base de datos local
+- SQLite3 Flutter Libs: Drivers para Flutter
+
+INTEGRACIONES:
+- libserialport: Comunicacion con dispositivos
+- pdf: Generacion de documentos PDF
+- excel: Exportacion a Excel
+
+PATRONES DE DISENO
+
+MODEL-VIEW-CONTROLLER (MVC):
+- Model: Modelos de datos y servicios
+- View: Pantallas y widgets de usuario
+- Controller: Controladores de estado
+
+SINGLETON:
+- Servicios unicos del sistema
+- Base de datos centralizada
+- Configuracion global
+
+REPOSITORY:
+- Abstraccion de acceso a datos
+- Separacion entre logica y persistencia
+- Facil testing y mantenimiento
+
+OPTIMIZACIONES
+
+RENDIMIENTO:
+- Indices en base de datos para consultas rapidas
+- Cache de productos frecuentemente consultados
+- Carga diferida de datos no criticos
+- Consultas SQL optimizadas
+
+ESCALABILIDAD:
+- Arquitectura modular
+- Servicios independientes
+- Facil adicion de nuevas funcionalidades
+- Base de datos normalizada
+
+MANTENIMIENTO:
+- Codigo bien documentado
+- Separacion de responsabilidades
+- Patrones de diseno implementados
+- Testing automatizado
+
+COMPATIBILIDAD
+
+PLATAFORMAS SOPORTADAS:
+- Windows 10/11 (64-bit): Plataforma principal
+- Android 7.0+: Para tablets POS
+- Web: Navegadores modernos
+
+REQUISITOS MINIMOS:
+- RAM: 4GB (8GB recomendado)
+- Disco: 2GB espacio libre
+- Procesador: Intel i3 o equivalente
+- Sistema Operativo: Windows 10 (64-bit)
+
+DEPENDENCIAS:
+- SQLite: Incluido en el paquete
+- Drivers de impresora: Especificos del fabricante
+- Drivers de balanza: Segun el modelo
+
+TESTING Y CALIDAD
+
+TIPOS DE PRUEBAS:
+- Pruebas unitarias: Funciones individuales
+- Pruebas de integracion: Comunicacion entre modulos
+- Pruebas de usuario: Experiencia completa
+
+METRICAS DE CALIDAD:
+- Cobertura de codigo: Objetivo > 80%
+- Analisis estatico: Sin errores criticos
+- Testing automatizado: Casos criticos cubiertos
+
+MANTENIMIENTO
+
+RESPALDOS:
+- Respaldo automatico diario
+- Respaldo manual bajo demanda
+- Rotacion de respaldos antiguos
+- Verificacion de integridad
+
+ACTUALIZACIONES:
+- Verificacion automatica de actualizaciones
+- Instalacion automatica
+- Respaldo antes de actualizar
+- Rollback en caso de problemas
+
+MONITOREO:
+- Verificacion de espacio en disco
+- Monitoreo de uso de memoria
+- Deteccion de errores
+- Generacion de alertas
+
+ROADMAP FUTURO
+
+MEJORAS PLANIFICADAS:
+- Integracion real con servicios DIAN
+- Sincronizacion en la nube
+- App movil complementaria
+- Modulo de contabilidad
+- Sistema de lealtad de clientes
+
+OPTIMIZACIONES TECNICAS:
+- Migracion a microservicios
+- Implementacion de cache distribuido
+- Base de datos distribuida
+- API publica para integraciones
+
+CONCLUSION
+
+SmartSeller POS v2.0 es un sistema de punto de venta profesional construido con tecnologias modernas y una arquitectura robusta. Su diseno modular permite facil mantenimiento y extension de funcionalidades, mientras que su sistema de seguridad garantiza la proteccion de datos y operaciones.
+
+La arquitectura de tres capas (presentacion, logica de negocio, acceso a datos) asegura la separacion de responsabilidades y facilita el desarrollo, testing y mantenimiento del sistema.
+
+El sistema esta disenado para ser escalable, seguro y facil de usar, cumpliendo con los estandares de la industria y las regulaciones fiscales colombianas.
+
+SmartSeller POS v2.0 - Sistema de Punto de Venta Profesional
+
+Fecha de Documentacion: Diciembre 2024
+Version: 2.0 Final
+Desarrollador: Oscar Mauricio Gonzalez
+Licencia: Propietaria
+Arquitectura: MVC + GetX + SQLite
+
+

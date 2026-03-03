@@ -1,0 +1,93 @@
+═══════════════════════════════════════════════════════════════════
+GUÍA PARA COMPLETAR EL FORMULARIO DE REGISTRO DNDA
+═══════════════════════════════════════════════════════════════════
+
+Sistema de Punto de Venta SmartSeller POS v1.0
+
+═══════════════════════════════════════════════════════════════════
+INSTRUCCIONES IMPORTANTES
+═══════════════════════════════════════════════════════════════════
+
+• El campo "BREVE DESCRIPCIÓN DE LAS FUNCIONES DEL PROGRAMA" 
+  puede tener MÁXIMO 500 CARACTERES.
+
+• Debe especificar si la obra es ORIGINARIA o DERIVADA.
+
+═══════════════════════════════════════════════════════════════════
+CAMPOS DEL FORMULARIO - VALORES A SELECCIONAR
+═══════════════════════════════════════════════════════════════════
+
+1. (*) TÍTULO DE LA OBRA
+   ✅ Ya está correcto:
+   "Sistema de Punto de Venta SmartSeller POS v1.0"
+
+2. (*) BREVE DESCRIPCIÓN DE LAS FUNCIONES DEL PROGRAMA
+   ✅ Usar el texto del archivo: DESCRIPCION_FUNCIONES_DNDA_500_CARACTERES.txt
+   (494 caracteres - dentro del límite de 500)
+
+3. (*) AÑO DE CREACIÓN
+   ✅ Ya está correcto: "2025"
+
+   OBRA INÉDITA / OBRA PUBLICADA:
+   → Seleccionar según corresponda (consultar con el usuario)
+
+4. (*) PAÍS DE ORIGEN DE LA OBRA
+   ✅ Ya está correcto: "COLOMBIANO"
+
+═══════════════════════════════════════════════════════════════════
+CARÁCTER DE LA OBRA
+═══════════════════════════════════════════════════════════════════
+
+1. Por participación de autores
+   ✅ Ya está seleccionado: "OBRA INDIVIDUAL"
+
+2. Por su origen
+   ⚠️ DEBE SELECCIONAR: "OBRA ORIGINARIA"
+   (Según TITULO_OFICIAL_OBRA.txt: "Obra Individual - Originaria")
+
+3. Por la forma en que se da a conocer el autor
+   → Seleccionar: "NINGUNA DE LAS ANTERIORES"
+   (El autor es conocido: Oscar Mauricio González)
+
+4. Por su forma de elaboración
+   → Seleccionar: "NINGUNA DE LAS ANTERIORES"
+   (No es por encargo ni funcionario público)
+
+═══════════════════════════════════════════════════════════════════
+ELEMENTOS DEL SOPORTE LÓGICO
+═══════════════════════════════════════════════════════════════════
+
+✅ Ya está correcto:
+☑ PROGRAMA DE COMPUTADOR (marcado)
+
+☐ MATERIAL AUXILIAR (no marcado)
+☐ DESCRIPCIÓN DEL PROGRAMA (no marcado)
+
+═══════════════════════════════════════════════════════════════════
+RESUMEN DE ACCIONES NECESARIAS
+═══════════════════════════════════════════════════════════════════
+
+✅ CAMPOS YA CORRECTOS:
+- Título de la obra
+- País de origen
+- Obra individual (seleccionada)
+- Programa de computador (marcado)
+
+⚠️ CAMPOS QUE DEBES COMPLETAR:
+
+1. Seleccionar en "2. Por su origen":
+   → "OBRA ORIGINARIA"
+
+2. Seleccionar en "3. Por la forma en que se da a conocer el autor":
+   → "NINGUNA DE LAS ANTERIORES"
+
+3. Seleccionar en "4. Por su forma de elaboración":
+   → "NINGUNA DE LAS ANTERIORES"
+
+4. Copiar y pegar el texto de DESCRIPCION_FUNCIONES_DNDA_500_CARACTERES.txt
+   en el campo "BREVE DESCRIPCIÓN DE LAS FUNCIONES DEL PROGRAMA"
+
+5. Confirmar si la obra es INÉDITA o PUBLICADA (según corresponda)
+
+═══════════════════════════════════════════════════════════════════
+

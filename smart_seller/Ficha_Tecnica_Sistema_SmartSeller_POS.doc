@@ -1,0 +1,37 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+\viewkind4\uc1
+\pard\sa200\sl276\slmult1\qc\f0\fs30\b FICHA TÉCNICA DEL SOFTWARE\par
+\pard\sa200\sl276\slmult1\par
+\b Nombre del Software:\b0  Sistema de Punto de Venta SmartSeller POS v1.0\par
+\b Versión:\b0  1.0\par
+\b Fecha de creación:\b0  septiembre 2025\par
+\b Autor/Desarrollador:\b0  Oscar Mauricio González Montenegro\par
+\b Identificación:\b0  C.C. 800344807\par
+\b Correo de contacto:\b0  ingenierodesoftware82@gmail.com\par
+\b Teléfono:\b0  3185183628\par
+\par
+\b Lenguaje de Programación:\b0  Dart (Framework Flutter Desktop)\par
+\b Base de Datos:\b0  SQLite\par
+\b Arquitectura:\b0  MVC (Modelo – Vista – Controlador) con gestión de estado GetX\par
+\b Plataforma Compatible:\b0  Escritorio (Windows 10/11 – 64 bits)\par
+\b Categoría:\b0  Sistema de Punto de Venta Profesional\par
+\b Propósito:\b0  Sistema integral de gestión de ventas, inventario, clientes y facturación electrónica (módulo en proceso de integración con la DIAN).\par
+\par
+\b Características principales\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Punto de venta con carrito dinámico, balanza integrada y múltiples métodos de pago.\par
+\bullet Gestión de inventario por unidad y peso con alertas de stock bajo.\par
+\bullet Administración de clientes con validación de documentos y seguimiento de compras.\par
+\bullet Reportes profesionales con exportación a PDF y Excel.\par
+\bullet Módulo de facturación electrónica en modo simulado conforme a lineamientos DIAN.\par
+\bullet Control de usuarios con permisos granulares y auditoría de operaciones.\par
+\pard\sa200\sl276\slmult1\par
+\b Requisitos mínimos recomendados\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Procesador: Intel Core i3 o equivalente.\par
+\bullet Memoria RAM: 4 GB (8 GB recomendado).\par
+\bullet Almacenamiento: 2 GB libres.\par
+\bullet Sistema Operativo: Windows 10/11 de 64 bits.\par
+\pard\sa200\sl276\slmult1\par
+\b Observaciones\b0\par
+La información de esta ficha técnica corresponde a la versión 1.0 de Sistema de Punto de Venta SmartSeller POS v1.0 y está destinada al trámite de registro ante la DNDA.\par
+}

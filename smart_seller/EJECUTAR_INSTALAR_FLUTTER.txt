@@ -1,0 +1,22 @@
+========================================
+  CÓMO EJECUTAR instalar_flutter.ps1
+========================================
+
+En PowerShell COMO ADMINISTRADOR, ejecuta UNO de estos comandos:
+
+OPCIÓN 1 (recomendada - ruta completa):
+----------------------------------------
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+& "D:\losoft\DEMOV2\smart_seller\instalar_flutter.ps1"
+
+OPCIÓN 2 (si ya estás en la carpeta del proyecto):
+----------------------------------------
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+cd D:\losoft\DEMOV2\smart_seller
+& ".\instalar_flutter.ps1"
+
+OPCIÓN 3 (invocar con -File):
+----------------------------------------
+powershell -ExecutionPolicy Bypass -File "D:\losoft\DEMOV2\smart_seller\instalar_flutter.ps1"
+
+========================================

@@ -1,0 +1,5 @@
+[33m82a2c47[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mrama-estable[m[33m)[m feat: Migración completa de category a groupName y gestión de productos en grupos
+[33m073ee7b[m[33m ([m[1;31morigin/rama-estable[m[33m)[m  Integración completa de balanza Aclas OS2X - Comunicación con widget de peso funcionando - Servicios de balanza unificados - Documentación completa - Configuración automática de puertos COM
+[33m3f2da62[m widget peso
+[33mde3c0e5[m FIX: Solucionado problema de navegación en POS después de completar ventas - Botón de regresar ahora funciona correctamente después del proceso de venta - Mantiene autofocus y proceso de ventas intactos
+[33m446e619[m feat: Pestaña de Inventario completa con todos los campos

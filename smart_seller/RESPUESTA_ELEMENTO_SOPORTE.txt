@@ -1,0 +1,48 @@
+═══════════════════════════════════════════════════════════════════
+ELEMENTO DE SOPORTE LÓGICO - RESPUESTA CORRECTA
+═══════════════════════════════════════════════════════════════════
+
+⚠️ IMPORTANTE: El campo "Elementos de soporte lógico" NO es para 
+escribir tecnologías, sino para SELECCIONAR el tipo de documento.
+
+═══════════════════════════════════════════════════════════════════
+
+¿QUÉ SIGNIFICA CADA OPCIÓN?
+
+1. Material Auxiliar
+   → Documentos complementarios (manuales, guías, diagramas)
+   
+2. Programa de Computador
+   → El software/código fuente del programa
+   
+3. Descripción del Programa
+   → Documentación técnica del software
+
+═══════════════════════════════════════════════════════════════════
+
+✅ RESPUESTA CORRECTA:
+
+Tipo de Elemento: PROGRAMA DE COMPUTADOR
+
+✅ Debes seleccionar: "Programa de computador"
+
+═══════════════════════════════════════════════════════════════════
+
+EXPLICACIÓN:
+
+Estás registrando SmartSeller POS v1.0 como un PROGRAMA DE 
+COMPUTADOR (software). Por lo tanto, debes seleccionar la opción 
+que dice "Programa de computador" en el campo de elementos de 
+soporte lógico.
+
+═══════════════════════════════════════════════════════════════════
+
+RESUMEN DE CAMPOS CORRECTOS:
+
+✓ Nacionalidad: Colombia
+✓ Tipo de Obra: Originaria
+✓ Elemento de Soporte Lógico: Programa de computador
+✓ Descripción: (la que ya tienes de 500 caracteres)
+
+═══════════════════════════════════════════════════════════════════
+

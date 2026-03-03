@@ -1,0 +1,229 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Arial;}}
+\viewkind4\uc1
+\pard\sa200\sl276\slmult1\f0\fs28\b FRAGMENTOS DE CÓDIGO FUENTE REPRESENTATIVO\\SmartSeller POS v1.0\b0\fs22\par
+\pard\sa200\sl276\slmult1\par
+\b Información del sistema\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Nombre: SmartSeller POS\par
+\bullet Versión: 1.0 Final\par
+\bullet Fecha: septiembre 2025\par
+\bullet Desarrollador: Oscar Mauricio González Montenegro\par
+\bullet Tecnología base: Flutter 3.16.0 + Dart\par
+\bullet Base de datos: SQLite (plugins `sqflite`, `sqlite3_flutter_libs`)\par
+\bullet Plataforma objetivo: Escritorio (Windows 10/11 – 64 bits)\par
+\pard\sa200\sl276\slmult1\par
+\b Arquitectura y estructura principal\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet `lib/main.dart` – Punto de entrada de la aplicación.\par
+\bullet `lib/controllers/` – Controladores GetX para la lógica de cada módulo.\par
+\bullet `lib/middleware/` – Middleware de autenticación/autorización.\par
+\bullet `lib/models/` – Modelos de datos para SQLite y lógica de negocio.\par
+\bullet `lib/modules/` – Módulos especializados (ej. facturación electrónica).\par
+\bullet `lib/screens/` – Pantallas de la interfaz de usuario (login, POS, inventario, etc.).\par
+\bullet `lib/services/` – Servicios de negocio (auth, base de datos, reportes, periféricos).\par
+\bullet `lib/utils/` – Utilidades, constantes y formateadores.\par
+\bullet `lib/widgets/` – Componentes reutilizables.\par
+\pard\sa200\sl276\slmult1\par
+\b Fragmento clave: `main.dart` (punto de entrada)\b0\par
+```
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
+import 'screens/login_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/pos_screen.dart';
+import 'screens/products_screen.dart';
+import 'screens/users_screen.dart';
+import 'screens/customers_screen.dart';
+import 'screens/reports_screen.dart';
+import 'screens/company_config_screen.dart';
+import 'screens/groups_screen.dart';
+import 'modules/electronic_invoicing/screens/electronic_invoice_screen.dart';
+import 'modules/electronic_invoicing/screens/system_configuration_screen.dart';
+import 'modules/electronic_invoicing/screens/invoice_status_screen.dart';
+import 'modules/electronic_invoicing/screens/pending_invoice_queue_screen.dart';
+
+import 'services/sqlite_database_service.dart';
+import 'services/auth_service.dart';
+import 'services/permissions_service.dart';
+import 'services/print_service.dart';
+import 'services/company_config_service.dart';
+import 'middleware/auth_middleware.dart';
+import 'middleware/guest_middleware.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SQLiteDatabaseService.initialize();
+  Get.put(AuthService());
+  Get.put(PermissionsService());
+  await PermissionsService.to.restoreDefaultPermissions();
+  await PrintService.instance.initialize();
+  await CompanyConfigService.initializeCompanyConfig();
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return GetMaterialApp(
+      title: 'Smart Seller',
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6C47FF),
+          brightness: Brightness.light,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          floatingLabelBehavior: FloatingLabelBehavior.always,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+        appBarTheme: const AppBarTheme(
+          elevation: 0,
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+        ),
+      ),
+      debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('es', 'CO'), Locale('es')],
+      initialRoute: '/login',
+      getPages: [
+        GetPage(name: '/login', page: () => const LoginScreen(), middlewares: [GuestMiddleware()]),
+        GetPage(name: '/dashboard', page: () => const DashboardScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/pos', page: () => const PosScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/productos', page: () => const ProductsScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/usuarios', page: () => const UsersScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/clientes', page: () => const CustomersScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/reportes', page: () => const ReportsScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/configuracion-empresa', page: () => const CompanyConfigScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/grupos', page: () => const GroupsScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/facturacion-electronica', page: () => const ElectronicInvoiceScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/electronic-invoicing/system-config', page: () => const SystemConfigurationScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/electronic-invoicing/status', page: () => const InvoiceStatusScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/electronic-invoicing/queue', page: () => const PendingInvoiceQueueScreen(), middlewares: [AuthMiddleware()]),
+        GetPage(name: '/debug', page: () => const DebugScreen(), middlewares: [AuthMiddleware()]),
+      ],
+    );
+  }
+}
+```
+\pard\sa200\sl276\slmult1\par
+\b Fragmento: `pubspec.yaml` (dependencias clave)\b0\par
+```
+name: smart_seller
+description: Sistema POS Smart Seller
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  get: ^4.6.6
+  path_provider: ^2.1.1
+  intl: ^0.20.2
+  shared_preferences: ^2.2.2
+  file_picker: ^6.1.1
+  excel: ^2.1.0
+  csv: ^5.0.2
+  pdf: ^3.10.7
+  sqflite: ^2.3.0
+  sqlite3_flutter_libs: ^0.5.0
+  path: ^1.8.3
+  sqflite_common_ffi: ^2.3.6
+  flutter_typeahead: ^4.0.0
+  libserialport: ^0.3.0+1
+  cached_network_image: ^3.3.0
+  image_picker: ^1.0.4
+  crypto: ^3.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  build_runner: ^2.4.6
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+```
+\pard\sa200\sl276\slmult1\par
+\b Servicios representativos\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet `auth_service.dart`: autenticación, hash de contraseñas, control de sesión con middleware.\par
+\bullet `permissions_service.dart`: permisos granulares para roles `Admin`, `Gerente`, `Supervisor`, `Cajero`, `Mantenimiento`.\par
+\bullet `sqlite_database_service.dart`: inicialización, creación de tablas, consultas parametrizadas.\par
+\bullet `print_service.dart`: impresión de tickets y facturas, soporte térmico/láser.\par
+\bullet `company_config_service.dart`: datos de empresa y parámetros fiscales (DIAN).\par
+\bullet `scale_service_real.dart`: comunicación con balanzas vía puerto serial.\par
+\pard\sa200\sl276\slmult1\par
+\b Modelos y tablas principales\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet `user.dart` → Tabla `users` (credenciales, roles, estado).\par
+\bullet `product.dart` → Tabla `products` (stock, precio, categoría).\par
+\bullet `customer.dart` → Tabla `customers` (datos fiscales y contacto).\par
+\bullet `sale.dart` → Tabla `sales` (ventas, detalle de ítems en JSON, relación con usuarios/clientes).\par
+\bullet `inventory_movement.dart` → Tabla `inventory_movements`.\par
+\bullet `company_config.dart` → Tabla `company_config` (datos empresa y fiscalidad).\par
+\bullet `accounting_entry.dart` → Tabla `accounting_entries`.\par
+\bullet `cash_session.dart` → Tabla `cash_sessions`.\par
+\bullet `accounts_receivable.dart` → Tabla `accounts_receivable` (cliente, factura, balance, estado, fechas).\par
+\pard\sa200\sl276\slmult1\par
+\b Seguridad y permisos\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Autenticación con credenciales almacenadas en hash SHA-256.\par
+\bullet Middleware `AuthMiddleware` para proteger rutas y validar sesión.\par
+\bullet Permisos granulares gestionados por `PermissionsService`.\par
+\bullet Auditoría de acciones críticas (ventas, inventario, usuarios).\par
+\pard\sa200\sl276\slmult1\par
+\b Compatibilidad\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Windows 10/11 (64 bits) como plataforma oficialmente soportada.\par
+\bullet Requisitos recomendados: 4 GB RAM (8 GB ideal), 2 GB libres en disco, procesador Intel i3 o equivalente.\par
+\pard\sa200\sl276\slmult1\par
+\b Funcionalidades principales resumidas\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Punto de venta (POS) con carrito, balanza integrada y múltiples métodos de pago.\par
+\bullet Inventario con productos por unidad/peso, alertas de stock, movimientos y categorías.\par
+\bullet Gestión de clientes con validación de documentos y seguimiento de compras.\par
+\bullet Reportes (ventas, inventario, rentabilidad, clientes) con exportación PDF/Excel.\par
+\bullet Facturación electrónica en modo simulado (estructura DIAN, validaciones fiscales, estados).\par
+\bullet Administración de usuarios y permisos con auditoría.\par
+\pard\sa200\sl276\slmult1\par
+\b Notas técnicas adicionales\b0\par
+\pard\sa200\sl276\slmult1\li720\bullet Código organizado y documentado para facilitar mantenimiento y pruebas.\par
+\bullet Arquitectura modular preparada para extensiones futuras (ej. integración DIAN productiva, sincronización en la nube).\par
+\bullet Planes de mejora: automatización de respaldos, ampliación de pruebas automatizadas, nueva capa contable.\par
+\pard\sa200\sl276\slmult1\par
+SmartSeller POS v1.0 – Sistema de Punto de Venta Profesional.\par
+Fecha de documentación: septiembre 2025.\par
+Licencia: Propietaria.\par
+\pard\sa200\sl276\slmult1\par
+}

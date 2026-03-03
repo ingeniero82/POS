@@ -1,0 +1,698 @@
+DESCRIPCION TECNICA DETALLADA - SmartSeller POS v2.0
+
+INFORMACION GENERAL DEL SOFTWARE
+
+Identificacion del Programa:
+- Nombre: SmartSeller POS (Point of Sale)
+- Version: 2.0 Final
+- Fecha de Desarrollo: Septiembre - Diciembre 2024
+- Desarrollador: Oscar Mauricio Gonzalez
+- Tipo de Software: Sistema de Punto de Venta Profesional
+- Categoria: Software de Gestion Comercial
+- Plataforma: Multiplataforma (Windows, Android, Web)
+
+Proposito del Software:
+SmartSeller POS es un sistema integral de punto de venta disenado para pequenas y medianas empresas que requieren una solucion completa para la gestion de ventas, inventario, clientes y facturacion electronica segun los estandares de la DIAN (Colombia).
+
+OBJETIVOS DEL SISTEMA
+
+Objetivo Principal:
+Automatizar y optimizar los procesos de venta, inventario y facturacion de empresas comerciales mediante una interfaz intuitiva y funcionalidades avanzadas.
+
+Objetivos Especificos:
+1. Gestion Eficiente de Ventas: Procesar ventas de manera rapida y precisa
+2. Control de Inventario: Mantener control automatico del stock de productos
+3. Facturacion Electronica: Generar facturas electronicas segun estandares DIAN
+4. Gestion de Clientes: Mantener base de datos completa de clientes
+5. Reportes Profesionales: Generar reportes detallados para toma de decisiones
+6. Control de Usuarios: Sistema granular de permisos y roles
+
+ARQUITECTURA DEL SISTEMA
+
+Arquitectura General:
+El sistema esta construido siguiendo el patron Model-View-Controller (MVC) con las siguientes capas:
+
+1. Capa de Presentacion (View)
+- Tecnologia: Flutter Widgets
+- Responsabilidad: Interfaz de usuario y experiencia del usuario
+- Componentes: Pantallas, widgets personalizados, navegacion
+
+2. Capa de Logica de Negocio (Controller)
+- Tecnologia: GetX Controllers
+- Responsabilidad: Logica de negocio y gestion de estado
+- Componentes: Controladores de pantallas, middleware de autenticacion
+
+3. Capa de Datos (Model)
+- Tecnologia: SQLite Database
+- Responsabilidad: Persistencia de datos y operaciones CRUD
+- Componentes: Servicios de base de datos, modelos de datos
+
+Patrones de Diseno Implementados:
+- Singleton: Para servicios unicos (AuthService, DatabaseService)
+- Repository: Para acceso a datos
+- Observer: Para reactividad con GetX
+- Factory: Para creacion de objetos complejos
+- Strategy: Para diferentes tipos de productos (unidad/peso)
+
+COMPONENTES PRINCIPALES DEL SISTEMA
+
+1. Modulo de Autenticacion
+Ubicacion: lib/services/auth_service.dart
+
+Funcionalidades:
+- Validacion de credenciales de usuario
+- Gestion de sesiones activas
+- Encriptacion de contrasenas
+- Middleware de autenticacion para rutas protegidas
+
+Procedimientos:
+1. Login de Usuario:
+   - Validar credenciales contra base de datos
+   - Generar token de sesion
+   - Registrar actividad de login
+   - Redirigir al dashboard principal
+
+2. Logout de Usuario:
+   - Invalidar token de sesion
+   - Limpiar datos de usuario en memoria
+   - Registrar actividad de logout
+   - Redirigir a pantalla de login
+
+3. Validacion de Sesion:
+   - Verificar token de sesion activo
+   - Renovar sesion si es necesario
+   - Bloquear acceso si sesion expirada
+
+2. Modulo de Gestion de Productos
+Ubicacion: lib/screens/products_screen.dart
+
+Funcionalidades:
+- CRUD completo de productos
+- Gestion de inventario por unidad y peso
+- Control de stock automatico
+- Categorizacion de productos
+- Gestion de precios (costo y venta)
+
+Procedimientos:
+1. Crear Producto:
+   - Validar datos de entrada (nombre, precio, stock)
+   - Determinar tipo de producto (unidad/peso)
+   - Asignar categoria y grupo
+   - Calcular codigos automaticos
+   - Guardar en base de datos
+   - Actualizar inventario
+
+2. Actualizar Producto:
+   - Buscar producto por ID
+   - Validar cambios permitidos
+   - Actualizar informacion modificada
+   - Recalcular stock si es necesario
+   - Registrar cambios en auditoria
+
+3. Eliminar Producto:
+   - Verificar que no tenga ventas asociadas
+   - Eliminar de base de datos
+   - Actualizar inventario
+   - Registrar eliminacion en auditoria
+
+4. Control de Stock:
+   - Monitorear niveles de inventario
+   - Generar alertas de stock bajo
+   - Calcular rotacion de productos
+   - Actualizar disponibilidad en tiempo real
+
+3. Modulo de Punto de Venta (POS)
+Ubicacion: lib/screens/pos_screen.dart
+
+Funcionalidades:
+- Interfaz de venta rapida
+- Busqueda inteligente de productos
+- Carrito de compras dinamico
+- Balanza integrada para productos por peso
+- Calculo automatico de totales e impuestos
+- Multiples metodos de pago
+- Impresion automatica de tickets
+
+Procedimientos:
+1. Procesar Venta:
+   - Buscar productos por nombre o codigo
+   - Agregar productos al carrito
+   - Calcular subtotal, impuestos y total
+   - Seleccionar metodo de pago
+   - Procesar pago
+   - Generar ticket de venta
+   - Actualizar inventario
+   - Registrar venta en base de datos
+
+2. Gestion de Carrito:
+   - Agregar productos con cantidad
+   - Modificar cantidades
+   - Eliminar productos del carrito
+   - Calcular totales en tiempo real
+   - Aplicar descuentos si corresponde
+
+3. Integracion con Balanza:
+   - Detectar productos por peso
+   - Simular lectura de peso
+   - Calcular precio por peso
+   - Actualizar total de venta
+
+4. Metodos de Pago:
+   - Efectivo (con calculo de vuelto)
+   - Tarjeta de debito/credito
+   - Transferencia bancaria
+   - Cheque
+   - Combinacion de metodos
+
+4. Modulo de Gestion de Clientes
+Ubicacion: lib/screens/customers_screen.dart
+
+Funcionalidades:
+- Base de datos completa de clientes
+- Validacion de documentos (Cedula, NIT, RUT)
+- Historial de compras por cliente
+- Busqueda avanzada de clientes
+- Gestion de informacion de contacto
+
+Procedimientos:
+1. Registrar Cliente:
+   - Validar tipo de documento
+   - Verificar formato de documento
+   - Validar unicidad del documento
+   - Completar informacion personal
+   - Guardar en base de datos
+   - Generar codigo de cliente unico
+
+2. Buscar Cliente:
+   - Busqueda por documento
+   - Busqueda por nombre
+   - Busqueda por telefono
+   - Filtros avanzados
+   - Resultados ordenados por relevancia
+
+3. Actualizar Informacion:
+   - Modificar datos de contacto
+   - Actualizar direccion
+   - Cambiar informacion fiscal
+   - Registrar cambios en auditoria
+
+4. Historial de Compras:
+   - Consultar ventas por cliente
+   - Calcular totales de compras
+   - Generar reportes de cliente
+   - Analisis de comportamiento de compra
+
+5. Modulo de Facturacion Electronica DIAN
+Ubicacion: lib/modules/electronic_invoicing/
+
+Funcionalidades:
+- Generacion de facturas electronicas
+- Validacion de datos fiscales segun DIAN
+- Envio de facturas a DIAN (simulado)
+- Gestion de estados de facturacion
+- Cola de facturas pendientes
+- Auditoria completa de operaciones
+
+Procedimientos:
+1. Crear Factura Electronica:
+   - Validar datos de la empresa
+   - Completar informacion del cliente
+   - Agregar productos a la factura
+   - Calcular subtotal, IVA y total
+   - Validar campos obligatorios DIAN
+   - Generar numero de factura unico
+   - Guardar como borrador o enviar
+
+2. Validacion DIAN:
+   - Verificar formato de NIT
+   - Validar digito de verificacion
+   - Comprobar regimen fiscal
+   - Verificar responsabilidades fiscales
+   - Validar datos de ubicacion
+
+3. Envio a DIAN:
+   - Simular envio a servicios DIAN
+   - Generar CUFE (Codigo Unico de Facturacion Electronica)
+   - Registrar estado de envio
+   - Manejar respuestas de DIAN
+   - Actualizar estado de factura
+
+4. Gestion de Estados:
+   - Borrador
+   - Enviada
+   - Autorizada
+   - Rechazada
+   - Enviada a contingencia
+
+6. Modulo de Reportes
+Ubicacion: lib/screens/reports_screen.dart
+
+Funcionalidades:
+- Reportes de ventas (diario, semanal, mensual)
+- Reportes de inventario
+- Reportes de rentabilidad
+- Reportes de clientes
+- Exportacion a PDF profesional
+- Filtros avanzados por fecha, producto, cliente
+
+Procedimientos:
+1. Generar Reporte de Ventas:
+   - Seleccionar periodo de tiempo
+   - Aplicar filtros (producto, cliente, vendedor)
+   - Consultar datos de ventas
+   - Calcular totales y estadisticas
+   - Generar graficos y tablas
+   - Exportar a PDF
+
+2. Reporte de Inventario:
+   - Consultar stock actual
+   - Calcular valor de inventario
+   - Identificar productos con stock bajo
+   - Analizar rotacion de productos
+   - Generar recomendaciones
+
+3. Reporte de Rentabilidad:
+   - Calcular margen de ganancia por producto
+   - Analizar productos mas rentables
+   - Identificar productos con perdidas
+   - Generar analisis de tendencias
+
+7. Modulo de Gestion de Usuarios
+Ubicacion: lib/screens/users_screen.dart
+
+Funcionalidades:
+- CRUD de usuarios del sistema
+- Sistema granular de permisos
+- Roles predefinidos (Admin, Vendedor, Mantenimiento)
+- Control de acceso por modulo
+- Auditoria de actividades de usuario
+
+Procedimientos:
+1. Crear Usuario:
+   - Validar datos personales
+   - Asignar rol de usuario
+   - Configurar permisos especificos
+   - Generar credenciales temporales
+   - Enviar informacion de acceso
+
+2. Gestionar Permisos:
+   - Definir permisos por modulo
+   - Asignar permisos por rol
+   - Personalizar permisos por usuario
+   - Validar acceso en tiempo real
+
+3. Auditoria de Usuarios:
+   - Registrar todas las actividades
+   - Generar logs de acceso
+   - Monitorear uso del sistema
+   - Detectar actividades sospechosas
+
+GESTION DE BASE DE DATOS
+
+Tecnologia: SQLite
+Ubicacion: lib/services/sqlite_database_service.dart
+
+Estructura de Tablas:
+
+1. Tabla Users
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    email TEXT,
+    role TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+2. Tabla Products
+CREATE TABLE products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    price REAL NOT NULL,
+    cost REAL,
+    stock INTEGER DEFAULT 0,
+    min_stock INTEGER DEFAULT 0,
+    type TEXT NOT NULL, -- 'unit' o 'weight'
+    category_id INTEGER,
+    group_id INTEGER,
+    barcode TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id),
+    FOREIGN KEY (group_id) REFERENCES groups(id)
+);
+
+3. Tabla Customers
+CREATE TABLE customers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_type TEXT NOT NULL,
+    document_number TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    address TEXT,
+    city TEXT,
+    department TEXT,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+4. Tabla Sales
+CREATE TABLE sales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER,
+    user_id INTEGER NOT NULL,
+    total REAL NOT NULL,
+    subtotal REAL NOT NULL,
+    tax REAL NOT NULL,
+    payment_method TEXT NOT NULL,
+    payment_amount REAL NOT NULL,
+    change_amount REAL DEFAULT 0,
+    sale_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+5. Tabla Sale_Items
+CREATE TABLE sale_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    quantity REAL NOT NULL,
+    unit_price REAL NOT NULL,
+    total_price REAL NOT NULL,
+    FOREIGN KEY (sale_id) REFERENCES sales(id),
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+Procedimientos de Base de Datos:
+
+1. Inicializacion:
+- Crear todas las tablas necesarias
+- Insertar datos por defecto
+- Configurar indices para optimizacion
+- Establecer relaciones entre tablas
+
+2. Operaciones CRUD:
+- Create: Insertar nuevos registros con validacion
+- Read: Consultas optimizadas con filtros
+- Update: Actualizar registros con auditoria
+- Delete: Eliminacion logica para mantener integridad
+
+3. Respaldos:
+- Respaldo automatico diario
+- Respaldo manual bajo demanda
+- Compresion de archivos de respaldo
+- Rotacion de respaldos antiguos
+
+SISTEMA DE SEGURIDAD
+
+Autenticacion:
+- Encriptacion de contrasenas con hash SHA-256
+- Tokens de sesion con expiracion automatica
+- Middleware de autenticacion en todas las rutas protegidas
+- Validacion de credenciales en cada operacion critica
+
+Autorizacion:
+- Sistema granular de permisos por modulo
+- Roles predefinidos con permisos especificos
+- Validacion de permisos en tiempo real
+- Bloqueo automatico por intentos fallidos
+
+Auditoria:
+- Registro de todas las operaciones criticas
+- Logs de acceso y modificacion de datos
+- Trazabilidad completa de cambios
+- Alertas por actividades sospechosas
+
+Validacion de Datos:
+- Sanitizacion de inputs del usuario
+- Validacion de formatos de documentos
+- Verificacion de rangos numericos
+- Prevencion de inyeccion SQL
+
+SISTEMA DE IMPRESION
+
+Tecnologia: lib/services/print_service.dart
+
+Funcionalidades:
+- Impresion de tickets de venta
+- Impresion de facturas electronicas
+- Configuracion de impresoras
+- Soporte para impresoras termicas y laser
+
+Procedimientos:
+1. Configurar Impresora:
+   - Detectar impresoras disponibles
+   - Seleccionar impresora por defecto
+   - Configurar parametros de impresion
+   - Probar conexion con impresora
+
+2. Imprimir Ticket:
+   - Generar contenido del ticket
+   - Formatear texto para impresora termica
+   - Enviar comando de impresion
+   - Verificar impresion exitosa
+
+3. Imprimir Factura:
+   - Generar PDF de factura
+   - Configurar formato A4
+   - Enviar a impresora laser
+   - Registrar impresion en auditoria
+
+ALGORITMOS Y CALCULOS
+
+1. Calculo de Totales de Venta:
+// Algoritmo para calcular totales de venta
+double calculateSaleTotal(List<SaleItem> items) {
+  double subtotal = 0;
+  for (var item in items) {
+    subtotal += item.quantity * item.unitPrice;
+  }
+  
+  double tax = subtotal * 0.19; // IVA 19%
+  double total = subtotal + tax;
+  
+  return total;
+}
+
+2. Control de Stock:
+// Algoritmo para actualizar stock despues de venta
+void updateStockAfterSale(List<SaleItem> items) {
+  for (var item in items) {
+    Product product = getProductById(item.productId);
+    product.stock -= item.quantity;
+    
+    if (product.stock <= product.minStock) {
+      generateLowStockAlert(product);
+    }
+    
+    updateProduct(product);
+  }
+}
+
+3. Validacion de Documentos:
+// Algoritmo para validar NIT colombiano
+bool validateNIT(String nit) {
+  if (nit.length < 8 || nit.length > 10) return false;
+  
+  String numbers = nit.substring(0, nit.length - 1);
+  String checkDigit = nit.substring(nit.length - 1);
+  
+  int sum = 0;
+  int[] weights = {71, 67, 59, 53, 47, 43, 41, 37, 29, 23, 19, 17, 13, 7, 3};
+  
+  for (int i = 0; i < numbers.length; i++) {
+    sum += int.parse(numbers[i]) * weights[i];
+  }
+  
+  int calculatedDigit = sum % 11;
+  if (calculatedDigit < 2) {
+    return checkDigit == calculatedDigit.toString();
+  } else {
+    return checkDigit == (11 - calculatedDigit).toString();
+  }
+}
+
+PROCEDIMIENTOS DE INSTALACION Y CONFIGURACION
+
+1. Instalacion del Sistema:
+1. Requisitos del Sistema:
+   - Windows 10/11 (64-bit)
+   - 4GB RAM minimo (8GB recomendado)
+   - 2GB espacio libre en disco
+   - Conexion a internet (opcional)
+
+2. Proceso de Instalacion:
+   - Extraer archivos del sistema
+   - Ejecutar smart_seller.exe como administrador
+   - El sistema se instala automaticamente
+   - Crear base de datos inicial
+   - Configurar usuario administrador por defecto
+
+2. Configuracion Inicial:
+1. Primer Acceso:
+   - Usuario: admin
+   - Contrasena: 123456
+   - Cambiar contrasena inmediatamente
+
+2. Configuracion de Empresa:
+   - Completar datos basicos de la empresa
+   - Configurar datos fiscales para DIAN
+   - Personalizar textos de facturacion
+   - Configurar metodos de pago
+
+3. Configuracion de Usuarios:
+   - Crear usuarios del sistema
+   - Asignar roles y permisos
+   - Configurar usuarios vendedores
+
+3. Configuracion de Productos:
+1. Categorias:
+   - Crear categorias de productos
+   - Organizar productos por grupos
+   - Configurar codigos de barras
+
+2. Productos Iniciales:
+   - Agregar productos basicos
+   - Configurar precios de costo y venta
+   - Establecer niveles de stock minimo
+
+4. Configuracion de Impresion:
+1. Impresora de Tickets:
+   - Conectar impresora termica
+   - Configurar puerto de comunicacion
+   - Probar impresion de tickets
+
+2. Impresora de Facturas:
+   - Configurar impresora laser
+   - Establecer formato A4
+   - Probar impresion de facturas
+
+PROCEDIMIENTOS DE MANTENIMIENTO
+
+1. Respaldo de Datos:
+- Automatico: Diario a las 23:00
+- Manual: Desde el menu de configuracion
+- Ubicacion: C:\SmartSellerPOS\Backups\
+- Retencion: 30 dias
+
+2. Actualizacion del Sistema:
+- Verificacion automatica de actualizaciones
+- Descarga e instalacion automatica
+- Respaldo antes de actualizar
+- Restauracion en caso de problemas
+
+3. Limpieza de Base de Datos:
+- Eliminacion de registros antiguos
+- Optimizacion de indices
+- Compresion de archivos
+- Verificacion de integridad
+
+4. Monitoreo del Sistema:
+- Verificacion de espacio en disco
+- Monitoreo de uso de memoria
+- Deteccion de errores
+- Generacion de alertas
+
+METRICAS Y RENDIMIENTO
+
+Metricas de Rendimiento:
+- Tiempo de respuesta: < 200ms para operaciones basicas
+- Tiempo de carga: < 3 segundos para inicio del sistema
+- Capacidad: Hasta 10,000 productos y 100,000 ventas
+- Concurrencia: Hasta 5 usuarios simultaneos
+
+Optimizaciones Implementadas:
+- Indices en base de datos para consultas rapidas
+- Cache de productos frecuentemente consultados
+- Lazy loading de datos no criticos
+- Compresion de imagenes y archivos
+
+MANEJO DE ERRORES Y EXCEPCIONES
+
+Tipos de Errores:
+1. Errores de Validacion: Datos incorrectos del usuario
+2. Errores de Base de Datos: Problemas de conexion o consulta
+3. Errores de Sistema: Problemas de hardware o sistema operativo
+4. Errores de Red: Problemas de conectividad
+
+Procedimientos de Manejo:
+1. Captura de Errores: Try-catch en operaciones criticas
+2. Logging: Registro detallado de errores
+3. Notificacion: Alertas al usuario sobre errores
+4. Recuperacion: Procedimientos automaticos de recuperacion
+
+INTEGRACION CON SISTEMAS EXTERNOS
+
+1. Balanzas Electronicas:
+- Comunicacion por puerto serial
+- Protocolo de comunicacion estandar
+- Lectura automatica de peso
+- Integracion con productos por peso
+
+2. Impresoras:
+- Soporte para impresoras termicas
+- Compatibilidad con impresoras laser
+- Configuracion automatica de puertos
+- Manejo de diferentes formatos
+
+3. Servicios DIAN:
+- Integracion con servicios de facturacion electronica
+- Envio automatico de facturas
+- Recepcion de respuestas de autorizacion
+- Manejo de estados de facturacion
+
+PROCEDIMIENTOS DE TESTING
+
+1. Testing Unitario:
+- Pruebas de funciones individuales
+- Validacion de algoritmos de calculo
+- Verificacion de validaciones de datos
+- Testing de servicios de base de datos
+
+2. Testing de Integracion:
+- Pruebas de comunicacion entre modulos
+- Validacion de flujos completos de venta
+- Testing de integracion con impresoras
+- Verificacion de respaldos y restauracion
+
+3. Testing de Usuario:
+- Pruebas de interfaz de usuario
+- Validacion de experiencia del usuario
+- Testing de rendimiento bajo carga
+- Verificacion de compatibilidad
+
+DOCUMENTACION TECNICA ADICIONAL
+
+Diagramas de Arquitectura:
+- Diagrama de componentes del sistema
+- Diagrama de flujo de datos
+- Diagrama de casos de uso
+- Diagrama de base de datos
+
+APIs y Servicios:
+- Documentacion de servicios internos
+- Especificacion de interfaces
+- Protocolos de comunicacion
+- Formatos de datos
+
+Configuracion Avanzada:
+- Parametros de configuracion del sistema
+- Variables de entorno
+- Archivos de configuracion
+- Opciones de personalizacion
+
+SmartSeller POS v2.0 - Sistema de Punto de Venta Profesional  
+Desarrollado con Flutter y SQLite para maxima compatibilidad y rendimiento
+
+Fecha de Documentacion: Diciembre 2024  
+Version del Sistema: 2.0 Final  
+Desarrollador: Oscar Mauricio Gonzalez  
+Licencia: Propietaria

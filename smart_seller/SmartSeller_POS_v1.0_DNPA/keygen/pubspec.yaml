@@ -1,0 +1,9 @@
+name: keygen
+description: Generador de claves de activación para Smart Seller POS. Solo uso interno; no distribuir.
+publish_to: 'none'
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  crypto: ^3.0.3
+executables:
+  keygen: keygen
