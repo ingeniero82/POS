@@ -34,9 +34,10 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
   final _fiscalRegimeController = TextEditingController();
   final _fiscalResponsibilitiesController = TextEditingController();
 
-  // Programa de puntos (fidelización) - opcional
+  // Programa de puntos: solo acumulación; por cada X pesos = Y puntos
   bool _pointsEnabled = false;
-  final _pointsPesosPerPointController = TextEditingController(text: '10');
+  final _pointsPesosBaseController = TextEditingController(text: '2000');
+  final _pointsPerBaseController = TextEditingController(text: '1');
 
   bool _isLoading = true;
   CompanyConfig? _currentConfig;
@@ -74,8 +75,8 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
         _fiscalResponsibilitiesController.text =
             config.fiscalResponsibilities ?? '';
         _pointsEnabled = config.pointsEnabled;
-        _pointsPesosPerPointController.text =
-            config.pointsPesosPerPoint.toString();
+        _pointsPesosBaseController.text = config.pointsPesosBase.toStringAsFixed(0);
+        _pointsPerBaseController.text = config.pointsPerBase.toStringAsFixed(0);
         _isLoading = false;
       });
     } catch (e) {
@@ -133,8 +134,11 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
                 ? null
                 : _fiscalResponsibilitiesController.text.trim(),
         pointsEnabled: _pointsEnabled,
-        pointsPesosPerPoint:
-            double.tryParse(_pointsPesosPerPointController.text.trim()) ?? 10.0,
+        pointsPesosPerPoint: _currentConfig?.pointsPesosPerPoint ?? 10.0,
+        pointsPesosBase:
+            double.tryParse(_pointsPesosBaseController.text.trim()) ?? 2000.0,
+        pointsPerBase:
+            double.tryParse(_pointsPerBaseController.text.trim()) ?? 1.0,
         createdAt: _currentConfig?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
       );
@@ -501,7 +505,7 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Programa de puntos (fidelización) - opcional
+                    // Programa de puntos: solo acumulación (sin canje automático)
                     const Text(
                       'Programa de Puntos (Fidelización)',
                       style: TextStyle(
@@ -512,7 +516,7 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Opcional. Si lo habilitas, los clientes acumulan puntos por compras y puedes definir cuánto vale cada punto al canjear.',
+                      'Solo acumulación. El encargado del negocio decide qué dar por los puntos acumulados.',
                       style: TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 12),
@@ -522,30 +526,54 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
                           setState(() => _pointsEnabled = value),
                       title: const Text('Habilitar programa de puntos'),
                       subtitle: const Text(
-                          'Acumular puntos por compra y permitir canje por descuento'),
+                          'Acumular puntos por compra (sin canje automático)'),
                       contentPadding: EdgeInsets.zero,
                     ),
                     if (_pointsEnabled) ...[
                       const SizedBox(height: 12),
                       TextFormField(
-                        controller: _pointsPesosPerPointController,
+                        controller: _pointsPesosBaseController,
                         decoration: const InputDecoration(
-                          labelText: 'Valor del descuento por punto (pesos)',
+                          labelText: 'Por cada cuántos pesos de compra (ej: 2000, 5000, 10000)',
                           prefixIcon:
                               Icon(Icons.monetization_on, color: Colors.amber),
                           border: OutlineInputBorder(),
                           helperText:
-                              'Ej: 10 = 1 punto canjeado = \$10 de descuento. Tú defines la equivalencia.',
+                              'Ej: 2000 = por cada \$2.000 de compra se aplica la regla de puntos.',
                         ),
                         keyboardType: TextInputType.number,
                         validator: _pointsEnabled
                             ? (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Indica cuánto vale cada punto en pesos';
+                                  return 'Indica cada cuántos pesos se dan puntos';
                                 }
                                 final n = double.tryParse(value.trim());
                                 if (n == null || n <= 0) {
                                   return 'Debe ser un número mayor a 0';
+                                }
+                                return null;
+                              }
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _pointsPerBaseController,
+                        decoration: const InputDecoration(
+                          labelText: 'Puntos que gana el cliente por ese monto',
+                          prefixIcon: Icon(Icons.stars, color: Colors.amber),
+                          border: OutlineInputBorder(),
+                          helperText:
+                              'Ej: 1 = 1 punto por cada bloque de pesos configurado arriba.',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: _pointsEnabled
+                            ? (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Indica cuántos puntos se dan';
+                                }
+                                final n = double.tryParse(value.trim());
+                                if (n == null || n < 0) {
+                                  return 'Debe ser un número mayor o igual a 0';
                                 }
                                 return null;
                               }
@@ -703,7 +731,8 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
     _countryController.dispose();
     _fiscalRegimeController.dispose();
     _fiscalResponsibilitiesController.dispose();
-    _pointsPesosPerPointController.dispose();
+    _pointsPesosBaseController.dispose();
+    _pointsPerBaseController.dispose();
 
     super.dispose();
   }

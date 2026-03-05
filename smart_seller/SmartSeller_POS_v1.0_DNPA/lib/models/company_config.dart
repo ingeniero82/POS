@@ -19,10 +19,13 @@ class CompanyConfig {
   final String? fiscalRegime; // Régimen fiscal (común, simplificado, etc.)
   final String? fiscalResponsibilities; // Responsabilidades fiscales (O-13, I-23, etc.)
   
-  /// Programa de puntos (fidelización): opcional. Si true, se acumulan puntos y se puede canjear descuento.
+  /// Programa de puntos: solo acumulación. El encargado decide qué dar por los puntos.
   final bool pointsEnabled;
-  /// Valor en pesos por cada punto canjeado. Ej: 10 = 1 punto = \$10 de descuento.
+  /// Legacy: no se usa para canje ni se muestra en pantalla (compatibilidad BD).
   final double pointsPesosPerPoint;
+  /// Por cada [pointsPesosBase] pesos de compra el cliente gana [pointsPerBase] puntos.
+  final double pointsPesosBase;
+  final double pointsPerBase;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -48,6 +51,8 @@ class CompanyConfig {
     this.fiscalResponsibilities,
     this.pointsEnabled = false,
     this.pointsPesosPerPoint = 10.0,
+    this.pointsPesosBase = 2000.0,
+    this.pointsPerBase = 1.0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -74,6 +79,8 @@ class CompanyConfig {
       'fiscal_responsibilities': fiscalResponsibilities,
       'points_enabled': pointsEnabled ? 1 : 0,
       'points_pesos_per_point': pointsPesosPerPoint,
+      'points_pesos_base': pointsPesosBase,
+      'points_per_base': pointsPerBase,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -101,6 +108,8 @@ class CompanyConfig {
       fiscalResponsibilities: map['fiscal_responsibilities'],
       pointsEnabled: (map['points_enabled'] ?? 0) == 1,
       pointsPesosPerPoint: (map['points_pesos_per_point'] ?? 10.0).toDouble(),
+      pointsPesosBase: (map['points_pesos_base'] ?? 2000.0).toDouble(),
+      pointsPerBase: (map['points_per_base'] ?? 1.0).toDouble(),
       createdAt: DateTime.parse(map['created_at']),
       updatedAt: DateTime.parse(map['updated_at']),
     );
@@ -127,6 +136,8 @@ class CompanyConfig {
     String? fiscalResponsibilities,
     bool? pointsEnabled,
     double? pointsPesosPerPoint,
+    double? pointsPesosBase,
+    double? pointsPerBase,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -151,6 +162,8 @@ class CompanyConfig {
       fiscalResponsibilities: fiscalResponsibilities ?? this.fiscalResponsibilities,
       pointsEnabled: pointsEnabled ?? this.pointsEnabled,
       pointsPesosPerPoint: pointsPesosPerPoint ?? this.pointsPesosPerPoint,
+      pointsPesosBase: pointsPesosBase ?? this.pointsPesosBase,
+      pointsPerBase: pointsPerBase ?? this.pointsPerBase,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

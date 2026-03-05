@@ -13,6 +13,7 @@ import '../modules/accounting/services/accounts_receivable_payable_service.dart'
 import '../modules/accounting/models/accounts_receivable.dart';
 
 import '../services/print_service.dart';
+import '../services/company_config_service.dart';
 import '../utils/puntos_miles_input_formatter.dart';
 import 'package:intl/intl.dart';
 
@@ -427,14 +428,17 @@ class PosController extends GetxController {
     );
   }
 
-  // ✅ NUEVO: Método para actualizar puntos del cliente después de la venta
+  // Actualizar puntos del cliente después de la venta (solo acumulación: por cada X pesos = Y puntos)
   Future<void> updateCustomerAfterSale() async {
     if (selectedCustomer.value == null) return;
 
     try {
       final customer = selectedCustomer.value!;
-      // 🎯 AQUÍ ESTÁ LA LÓGICA: Usar la tasa del cliente
-      final pointsEarned = customer.calculatePointsEarned(total);
+      final config = await CompanyConfigService.getCompanyConfig();
+      int pointsEarned = 0;
+      if (config.pointsEnabled && config.pointsPesosBase > 0) {
+        pointsEarned = ((total / config.pointsPesosBase).floor() * config.pointsPerBase).toInt();
+      }
       final newAccumulatedPoints = customer.accumulatedPoints + pointsEarned;
       final newTotalPurchases = customer.totalPurchases + total;
 

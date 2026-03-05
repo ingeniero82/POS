@@ -477,6 +477,20 @@ class SQLiteDatabaseService {
       } catch (e) {
         print('ℹ️ Columna points_pesos_per_point ya existe en company_config');
       }
+      try {
+        await db.execute(
+            'ALTER TABLE company_config ADD COLUMN points_pesos_base REAL DEFAULT 2000.0');
+        print('✅ Columna points_pesos_base agregada a company_config');
+      } catch (e) {
+        print('ℹ️ Columna points_pesos_base ya existe en company_config');
+      }
+      try {
+        await db.execute(
+            'ALTER TABLE company_config ADD COLUMN points_per_base REAL DEFAULT 1.0');
+        print('✅ Columna points_per_base agregada a company_config');
+      } catch (e) {
+        print('ℹ️ Columna points_per_base ya existe en company_config');
+      }
       print('✅ Migración de company_config completada');
     } catch (e) {
       print('❌ Error en migración de company_config: $e');
