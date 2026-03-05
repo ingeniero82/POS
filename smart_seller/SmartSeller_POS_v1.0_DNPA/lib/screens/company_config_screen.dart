@@ -61,9 +61,9 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
         _headerTextController.text = config.headerText;
         _footerTextController.text = config.footerText;
 
-        // ✅ CARGAR NUEVOS CAMPOS DE FACTURACIÓN ELECTRÓNICA
-        _documentTypeController.text =
-            config.documentType ?? '31'; // Por defecto NIT
+        // ✅ CARGAR NUEVOS CAMPOS DE FACTURACIÓN ELECTRÓNICA (normalizar NIT -> 31 para el dropdown)
+        final docType = config.documentType?.trim().toUpperCase();
+        _documentTypeController.text = (docType == null || docType.isEmpty || docType == 'NIT') ? '31' : config.documentType!;
         _nitNumberController.text = config.nitNumber ?? '';
         _verificationDigitController.text = config.verificationDigit ?? '';
         _cityController.text = config.city ?? '';
@@ -345,9 +345,7 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
 
                     // Tipo de documento (empresa emisora: solo NIT para facturación electrónica)
                     DropdownButtonFormField<String>(
-                      initialValue: _documentTypeController.text.isEmpty
-                          ? '31'
-                          : _documentTypeController.text,
+                      value: '31', // Único ítem; si en BD estaba "NIT", ya se normalizó al cargar
                       decoration: const InputDecoration(
                         labelText: 'Tipo de Documento *',
                         prefixIcon: Icon(Icons.description),

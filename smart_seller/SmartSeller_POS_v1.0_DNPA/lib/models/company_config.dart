@@ -23,7 +23,7 @@ class CompanyConfig {
   final bool pointsEnabled;
   /// Valor en pesos por cada punto canjeado. Ej: 10 = 1 punto = \$10 de descuento.
   final double pointsPesosPerPoint;
-  
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
