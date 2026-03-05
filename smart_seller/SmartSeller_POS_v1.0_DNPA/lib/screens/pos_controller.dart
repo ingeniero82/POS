@@ -74,6 +74,9 @@ class PosController extends GetxController {
   static const String _keyHeldSales = 'pos_held_sales';
   var heldSales = <HeldSale>[].obs;
 
+  /// Carrito actual: se persiste al salir del POS (config, inventario, etc.) para que al volver siga ahí.
+  static const String _keyCurrentCart = 'pos_current_cart';
+
   /// Para recibo: monto recibido y vuelto en pago efectivo (se pasan al imprimir).
   double? _lastCashReceived;
   double? _lastChange;
@@ -111,6 +114,90 @@ class PosController extends GetxController {
   void onReady() {
     super.onReady();
     _loadHeldSalesFromStorage();
+    _loadCurrentCartFromStorage();
+  }
+
+  @override
+  void onClose() {
+    _saveCurrentCartToStorage();
+    super.onClose();
+  }
+
+  /// Persiste el carrito actual al salir del POS para que al volver (config, inventario, etc.) siga ahí.
+  Future<void> _saveCurrentCartToStorage() async {
+    try {
+      if (cartItems.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      final data = {
+        'items': cartItems
+            .map((i) => {
+                  'name': i.name,
+                  'price': i.price,
+                  'unit': i.unit,
+                  'quantity': i.quantity,
+                  'ivaPercentage': i.ivaPercentage,
+                })
+            .toList(),
+        'customerId': selectedCustomer.value?.id,
+        'clientId': selectedClient.value?.id,
+      };
+      await prefs.setString(_keyCurrentCart, jsonEncode(data));
+    } catch (e) {
+      print('⚠️ No se pudo guardar carrito actual: $e');
+    }
+  }
+
+  /// Carga el carrito actual guardado al volver al POS.
+  Future<void> _loadCurrentCartFromStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyCurrentCart);
+      if (raw == null || raw.isEmpty) return;
+      final map = jsonDecode(raw) as Map<String, dynamic>?;
+      if (map == null) return;
+      final itemsList = map['items'] as List<dynamic>? ?? [];
+      if (itemsList.isEmpty) {
+        await prefs.remove(_keyCurrentCart);
+        return;
+      }
+      final items = itemsList.map((i) {
+        final item = i as Map<String, dynamic>;
+        return CartItem(
+          name: item['name'] as String? ?? '',
+          price: (item['price'] as num?)?.toDouble() ?? 0,
+          unit: item['unit'] as String? ?? 'unidad',
+          quantity: (item['quantity'] as num?)?.toInt() ?? 1,
+          ivaPercentage: (item['ivaPercentage'] as num?)?.toInt() ?? 19,
+        );
+      }).toList();
+      cartItems.assignAll(items);
+      final customerId = (map['customerId'] as num?)?.toInt();
+      final clientId = (map['clientId'] as num?)?.toInt();
+      if (customerId != null) {
+        final c = await SQLiteDatabaseService.getCustomerById(customerId);
+        selectedCustomer.value = c;
+      } else {
+        selectedCustomer.value = null;
+      }
+      if (clientId != null) {
+        final c = await SQLiteDatabaseService.getClientById(clientId);
+        selectedClient.value = c;
+      } else {
+        selectedClient.value = null;
+      }
+      notifyCustomerDisplayChanged();
+      await prefs.remove(_keyCurrentCart);
+    } catch (e) {
+      print('⚠️ No se pudo cargar carrito actual: $e');
+    }
+  }
+
+  /// Borra el carrito actual guardado (se llama al finalizar una venta para no restaurar después).
+  Future<void> _clearCurrentCartFromStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_keyCurrentCart);
+    } catch (_) {}
   }
 
   /// Persiste los carritos en espera para que sigan disponibles al salir del POS (ej. a Inventario) y volver.
@@ -1595,6 +1682,7 @@ class PosController extends GetxController {
       // ✅ MEJORADO: Limpiar carrito y quitar carritos vacíos en espera (evitar varias pestañas "Venta actual")
       Future.delayed(const Duration(milliseconds: 100), () {
         clearCart();
+        _clearCurrentCartFromStorage();
         selectedCustomer.value = null;
         selectedClient.value = null;
         _removeEmptyHeldSales();
@@ -1810,6 +1898,7 @@ class PosController extends GetxController {
           duration: const Duration(seconds: 4),
         );
         clearCart();
+        _clearCurrentCartFromStorage();
         return;
       }
 
@@ -1865,6 +1954,7 @@ class PosController extends GetxController {
 
       // Limpiar el carrito y quitar de "en espera" el slot vacío para no mostrar dos pestañas "Venta actual"
       clearCart();
+      _clearCurrentCartFromStorage();
       selectedCustomer.value = null;
       selectedClient.value = null;
       _removeEmptyHeldSales();
@@ -1884,6 +1974,7 @@ class PosController extends GetxController {
         duration: const Duration(seconds: 3),
       );
       clearCart();
+      _clearCurrentCartFromStorage();
       selectedCustomer.value = null;
       selectedClient.value = null;
       _removeEmptyHeldSales();
