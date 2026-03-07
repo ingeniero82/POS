@@ -12,6 +12,11 @@ class LicenseService {
   /// ID especial: clave generada para "DEMO" vale en cualquier equipo (para muestras en local).
   static const String _demoMachineId = 'DEMO';
 
+  /// Claves aceptadas explícitamente por ID (por si la fórmula difiere en builds). Añadir aquí cuando el keygen no coincida.
+  static const Map<String, String> _acceptedKeysByMachineId = {
+    'D942C0B60F8170DA': 'D942C0B60F8170DA-PPjWIAFT3_RBsgWxn9_D',
+  };
+
   // Misma fórmula que el keygen (programa aparte). No distribuir el keygen.
   static String _getSecret() {
     const a = 'Smart';
@@ -44,11 +49,17 @@ class LicenseService {
 
   /// Genera la clave esperada para esta máquina (solo para validar).
   static Future<String> _generateKeyForMachine(String machineId) async {
+    return generateKeyForMachineId(machineId);
+  }
+
+  /// Genera la clave para un ID de máquina (para keygen; no distribuir).
+  static String generateKeyForMachineId(String machineId) {
+    final id = machineId.trim().toUpperCase().replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
     final secret = _getSecret();
-    final input = utf8.encode('$machineId$secret');
+    final input = utf8.encode('$id$secret');
     final h = sha256.convert(input);
     final b64 = base64UrlEncode(h.bytes).replaceAll('=', '').substring(0, 20);
-    return '$machineId-$b64';
+    return '$id-$b64';
   }
 
   /// Indica si la app está activada en este equipo.
@@ -107,9 +118,9 @@ class LicenseService {
     await prefs.remove(_keyMachineId);
   }
 
-  /// Normaliza la clave pegada: quita espacios y caracteres raros que impiden que coincida.
+  /// Normaliza la clave pegada: quita espacios y caracteres raros (mantiene guión y guión bajo, base64url).
   static String _normalizeEnteredKey(String key) {
-    final onlyValid = key.replaceAll(RegExp(r'[^A-Za-z0-9\-]'), '').trim();
+    final onlyValid = key.replaceAll(RegExp(r'[^A-Za-z0-9_\-]'), '').trim();
     return onlyValid.toUpperCase();
   }
 
@@ -123,7 +134,7 @@ class LicenseService {
 
       // Comprobar si es la clave DEMO (para muestras en local; vale en cualquier equipo).
       final expectedDemoKey = await _generateKeyForMachine(_demoMachineId);
-      if (normalized == expectedDemoKey.toUpperCase()) {
+      if (normalized == _normalizeEnteredKey(expectedDemoKey)) {
         await prefs.setBool(_keyActivated, true);
         await prefs.setString(_keyLicense, expectedDemoKey);
         await prefs.setString(_keyMachineId, _demoMachineId);
@@ -132,8 +143,20 @@ class LicenseService {
 
       // Clave atada a este equipo.
       final machineId = await getMachineId();
+      // Comprobar primero si hay una clave aceptada explícita para este ID.
+      final acceptedForThisId = _acceptedKeysByMachineId[machineId];
+      if (acceptedForThisId != null && normalized == _normalizeEnteredKey(acceptedForThisId)) {
+        await prefs.setBool(_keyActivated, true);
+        await prefs.setString(_keyLicense, acceptedForThisId);
+        await prefs.setString(_keyMachineId, machineId);
+        return true;
+      }
+      // Validación por fórmula (con o sin guiones bajos).
       final expectedKey = await _generateKeyForMachine(machineId);
-      if (normalized != expectedKey.toUpperCase()) return false;
+      final expectedNormalized = _normalizeEnteredKey(expectedKey);
+      final normNoUnderscore = normalized.replaceAll('_', '');
+      final expectedNoUnderscore = expectedNormalized.replaceAll('_', '');
+      if (normalized != expectedNormalized && normNoUnderscore != expectedNoUnderscore) return false;
       await prefs.setBool(_keyActivated, true);
       await prefs.setString(_keyLicense, expectedKey);
       await prefs.setString(_keyMachineId, machineId);

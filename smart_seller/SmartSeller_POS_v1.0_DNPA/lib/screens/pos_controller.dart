@@ -1011,7 +1011,7 @@ class PosController extends GetxController {
                       icon: Icons.qr_code,
                       title: 'QR',
                       subtitle: 'Nequi/Daviplata',
-                      onTap: () => _processPaymentWithMethod('QR'),
+                      onTap: () => _showQRPaymentChoice(copFormat),
                     ),
                   ),
                 ],
@@ -1533,6 +1533,62 @@ class PosController extends GetxController {
         colorText: Colors.white,
       );
     }
+  }
+
+  /// Al tocar QR, muestra opción: ¿Nequi o Daviplata?
+  void _showQRPaymentChoice(NumberFormat copFormat) {
+    // No cerrar aquí el diálogo de métodos; _processPaymentWithMethod lo cerrará al elegir
+    Get.dialog(
+      Dialog(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                '¿Cómo pagó con QR?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _PaymentOption(
+                      icon: Icons.qr_code,
+                      title: 'Nequi',
+                      subtitle: 'Billetera digital',
+                      onTap: () {
+                        Get.back();
+                        _processPaymentWithMethod('Nequi');
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _PaymentOption(
+                      icon: Icons.qr_code,
+                      title: 'Daviplata',
+                      subtitle: 'Billetera digital',
+                      onTap: () {
+                        Get.back();
+                        _processPaymentWithMethod('Daviplata');
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cancelar'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _processPaymentWithMethod(String method) async {

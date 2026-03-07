@@ -288,20 +288,24 @@ class PrintService {
   ]; // ESC p 1 50 150 (cajón 2)
 
   // Configuración de métodos de pago que requieren duplicado
-  // TODOS los métodos diferentes a "Efectivo" requieren duplicado
+  // Solo Efectivo imprime una copia; cualquier otro método imprime doble (cliente + negocio)
   static const Map<String, bool> _paymentMethodsRequiringDuplicate = {
-    // Efectivo - NO requiere duplicado
+    // Efectivo - una sola copia
     'efectivo': false,
     'Efectivo': false,
     'Efectivo (Cash)': false,
-    // Pago mixto: una sola copia (como efectivo)
-    'mixto': false,
-    'Mixto': false,
-    // Venta a crédito: una copia (para que el cliente firme)
-    'crédito': false,
-    'Crédito': false,
+    'cash': false,
+    'Cash': false,
 
-    // TODOS los demás métodos SÍ requieren duplicado
+    // Cualquier otro método (Mixto, Crédito, Tarjeta, etc.) - doble factura
+    'mixto': true,
+    'Mixto': true,
+    'crédito': true,
+    'Crédito': true,
+    'credito': true,
+    'Credito': true,
+
+    // Tarjeta, transferencia, etc. - doble factura
     'tarjeta': true,
     'Tarjeta': true,
     'tarjeta crédito': true,
@@ -310,7 +314,6 @@ class PrintService {
     'Tarjeta Débito': true,
     'tarjeta debito': true,
     'Tarjeta Debito': true,
-    // 'Crédito' está arriba como false (venta a crédito = una copia para firmar)
     'debito': true,
     'Débito': true,
     'Debito': true,

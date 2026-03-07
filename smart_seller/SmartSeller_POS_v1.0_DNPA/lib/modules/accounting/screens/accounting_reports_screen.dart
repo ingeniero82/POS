@@ -589,18 +589,6 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     lineVal('DIFERENCIA:', diffStr);
     sb.writeln(sepW);
     sb.writeln('');
-    sb.writeln('DETALLE BILLETES Y MONEDAS');
-    sb.writeln(dashW);
-    lineVal('\$100,000 x ___ ='.padRight(35), '\$________');
-    lineVal('\$50,000  x ___ ='.padRight(35), '\$________');
-    lineVal('\$20,000  x ___ ='.padRight(35), '\$________');
-    lineVal('\$10,000  x ___ ='.padRight(35), '\$________');
-    lineVal('\$5,000   x ___ ='.padRight(35), '\$________');
-    lineVal('Monedas:'.padRight(35), '\$________');
-    sb.writeln(dashW);
-    lineVal('TOTAL CONTADO:'.padRight(35), '\$________');
-    sb.writeln(sepW);
-    sb.writeln('');
     sb.writeln('RETIROS DE EFECTIVO');
     sb.writeln(dashW);
     if (retirosList.isEmpty) {
