@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -25,8 +26,28 @@ class SQLiteDatabaseService {
     // Inicialización para escritorio (Windows, Linux, Mac)
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    final dir = await getApplicationDocumentsDirectory();
-    final path = join(dir.path, 'smart_seller.db');
+    // Carpeta fija en AppData\Local\SmartSellerPOS (Windows) para que el usuario la encuentre si la busca
+    final String appDirPath;
+    if (Platform.isWindows) {
+      final localAppData = Platform.environment['LOCALAPPDATA'];
+      appDirPath = localAppData != null && localAppData.isNotEmpty
+          ? join(localAppData, 'SmartSellerPOS')
+          : join((await getApplicationSupportDirectory()).path, 'SmartSellerPOS');
+    } else {
+      appDirPath = join((await getApplicationSupportDirectory()).path, 'SmartSellerPOS');
+    }
+    final appDir = Directory(appDirPath);
+    if (!await appDir.exists()) await appDir.create(recursive: true);
+    final path = join(appDir.path, 'smart_seller.db');
+
+    // Migración única: si la BD está en Documentos, copiarla a la nueva ubicación
+    final docsDir = await getApplicationDocumentsDirectory();
+    final oldPath = join(docsDir.path, 'smart_seller.db');
+    final oldFile = File(oldPath);
+    if (await oldFile.exists() && !await File(path).exists()) {
+      await oldFile.copy(path);
+      print('✅ Base de datos migrada de Documentos a carpeta de aplicación');
+    }
 
     _database = await openDatabase(
       path,
@@ -522,7 +543,8 @@ class SQLiteDatabaseService {
         'isActive': 1,
         'userCode': 'ADM-1001',
       });
-      print('✅ Usuario admin creado (admin / contraseña configurada para este ejecutable)');
+      print(
+          '✅ Usuario admin creado (admin / contraseña configurada para este ejecutable)');
     }
 
     // Crear usuario supervisor si no existe
