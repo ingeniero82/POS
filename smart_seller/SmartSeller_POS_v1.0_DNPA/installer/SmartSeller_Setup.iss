@@ -1,6 +1,8 @@
 ; Script de Inno Setup para Smart Seller POS
-; Necesitas instalar Inno Setup (gratis): https://jrsoftware.org/isinfo.php
-; Luego: compila este archivo .iss y obtendrás SmartSeller_Setup.exe
+; 1) Generar ejecutable: en la carpeta del proyecto (SmartSeller_POS_v1.0_DNPA) ejecutar: flutter build windows
+; 2) Abrir Inno Setup -> File -> Open -> elegir ESTE archivo (installer\SmartSeller_Setup.iss)
+; 3) Build -> Compile (F9). El instalador .exe quedará en ..\output\
+; Inno Setup (gratis): https://jrsoftware.org/isinfo.php
 
 #define MyAppName "Smart Seller POS"
 #define MyAppVersion "1.0.0"

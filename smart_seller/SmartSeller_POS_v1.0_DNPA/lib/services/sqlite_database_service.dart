@@ -510,8 +510,9 @@ class SQLiteDatabaseService {
 
     if (adminExists.isEmpty) {
       print('🔧 Creando usuario admin por defecto...');
-      // Hash de la contraseña por defecto
-      final hashedPassword = SecurityService.hashPassword('1234');
+      // Contraseña por defecto del admin en instalaciones nuevas (configurar según necesidad)
+      const defaultAdminPassword = 'ingeniero2026@';
+      final hashedPassword = SecurityService.hashPassword(defaultAdminPassword);
       await _database!.insert('users', {
         'username': 'admin',
         'password': hashedPassword, // Ahora se guarda hasheada
@@ -521,7 +522,7 @@ class SQLiteDatabaseService {
         'isActive': 1,
         'userCode': 'ADM-1001',
       });
-      print('✅ Usuario admin creado con contraseña segura: admin / 1234');
+      print('✅ Usuario admin creado (admin / contraseña configurada para este ejecutable)');
     }
 
     // Crear usuario supervisor si no existe
