@@ -51,7 +51,7 @@ class SQLiteDatabaseService {
 
     _database = await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -284,7 +284,10 @@ class SQLiteDatabaseService {
         discountPercentage REAL DEFAULT 0.0,
         isReturn INTEGER DEFAULT 0,
         originalSaleId INTEGER,
-        returnedAmount REAL DEFAULT 0.0
+        returnedAmount REAL DEFAULT 0.0,
+        anulada INTEGER DEFAULT 0,
+        anulada_at TEXT,
+        anulada_por TEXT
       )
     ''');
 
@@ -417,6 +420,29 @@ class SQLiteDatabaseService {
         print('✅ Columna city agregada a customers');
       } catch (e) {
         print('ℹ️ Columna city ya existe en customers');
+      }
+    }
+
+    // Migración versión 6: Anulación de ventas
+    if (oldVersion < 6) {
+      print('🔧 Agregando columnas de anulación a tabla sales...');
+      try {
+        await db.execute('ALTER TABLE sales ADD COLUMN anulada INTEGER DEFAULT 0');
+        print('✅ Columna anulada agregada a sales');
+      } catch (e) {
+        print('ℹ️ Columna anulada ya existe en sales');
+      }
+      try {
+        await db.execute('ALTER TABLE sales ADD COLUMN anulada_at TEXT');
+        print('✅ Columna anulada_at agregada a sales');
+      } catch (e) {
+        print('ℹ️ Columna anulada_at ya existe en sales');
+      }
+      try {
+        await db.execute('ALTER TABLE sales ADD COLUMN anulada_por TEXT');
+        print('✅ Columna anulada_por agregada a sales');
+      } catch (e) {
+        print('ℹ️ Columna anulada_por ya existe en sales');
       }
     }
   }
@@ -1023,9 +1049,8 @@ class SQLiteDatabaseService {
     });
     sale.id = id;
 
-    // Descontar stock de cada producto vendido
+    // Ajustar stock: venta normal = descontar; devolución = sumar (productos vuelven)
     for (final item in sale.items) {
-      // Buscar producto por nombre y unidad (ajustar si tienes código único)
       final results = await _database!.query(
         'products',
         where: 'name = ? AND unit = ? AND isActive = 1',
@@ -1034,8 +1059,9 @@ class SQLiteDatabaseService {
       if (results.isNotEmpty) {
         final productData = results.first;
         int currentStock = productData['stock'] as int;
-        int newStock = currentStock - (item.quantity);
-        if (newStock < 0) newStock = 0;
+        int newStock = sale.isReturn
+            ? currentStock + item.quantity
+            : (currentStock - item.quantity).clamp(0, 0x7fffffff);
         await _database!.update(
           'products',
           {'stock': newStock, 'updatedAt': DateTime.now().toIso8601String()},
@@ -1108,6 +1134,11 @@ class SQLiteDatabaseService {
         isReturn: (saleData['isReturn'] as int? ?? 0) == 1,
         originalSaleId: saleData['originalSaleId'] as int?,
         returnedAmount: saleData['returnedAmount'] as double?,
+        isAnulada: (saleData['anulada'] as int? ?? 0) == 1,
+        anuladaAt: saleData['anulada_at'] != null
+            ? DateTime.tryParse(saleData['anulada_at'] as String)
+            : null,
+        anuladaPor: saleData['anulada_por'] as String?,
       );
       // Parsear items desde JSON string
       try {
@@ -1140,6 +1171,117 @@ class SQLiteDatabaseService {
       }
       return sale;
     }).toList();
+  }
+
+  /// Obtiene una venta por ID (para anulación o detalle).
+  static Future<Sale?> getSaleById(int id) async {
+    final results = await _database!.query(
+      'sales',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (results.isEmpty) return null;
+    final saleData = results.first;
+    List<PaymentPart>? paymentBreakdown;
+    final pbStr = saleData['payment_breakdown'] as String?;
+    if (pbStr != null && pbStr.isNotEmpty) {
+      try {
+        final list = jsonDecode(pbStr) as List<dynamic>?;
+        paymentBreakdown = list
+            ?.map((e) => PaymentPart.fromMap(e as Map<String, dynamic>))
+            .toList();
+      } catch (_) {}
+    }
+    final sale = Sale(
+      id: saleData['id'] as int,
+      date: DateTime.parse(saleData['date'] as String),
+      total: saleData['total'] as double,
+      user: saleData['user'] as String,
+      paymentMethod: saleData['paymentMethod'] as String?,
+      items: [],
+      paymentBreakdown: paymentBreakdown,
+      customerId: saleData['customer_id'] as int?,
+      clientId: saleData['client_id'] as int?,
+      discount: saleData['discount'] as double?,
+      discountPercentage: saleData['discountPercentage'] as double?,
+      isReturn: (saleData['isReturn'] as int? ?? 0) == 1,
+      originalSaleId: saleData['originalSaleId'] as int?,
+      returnedAmount: saleData['returnedAmount'] as double?,
+      isAnulada: (saleData['anulada'] as int? ?? 0) == 1,
+      anuladaAt: saleData['anulada_at'] != null
+          ? DateTime.tryParse(saleData['anulada_at'] as String)
+          : null,
+      anuladaPor: saleData['anulada_por'] as String?,
+    );
+    try {
+      final itemsString = saleData['items'] as String?;
+      if (itemsString != null && itemsString.isNotEmpty) {
+        final List<dynamic> itemsList =
+            itemsString.contains('[') ? jsonDecode(itemsString) : [];
+        sale.items = itemsList
+            .map((item) => SaleItem(
+                  name: item['name'],
+                  price: item['price'] is int
+                      ? (item['price'] as int).toDouble()
+                      : item['price'],
+                  quantity: item['quantity'] is int
+                      ? item['quantity']
+                      : (item['quantity'] as double).toInt(),
+                  unit: item['unit'],
+                  discount: item['discount'] as double?,
+                  discountPercentage: item['discountPercentage'] as double?,
+                  ivaPercentage: item['ivaPercentage'] is int
+                      ? item['ivaPercentage'] as int
+                      : (item['ivaPercentage'] as num?)?.toInt() ?? 19,
+                ))
+            .toList();
+      }
+    } catch (_) {
+      sale.items = [];
+    }
+    return sale;
+  }
+
+  /// Anula una venta: marca como anulada y devuelve el stock al inventario.
+  /// Requiere permiso cancelSales. Lanza si la venta no existe o ya está anulada.
+  static Future<void> voidSale(int saleId, String anuladaPor) async {
+    final sale = await getSaleById(saleId);
+    if (sale == null) {
+      throw Exception('Venta #$saleId no encontrada');
+    }
+    if (sale.isAnulada) {
+      throw Exception('La venta #$saleId ya está anulada');
+    }
+    final now = DateTime.now().toIso8601String();
+    await _database!.update(
+      'sales',
+      {
+        'anulada': 1,
+        'anulada_at': now,
+        'anulada_por': anuladaPor,
+      },
+      where: 'id = ?',
+      whereArgs: [saleId],
+    );
+    // Devolver stock por cada ítem
+    for (final item in sale.items) {
+      final results = await _database!.query(
+        'products',
+        where: 'name = ? AND unit = ? AND isActive = 1',
+        whereArgs: [item.name, item.unit],
+      );
+      if (results.isNotEmpty) {
+        final productData = results.first;
+        int currentStock = productData['stock'] as int;
+        int newStock = currentStock + item.quantity;
+        await _database!.update(
+          'products',
+          {'stock': newStock, 'updatedAt': now},
+          where: 'id = ?',
+          whereArgs: [productData['id']],
+        );
+      }
+    }
   }
 
   // ================== MOVIMIENTOS DE INVENTARIO ==================

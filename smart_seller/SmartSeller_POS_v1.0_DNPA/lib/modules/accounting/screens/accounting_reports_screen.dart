@@ -83,15 +83,32 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     }
   }
 
+  /// Sesión a usar para Cierre de Caja: la que cubre hoy (para ver anulaciones del día) o la primera.
+  int? _getCierreDeCajaSessionId() {
+    final sessions = _cashSessionReport?.sessions ?? [];
+    if (sessions.isEmpty) return null;
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    // Preferir la sesión que incluye hoy (apertura <= hoy y (sin cierre o cierre >= hoy))
+    for (final s in sessions) {
+      final openDay = DateTime(s.openDate.year, s.openDate.month, s.openDate.day);
+      final closeDay = s.closeDate != null
+          ? DateTime(s.closeDate!.year, s.closeDate!.month, s.closeDate!.day)
+          : today;
+      if (!openDay.isAfter(today) && !closeDay.isBefore(today)) {
+        return s.sessionId;
+      }
+    }
+    return sessions.first.sessionId;
+  }
+
   /// Selecciona un reporte y carga sus datos. 1-5 + 6 = Devoluciones.
   Future<void> _selectDailyReport(int index) async {
     setState(() => _selectedDailyReport = index);
     if (index == 1) {
       await _loadCashSessionReport();
-      if (_cashSessionReport != null &&
-          _cashSessionReport!.sessions.isNotEmpty) {
-        final data = await AccountingReportsService.getCierreDeCajaData(
-            _cashSessionReport!.sessions.first.sessionId);
+      final sessionId = _getCierreDeCajaSessionId();
+      if (sessionId != null) {
+        final data = await AccountingReportsService.getCierreDeCajaData(sessionId);
         if (mounted) setState(() => _cierreDeCajaData = data);
       } else if (mounted) setState(() => _cierreDeCajaData = null);
     } else if (index == 2) {
@@ -215,19 +232,15 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     if (_cierreDeCajaData == null &&
         (_cashSessionReport == null || _cashSessionReport!.sessions.isEmpty)) {
       await _loadCashSessionReport();
-      if (_cashSessionReport != null &&
-          _cashSessionReport!.sessions.isNotEmpty) {
-        final data = await AccountingReportsService.getCierreDeCajaData(
-            _cashSessionReport!.sessions.first.sessionId);
-        if (mounted) setState(() => _cierreDeCajaData = data);
-      }
+    }
+    final sessionId = _getCierreDeCajaSessionId();
+    if (_cierreDeCajaData == null && sessionId != null) {
+      final data = await AccountingReportsService.getCierreDeCajaData(sessionId);
+      if (mounted) setState(() => _cierreDeCajaData = data);
     }
     Map<String, dynamic>? cierreData = _cierreDeCajaData;
-    if (cierreData == null &&
-        _cashSessionReport != null &&
-        _cashSessionReport!.sessions.isNotEmpty) {
-      cierreData = await AccountingReportsService.getCierreDeCajaData(
-          _cashSessionReport!.sessions.first.sessionId);
+    if (cierreData == null && sessionId != null) {
+      cierreData = await AccountingReportsService.getCierreDeCajaData(sessionId);
     }
     if (_ventasPorProductoData == null) {
       final data = await AccountingReportsService.getVentasPorProductoData(
@@ -544,6 +557,10 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     lineVal('Venta bruta:', '\$${fmtNum(ventaBruta)}');
     lineVal('Descuentos:', '-\$${fmtNum(descuentos)}');
     lineVal('Devoluciones:', '-\$${fmtNum(devoluciones)}');
+    final numAnuladas = data['numAnuladas'] as int? ?? 0;
+    final montoAnuladas = (data['montoAnuladas'] as num?)?.toDouble() ?? 0.0;
+    lineVal('Facturas canceladas / anuladas:',
+        '$numAnuladas factura(s) · -\$${fmtNum(montoAnuladas)}');
     sb.writeln(dashW);
     lineVal('VENTA NETA:', '\$${fmtNum(ventaNeta)}');
     lineVal('IVA incluido:', '\$${fmtNum(ivaIncluido)}');
@@ -1434,6 +1451,30 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
+              OutlinedButton.icon(
+                onPressed: _isLoading
+                    ? null
+                    : () async {
+                        setState(() => _isLoading = true);
+                        await _loadCashSessionReport();
+                        final sessionId = _getCierreDeCajaSessionId();
+                        if (sessionId != null) {
+                          final data =
+                              await AccountingReportsService.getCierreDeCajaData(sessionId);
+                          if (mounted) setState(() {
+                            _cierreDeCajaData = data;
+                            _isLoading = false;
+                          });
+                        } else if (mounted) setState(() => _isLoading = false);
+                      },
+                icon: const Icon(Icons.refresh, size: 20),
+                label: const Text('Actualizar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.blue.shade700,
+                  side: BorderSide(color: Colors.blue.shade700),
+                ),
+              ),
+              const SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: _isLoading ? null : _onDescargarCierreDeCajaPdf,
                 icon: const Icon(Icons.picture_as_pdf, size: 20),
@@ -1492,6 +1533,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                           '-\$${_currencyFormat.format((d['descuentos'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('Devoluciones',
                           '-\$${_currencyFormat.format((d['devoluciones'] as num?)?.toDouble() ?? 0)}'),
+                      _dataRow('Facturas canceladas / anuladas',
+                          '${d['numAnuladas'] ?? 0} factura(s) · -\$${_currencyFormat.format((d['montoAnuladas'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('Venta neta',
                           '\$${_currencyFormat.format((d['ventaNeta'] as num?)?.toDouble() ?? 0)}',
                           bold: true),

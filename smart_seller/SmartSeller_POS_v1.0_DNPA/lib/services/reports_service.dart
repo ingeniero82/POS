@@ -32,6 +32,7 @@ class ReportsService {
     int returnTransactions = 0;
 
     for (final sale in sales) {
+      if (sale.isAnulada) continue; // No contar ventas anuladas
       if (sale.isReturn) {
         // Es una devolución
         totalReturns += sale.returnedAmount ?? sale.total;
@@ -46,12 +47,15 @@ class ReportsService {
 
     // Ventas netas = Ventas brutas - Descuentos - Devoluciones
     final netSales = totalSales - totalDiscounts - totalReturns;
-    final totalTransactions = sales.length;
+    final totalTransactions =
+        sales.where((s) => !s.isAnulada).length; // Excluir anuladas
     final averageTicket =
         totalTransactions > 0 ? totalSales / totalTransactions : 0.0;
 
-    // ✅ NUEVO: Filtrar devoluciones para métricas (solo ventas reales)
-    final salesWithoutReturns = sales.where((sale) => !sale.isReturn).toList();
+    // ✅ Filtrar devoluciones y ventas anuladas para métricas (solo ventas reales)
+    final salesWithoutReturns = sales
+        .where((sale) => !sale.isReturn && !sale.isAnulada)
+        .toList();
 
     // Generar datos por hora
     final salesByHour = _generateSalesByHour(salesWithoutReturns);
@@ -246,6 +250,7 @@ class ReportsService {
     Map<String, ProductProfitability> productProfits = {};
 
     for (final sale in sales) {
+      if (sale.isAnulada) continue;
       for (final item in sale.items) {
         // Buscar producto
         final product = products.firstWhere(

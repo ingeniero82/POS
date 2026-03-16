@@ -137,7 +137,12 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
         final paymentMatch = selectedPaymentMethod.isEmpty ||
             (sale.paymentMethod ?? '') == selectedPaymentMethod;
 
-        return searchMatch && cashierMatch && paymentMatch;
+        // Filtro por estado: '' = Todas, 'activas' = solo no anuladas, 'anuladas' = solo anuladas
+        final statusMatch = selectedStatus.isEmpty ||
+            (selectedStatus == 'anuladas' && sale.isAnulada) ||
+            (selectedStatus == 'activas' && !sale.isAnulada);
+
+        return searchMatch && cashierMatch && paymentMatch && statusMatch;
       }).toList();
     });
   }
@@ -161,14 +166,38 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
   }
 
   void _showSaleDetails(Sale sale) {
+    final role = AuthService.to.currentUser?.role;
+    final canCancel = role != null &&
+        PermissionsService.to.hasPermission(role, Permission.cancelSales);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.receipt_long, color: Colors.blue),
+            Icon(
+              sale.isAnulada ? Icons.cancel : Icons.receipt_long,
+              color: sale.isAnulada ? Colors.red : Colors.blue,
+            ),
             const SizedBox(width: 8),
             Text('Factura #${sale.id.toString().padLeft(6, '0')}'),
+            if (sale.isAnulada) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'ANULADA',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade800,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         content: SizedBox(
@@ -187,6 +216,14 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
               _buildDetailRow(
                   'Método de pago:', sale.paymentMethod ?? 'No especificado'),
               _buildDetailRow('Total:', currencyFormat.format(sale.total)),
+              if (sale.isAnulada) ...[
+                _buildDetailRow('Anulada por:', sale.anuladaPor ?? '—'),
+                _buildDetailRow(
+                    'Fecha anulación:',
+                    sale.anuladaAt != null
+                        ? dateFormat.format(sale.anuladaAt!)
+                        : '—'),
+              ],
               const SizedBox(height: 16),
               const Text(
                 'Productos:',
@@ -238,21 +275,243 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cerrar'),
           ),
+          if (!sale.isAnulada)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _reprintInvoice(sale);
+              },
+              icon: const Icon(Icons.print),
+              label: const Text('Reimprimir'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          if (!sale.isAnulada && !sale.isReturn && canCancel)
+            ElevatedButton.icon(
+              onPressed: () => _confirmRegistrarDevolucion(context, sale),
+              icon: const Icon(Icons.keyboard_return),
+              label: const Text('Registrar devolución'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          if (!sale.isAnulada && canCancel)
+            ElevatedButton.icon(
+              onPressed: () => _confirmVoidSale(context, sale),
+              icon: const Icon(Icons.cancel),
+              label: const Text('Anular venta'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmRegistrarDevolucion(BuildContext context, Sale sale) async {
+    String metodoDevolucion = 'Efectivo';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.keyboard_return, color: Colors.orange, size: 28),
+                SizedBox(width: 8),
+                Text('Registrar devolución'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Factura #${sale.id.toString().padLeft(6, '0')} · Total: ${currencyFormat.format(sale.total)}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Se creará un registro de devolución. El stock de los productos volverá al inventario y la devolución aparecerá en Reportes → Devoluciones.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: metodoDevolucion,
+                  decoration: const InputDecoration(
+                    labelText: 'Método de devolución',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Efectivo', child: Text('Efectivo')),
+                    DropdownMenuItem(value: 'Tarjeta', child: Text('Tarjeta')),
+                    DropdownMenuItem(value: 'Transferencia', child: Text('Transferencia')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      metodoDevolucion = value;
+                      setStateDialog(() {});
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                icon: const Icon(Icons.check),
+                label: const Text('Registrar devolución'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (confirmed != true) return;
+    Navigator.of(context).pop(); // Cerrar detalle
+    try {
+      final user = AuthService.to.currentUser?.fullName ??
+          AuthService.to.currentUser?.username ??
+          'Sistema';
+      final returnSale = Sale(
+        date: DateTime.now(),
+        total: sale.total,
+        user: user,
+        paymentMethod: metodoDevolucion,
+        items: List<SaleItem>.from(sale.items.map((i) => SaleItem(
+          name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+          unit: i.unit,
+          discount: i.discount,
+          discountPercentage: i.discountPercentage,
+          ivaPercentage: i.ivaPercentage,
+        ))),
+        paymentBreakdown: null,
+        customerId: sale.customerId,
+        clientId: sale.clientId,
+        discount: sale.discount ?? 0.0,
+        discountPercentage: sale.discountPercentage ?? 0.0,
+        isReturn: true,
+        originalSaleId: sale.id,
+        returnedAmount: sale.total,
+      );
+      await SQLiteDatabaseService.saveSale(returnSale);
+      if (mounted) {
+        _loadSales();
+        Get.snackbar(
+          'Devolución registrada',
+          'Factura #${sale.id.toString().padLeft(6, '0')} · La devolución aparece en Reportes → Devoluciones.',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Get.snackbar(
+          'Error',
+          e.toString().replaceFirst('Exception: ', ''),
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmVoidSale(BuildContext context, Sale sale) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text('Anular venta'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Está seguro de anular la factura #${sale.id.toString().padLeft(6, '0')}?',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Total: ${currencyFormat.format(sale.total)} — ${sale.items.length} producto(s).',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'La venta quedará marcada como anulada y el stock de los productos se devolverá al inventario. Esta acción no se puede deshacer.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _reprintInvoice(sale);
-            },
-            icon: const Icon(Icons.print),
-            label: const Text('Reimprimir'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.check),
+            label: const Text('Sí, anular'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
           ),
         ],
       ),
     );
+    if (confirm != true) return;
+    Navigator.of(context).pop(); // Cerrar detalle
+    try {
+      final user = AuthService.to.currentUser?.fullName ??
+          AuthService.to.currentUser?.username ??
+          'Sistema';
+      await SQLiteDatabaseService.voidSale(sale.id!, user);
+      if (mounted) {
+        _loadSales();
+        Get.snackbar(
+          'Venta anulada',
+          'Factura #${sale.id.toString().padLeft(6, '0')} anulada correctamente. El stock fue devuelto.',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Get.snackbar(
+          'Error al anular',
+          e.toString().replaceFirst('Exception: ', ''),
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    }
   }
 
   Widget _buildDetailRow(String label, String value) {
@@ -665,6 +924,37 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                         },
                       ),
                     ),
+
+                    const SizedBox(width: 12),
+
+                    // Filtro por estado (activas / anuladas)
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: selectedStatus.isEmpty ? '' : selectedStatus,
+                        decoration: InputDecoration(
+                          labelText: 'Estado',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                              value: '', child: Text('Todas')),
+                          DropdownMenuItem(
+                              value: 'activas', child: Text('Solo activas')),
+                          DropdownMenuItem(
+                              value: 'anuladas', child: Text('Solo anuladas')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            selectedStatus = value ?? '';
+                          });
+                          _filterSales();
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -687,7 +977,9 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                 _buildStatCard(
                   'Ventas del Día',
                   currencyFormat.format(
-                    filteredSales.fold(0.0, (sum, sale) => sum + sale.total),
+                    filteredSales
+                        .where((s) => !s.isAnulada)
+                        .fold(0.0, (sum, sale) => sum + sale.total),
                   ),
                   Icons.attach_money,
                   Colors.green,
@@ -789,9 +1081,11 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
   }
 
   Widget _buildSaleCard(Sale sale) {
+    final isAnulada = sale.isAnulada;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
+      color: isAnulada ? Colors.grey.shade100 : null,
       child: InkWell(
         onTap: () => _showSaleDetails(sale),
         borderRadius: BorderRadius.circular(8),
@@ -804,19 +1098,25 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade100,
+                  color: isAnulada
+                      ? Colors.grey.shade300
+                      : Colors.blue.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.receipt, color: Colors.blue, size: 20),
+                    Icon(
+                      isAnulada ? Icons.cancel : Icons.receipt,
+                      color: isAnulada ? Colors.grey : Colors.blue,
+                      size: 20,
+                    ),
                     Text(
                       '#${sale.id.toString().padLeft(4, '0')}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue,
+                        color: isAnulada ? Colors.grey.shade700 : Colors.blue,
                       ),
                     ),
                   ],
@@ -833,19 +1133,53 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          timeFormat.format(sale.date),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              timeFormat.format(sale.date),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isAnulada
+                                    ? Colors.grey.shade600
+                                    : null,
+                                decoration: isAnulada
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                            if (isAnulada) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Anulada',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         Text(
                           currencyFormat.format(sale.total),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.green,
+                            color: isAnulada
+                                ? Colors.grey.shade600
+                                : Colors.green,
+                            decoration: isAnulada
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                         ),
                       ],
@@ -912,12 +1246,13 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
               ),
 
               // Botón de acción
-              IconButton(
-                onPressed: () => _reprintInvoice(sale),
-                icon: const Icon(Icons.print),
-                color: Colors.green,
-                tooltip: 'Reimprimir factura',
-              ),
+              if (!isAnulada)
+                IconButton(
+                  onPressed: () => _reprintInvoice(sale),
+                  icon: const Icon(Icons.print),
+                  color: Colors.green,
+                  tooltip: 'Reimprimir factura',
+                ),
             ],
           ),
         ),

@@ -40,6 +40,11 @@ class Sale {
   int? originalSaleId; // ID de la venta original (si es devolución)
   double? returnedAmount; // Monto devuelto
 
+  /// Indica si la venta fue anulada (no se cuenta en totales ni en inventario).
+  bool isAnulada = false;
+  DateTime? anuladaAt;
+  String? anuladaPor;
+
   // Constructor
   Sale({
     this.id,
@@ -56,6 +61,9 @@ class Sale {
     this.isReturn = false,
     this.originalSaleId,
     this.returnedAmount,
+    this.isAnulada = false,
+    this.anuladaAt,
+    this.anuladaPor,
   });
 }
 

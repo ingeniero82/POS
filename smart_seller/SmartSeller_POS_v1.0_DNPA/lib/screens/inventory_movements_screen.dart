@@ -199,6 +199,14 @@ class _MovementFormDialogState extends State<_MovementFormDialog> {
   final _quantityController = TextEditingController();
   final _obsController = TextEditingController();
 
+  Future<void> _openProductSearch() async {
+    final picked = await showDialog<Product>(
+      context: context,
+      builder: (ctx) => _ProductSearchDialog(products: widget.products),
+    );
+    if (picked != null && mounted) setState(() => _selectedProduct = picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -214,16 +222,34 @@ class _MovementFormDialogState extends State<_MovementFormDialog> {
               const Text('Registrar movimiento',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              DropdownButtonFormField<Product>(
-                initialValue: _selectedProduct,
-                items: widget.products
-                    .map((p) => DropdownMenuItem(value: p, child: Text(p.name)))
-                    .toList(),
-                onChanged: (p) => setState(() => _selectedProduct = p),
-                decoration: const InputDecoration(
-                    labelText: 'Producto', border: OutlineInputBorder()),
-                validator: (v) => v == null ? 'Selecciona un producto' : null,
+              InkWell(
+                onTap: _openProductSearch,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Producto',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: const Icon(Icons.search, color: Colors.blue),
+                    errorText: null,
+                  ),
+                  child: Text(
+                    _selectedProduct != null
+                        ? '${_selectedProduct!.name} (${_selectedProduct!.code})'
+                        : 'Toca para buscar producto por nombre o código...',
+                    style: TextStyle(
+                      color: _selectedProduct != null
+                          ? Colors.black87
+                          : Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(height: 4),
+              if (_selectedProduct != null)
+                Text(
+                  'Stock actual: ${_selectedProduct!.stock} ${_selectedProduct!.unit}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
               const SizedBox(height: 12),
               DropdownButtonFormField<MovementType>(
                 initialValue: _selectedType,
@@ -279,6 +305,15 @@ class _MovementFormDialogState extends State<_MovementFormDialog> {
                   const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: () async {
+                      if (_selectedProduct == null) {
+                        Get.snackbar(
+                          'Producto requerido',
+                          'Toca el campo Producto y busca uno para seleccionarlo.',
+                          backgroundColor: Colors.orange,
+                          colorText: Colors.white,
+                        );
+                        return;
+                      }
                       if (_formKey.currentState!.validate()) {
                         try {
                           final movement = InventoryMovement(
@@ -315,6 +350,136 @@ class _MovementFormDialogState extends State<_MovementFormDialog> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- Diálogo para buscar producto por nombre o código ---
+class _ProductSearchDialog extends StatefulWidget {
+  final List<Product> products;
+
+  const _ProductSearchDialog({required this.products});
+
+  @override
+  State<_ProductSearchDialog> createState() => _ProductSearchDialogState();
+}
+
+class _ProductSearchDialogState extends State<_ProductSearchDialog> {
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
+
+  List<Product> get _filteredProducts {
+    if (_query.trim().isEmpty) {
+      return List<Product>.from(widget.products)
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    }
+    final q = _query.trim().toLowerCase();
+    return widget.products.where((p) {
+      return p.name.toLowerCase().contains(q) ||
+          (p.code.toLowerCase().contains(q)) ||
+          (p.shortCode.toLowerCase().contains(q));
+    }).toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredProducts;
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.search, color: Colors.blue, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocus,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por nombre o código...',
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _query.isEmpty
+                  ? '${widget.products.length} productos'
+                  : '${filtered.length} resultado(s)',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        _query.isEmpty
+                            ? 'Escribe para filtrar productos'
+                            : 'No hay productos que coincidan con "$_query"',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final p = filtered[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.blue.shade100,
+                            child: Text(
+                              p.name.isNotEmpty ? p.name[0].toUpperCase() : '?',
+                              style: TextStyle(color: Colors.blue.shade800),
+                            ),
+                          ),
+                          title: Text(
+                            p.name,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Text(
+                            'Código: ${p.code} · Stock: ${p.stock} ${p.unit}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                          onTap: () => Navigator.of(context).pop(p),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+          ],
         ),
       ),
     );

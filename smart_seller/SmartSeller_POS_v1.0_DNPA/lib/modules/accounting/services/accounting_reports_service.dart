@@ -632,9 +632,11 @@ class AccountingReportsService {
       final row = sessionRows.first;
 
       final openDate = DateTime.parse(row['open_date'] as String);
-      final closeDate = row['close_date'] != null
+      final hasCloseDate = row['close_date'] != null && (row['close_date'] as String).trim().isNotEmpty;
+      // Si la sesión está abierta (sin cierre), incluir ventas hasta hoy para que anulaciones del día se vean
+      final closeDate = hasCloseDate
           ? DateTime.parse(row['close_date'] as String)
-          : openDate;
+          : DateTime.now();
       final initialAmount = (row['initial_amount'] as num?)?.toDouble() ?? 0.0;
       final finalAmount = (row['final_amount'] as num?)?.toDouble();
       final userId = row['user_id'] as int?;
@@ -653,17 +655,25 @@ class AccountingReportsService {
           .add(const Duration(days: 1));
 
       final salesRows = await db.rawQuery(
-        "SELECT id, date, total, items, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount FROM sales WHERE date >= ? AND date < ? ORDER BY date",
+        "SELECT id, date, total, items, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount, anulada FROM sales WHERE date >= ? AND date < ? ORDER BY date",
         [startDay.toIso8601String(), endDay.toIso8601String()],
       );
 
       int numVentas = 0;
+      int numAnuladas = 0;
+      double montoAnuladas = 0.0;
       double ventaBruta = 0, descuentos = 0, devoluciones = 0;
       double ivaIncluido = 0.0; // Suma de IVA real por ítem (0% = exento)
       final byMethod =
           <String, Map<String, dynamic>>{}; // method -> { amount, count }
 
       for (final s in salesRows) {
+        final anulada = (s['anulada'] as int? ?? 0) == 1;
+        if (anulada) {
+          numAnuladas++;
+          montoAnuladas += (s['total'] as num?)?.toDouble() ?? 0;
+          continue;
+        }
         final isReturn = (s['isReturn'] as int? ?? 0) == 1;
         final total = (s['total'] as num?)?.toDouble() ?? 0;
         final discount = (s['discount'] as num?)?.toDouble() ?? 0;
@@ -802,6 +812,8 @@ class AccountingReportsService {
         'initialAmount': initialAmount,
         'finalAmount': finalAmount,
         'numVentas': numVentas,
+        'numAnuladas': numAnuladas,
+        'montoAnuladas': montoAnuladas,
         'ticketPromedio': ticketPromedio,
         'ventaBruta': ventaBruta,
         'descuentos': descuentos,
@@ -1048,7 +1060,7 @@ class AccountingReportsService {
       final rows = await db.rawQuery(
         '''SELECT id, date, total, returnedAmount, user, originalSaleId, paymentMethod, payment_breakdown
            FROM sales
-           WHERE date >= ? AND date < ? AND isReturn = 1
+           WHERE date >= ? AND date < ? AND isReturn = 1 AND (anulada IS NULL OR anulada = 0)
            ORDER BY date''',
         [start.toIso8601String(), end.toIso8601String()],
       );
