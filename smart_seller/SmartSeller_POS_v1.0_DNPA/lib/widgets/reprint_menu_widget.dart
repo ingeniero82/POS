@@ -165,10 +165,14 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
     }
   }
 
-  void _showSaleDetails(Sale sale) {
+  Future<void> _showSaleDetails(Sale sale) async {
     final role = AuthService.to.currentUser?.role;
     final canCancel = role != null &&
         PermissionsService.to.hasPermission(role, Permission.cancelSales);
+    final alreadyHasReturn = sale.id != null
+        ? await SQLiteDatabaseService.hasReturnForSale(sale.id!)
+        : true;
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -223,6 +227,26 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                     sale.anuladaAt != null
                         ? dateFormat.format(sale.anuladaAt!)
                         : '—'),
+              ],
+              if (alreadyHasReturn && !sale.isAnulada) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Esta factura ya tiene una devolución registrada.',
+                        style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                      ),
+                    ],
+                  ),
+                ),
               ],
               const SizedBox(height: 16),
               const Text(
@@ -288,7 +312,7 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                 foregroundColor: Colors.white,
               ),
             ),
-          if (!sale.isAnulada && !sale.isReturn && canCancel)
+          if (!sale.isAnulada && !sale.isReturn && !alreadyHasReturn && canCancel)
             ElevatedButton.icon(
               onPressed: () => _confirmRegistrarDevolucion(context, sale),
               icon: const Icon(Icons.keyboard_return),
@@ -381,6 +405,17 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
       },
     );
     if (confirmed != true) return;
+    // Evitar doble devolución por si acaso
+    final alreadyHasReturn = await SQLiteDatabaseService.hasReturnForSale(sale.id!);
+    if (alreadyHasReturn && mounted) {
+      Get.snackbar(
+        'Ya registrada',
+        'Esta factura ya tiene una devolución. No se puede registrar otra.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
     Navigator.of(context).pop(); // Cerrar detalle
     try {
       final user = AuthService.to.currentUser?.fullName ??

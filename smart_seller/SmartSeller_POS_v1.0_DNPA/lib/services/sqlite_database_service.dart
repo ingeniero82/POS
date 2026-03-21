@@ -1242,6 +1242,17 @@ class SQLiteDatabaseService {
     return sale;
   }
 
+  /// Indica si ya existe una devolución registrada para la factura original (evita duplicados).
+  static Future<bool> hasReturnForSale(int originalSaleId) async {
+    final rows = await _database!.query(
+      'sales',
+      columns: ['id'],
+      where: 'isReturn = 1 AND originalSaleId = ? AND (anulada IS NULL OR anulada = 0)',
+      whereArgs: [originalSaleId],
+    );
+    return rows.isNotEmpty;
+  }
+
   /// Anula una venta: marca como anulada y devuelve el stock al inventario.
   /// Requiere permiso cancelSales. Lanza si la venta no existe o ya está anulada.
   static Future<void> voidSale(int saleId, String anuladaPor) async {

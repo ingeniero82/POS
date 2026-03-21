@@ -286,7 +286,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         updatedAt: DateTime.now(),
         isActive: _isActive,
         imageUrl: _currentImagePath,
-        ivaPercentage: _ivaPercentage,
+        // Si marcó "Exento de IVA" en información básica, se guarda 0%; si no, el % de la pestaña Facturación electrónica (5 o 19).
+        ivaPercentage: _exentoIva ? 0 : _ivaPercentage,
       );
 
       if (widget.product == null) {
@@ -859,13 +860,22 @@ class _ProductFormDialogState extends State<ProductFormDialog>
           ),
           const SizedBox(height: 16),
 
-          // Producto exento de IVA (visible al crear/editar)
+          // Producto exento de IVA (visible al crear/editar). Si se marca, se guarda IVA 0% y no hace falta marcarlo en Facturación electrónica.
           CheckboxListTile(
             value: _exentoIva,
-            onChanged: (value) => setState(() => _exentoIva = value ?? false),
+            onChanged: (value) {
+              setState(() {
+                _exentoIva = value ?? false;
+                if (_exentoIva) {
+                  _ivaPercentage = 0; // exento en básica = 0% en ventas y FE
+                } else {
+                  _ivaPercentage = 19; // al desmarcar, gravado 19% por defecto (puede cambiarse en pestaña FE)
+                }
+              });
+            },
             title: const Text('Producto exento de IVA'),
             subtitle: const Text(
-                'Marcar si el producto no lleva IVA (0%). Si no marca, se aplica 19%.'),
+                'Marcar si el producto no lleva IVA (0%). En ventas aparecerá como exento. Para 5% o 19% use la pestaña Facturación electrónica.'),
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
           ),
