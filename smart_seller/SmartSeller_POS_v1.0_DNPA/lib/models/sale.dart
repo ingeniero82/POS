@@ -77,6 +77,9 @@ class SaleItem {
   /// IVA del producto (0 = exento, 19 = gravado). Para reporte de cierre "IVA incluido".
   int ivaPercentage;
 
+  /// ID en tabla `products` (POS). Permite "productos frecuentes" y reportes sin depender solo de nombre/unidad.
+  int? productId;
+
   // Constructor
   SaleItem({
     required this.name,
@@ -86,5 +89,6 @@ class SaleItem {
     this.discount,
     this.discountPercentage,
     this.ivaPercentage = 19,
+    this.productId,
   });
 }

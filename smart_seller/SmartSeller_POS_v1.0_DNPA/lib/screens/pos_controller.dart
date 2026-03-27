@@ -26,12 +26,16 @@ class CartItem {
   /// IVA por ítem: 19 = gravado, 0 = exento. Por defecto 19.
   final int ivaPercentage;
 
+  /// Coincide con `products.id` cuando el ítem viene del catálogo POS.
+  final int? productId;
+
   CartItem({
     required this.name,
     required this.price,
     required this.unit,
     this.quantity = 1,
     this.ivaPercentage = 19,
+    this.productId,
   });
 
   double get total => price * quantity;
@@ -43,7 +47,8 @@ class CartItem {
       price: price,
       unit: unit,
       quantity: quantity,
-      ivaPercentage: ivaPercentage);
+      ivaPercentage: ivaPercentage,
+      productId: productId);
 }
 
 /// Carrito guardado en espera para atender otro cliente y recuperar después.
@@ -110,6 +115,17 @@ class PosController extends GetxController {
   // ✅ NUEVO: Callback para limpiar campo de búsqueda
   Function()? onClearSearchField;
 
+  /// Tras guardar una venta en el POS: actualizar "Productos frecuentes" en pantalla.
+  Function()? onSaleCompleted;
+
+  void _notifySaleCompleted() {
+    try {
+      onSaleCompleted?.call();
+    } catch (e) {
+      print('onSaleCompleted: $e');
+    }
+  }
+
   @override
   void onReady() {
     super.onReady();
@@ -136,6 +152,7 @@ class PosController extends GetxController {
                   'unit': i.unit,
                   'quantity': i.quantity,
                   'ivaPercentage': i.ivaPercentage,
+                  if (i.productId != null) 'productId': i.productId,
                 })
             .toList(),
         'customerId': selectedCustomer.value?.id,
@@ -168,6 +185,7 @@ class PosController extends GetxController {
           unit: item['unit'] as String? ?? 'unidad',
           quantity: (item['quantity'] as num?)?.toInt() ?? 1,
           ivaPercentage: (item['ivaPercentage'] as num?)?.toInt() ?? 19,
+          productId: (item['productId'] as num?)?.toInt(),
         );
       }).toList();
       cartItems.assignAll(items);
@@ -217,6 +235,7 @@ class PosController extends GetxController {
                           'unit': i.unit,
                           'quantity': i.quantity,
                           'ivaPercentage': i.ivaPercentage,
+                          if (i.productId != null) 'productId': i.productId,
                         })
                     .toList(),
               })
@@ -247,6 +266,7 @@ class PosController extends GetxController {
             unit: item['unit'] as String? ?? 'unidad',
             quantity: (item['quantity'] as num?)?.toInt() ?? 1,
             ivaPercentage: (item['ivaPercentage'] as num?)?.toInt() ?? 19,
+            productId: (item['productId'] as num?)?.toInt(),
           );
         }).toList();
         if (items.isEmpty) continue;
@@ -565,9 +585,17 @@ class PosController extends GetxController {
     int quantity = 1,
     int? availableStock,
     int ivaPercentage = 19,
+    int? productId,
   }) {
-    // Buscar si el producto ya existe en el carrito
-    final existingIndex = cartItems.indexWhere((item) => item.name == name);
+    // Buscar si el producto ya existe en el carrito (por id de catálogo o nombre+unidad)
+    final existingIndex = cartItems.indexWhere((item) {
+      if (productId != null &&
+          item.productId != null &&
+          item.productId == productId) {
+        return true;
+      }
+      return item.name == name && item.unit == unit;
+    });
 
     if (existingIndex >= 0) {
       // Si existe, verificar stock antes de aumentar
@@ -603,6 +631,7 @@ class PosController extends GetxController {
         unit: unit,
         quantity: quantity,
         ivaPercentage: ivaPercentage,
+        productId: productId,
       ));
     }
   }
@@ -618,6 +647,7 @@ class PosController extends GetxController {
         unit: item.unit,
         quantity: item.quantity,
         ivaPercentage: item.ivaPercentage,
+        productId: item.productId,
       );
       cartItems[index] = updatedItem;
       cartItems.refresh();
@@ -770,6 +800,7 @@ class PosController extends GetxController {
         unit: item.unit,
         quantity: item.quantity,
         ivaPercentage: item.ivaPercentage,
+        productId: item.productId,
       ));
     }
     heldSales.removeAt(index);
@@ -1433,10 +1464,12 @@ class PosController extends GetxController {
                   quantity: item.quantity,
                   unit: item.unit,
                   ivaPercentage: item.ivaPercentage,
+                  productId: item.productId,
                 ))
             .toList(),
       );
       await SQLiteDatabaseService.saveSale(sale);
+      _notifySaleCompleted();
       try {
         final currentUser = AuthService.to.currentUser;
         if (currentUser != null && currentUser.id != null) {
@@ -1493,10 +1526,12 @@ class PosController extends GetxController {
                   quantity: item.quantity,
                   unit: item.unit,
                   ivaPercentage: item.ivaPercentage,
+                  productId: item.productId,
                 ))
             .toList(),
       );
       await SQLiteDatabaseService.saveSale(sale);
+      _notifySaleCompleted();
       // No registrar ingreso en caja (es por cobrar). Crear cuenta por cobrar.
       final invoiceNumber = 'POS-${sale.id ?? 0}';
       final now = DateTime.now();
@@ -1615,12 +1650,14 @@ class PosController extends GetxController {
                   quantity: item.quantity,
                   unit: item.unit,
                   ivaPercentage: item.ivaPercentage,
+                  productId: item.productId,
                 ))
             .toList(),
       );
 
       // Guardar la venta
       await SQLiteDatabaseService.saveSale(sale);
+      _notifySaleCompleted();
 
       // ✅ NUEVO: Registrar ingreso contable automático
       try {

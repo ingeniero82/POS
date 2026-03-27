@@ -434,6 +434,7 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
           discount: i.discount,
           discountPercentage: i.discountPercentage,
           ivaPercentage: i.ivaPercentage,
+          productId: i.productId,
         ))),
         paymentBreakdown: null,
         customerId: sale.customerId,

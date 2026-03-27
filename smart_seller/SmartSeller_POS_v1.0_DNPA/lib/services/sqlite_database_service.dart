@@ -935,6 +935,90 @@ class SQLiteDatabaseService {
     }).toList();
   }
 
+  /// Productos más vendidos en el POS (cuadrícula "Productos frecuentes").
+  /// Prioriza `productId` en el JSON de ítems (ventas nuevas); si no existe, usa nombre+unidad.
+  static Future<List<Product>> getFrequentProductsForPos({
+    int limit = 12,
+    int lookbackDays = 365,
+  }) async {
+    const sep = '\u001F';
+    final allProducts = await getAllProducts();
+    final Map<String, Product> byNameUnit = {};
+    final Map<int, Product> byId = {};
+    for (final p in allProducts) {
+      byNameUnit['${p.name.trim()}$sep${p.unit.trim()}'] = p;
+      if (p.id != null) byId[p.id!] = p;
+    }
+
+    final cutoff = DateTime.now().subtract(Duration(days: lookbackDays));
+    final results = await _database!.query(
+      'sales',
+      columns: ['items'],
+      where:
+          'date >= ? AND IFNULL(anulada, 0) = 0 AND IFNULL(isReturn, 0) = 0',
+      whereArgs: [cutoff.toIso8601String()],
+    );
+
+    final Map<int, int> qtyByProductId = {};
+    final Map<String, int> qtyByNameUnit = {};
+    for (final row in results) {
+      final itemsStr = row['items'] as String?;
+      if (itemsStr == null || itemsStr.isEmpty) continue;
+      try {
+        final itemsList = jsonDecode(itemsStr) as List<dynamic>;
+        for (final raw in itemsList) {
+          if (raw is! Map) continue;
+          final item = Map<String, dynamic>.from(raw);
+          final q = item['quantity'];
+          final n = q is int ? q : (q as num?)?.toInt() ?? 0;
+          if (n <= 0) continue;
+          final pid = (item['productId'] as num?)?.toInt();
+          if (pid != null && pid > 0) {
+            qtyByProductId[pid] = (qtyByProductId[pid] ?? 0) + n;
+            continue;
+          }
+          final name = item['name']?.toString().trim() ?? '';
+          final unit = item['unit']?.toString().trim() ?? '';
+          if (name.isEmpty) continue;
+          final key = '$name$sep$unit';
+          qtyByNameUnit[key] = (qtyByNameUnit[key] ?? 0) + n;
+        }
+      } catch (_) {}
+    }
+
+    final sortedIds = qtyByProductId.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final sortedLegacy = qtyByNameUnit.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final List<Product> frequent = [];
+    for (final e in sortedIds) {
+      if (frequent.length >= limit) break;
+      final p = byId[e.key];
+      if (p == null) continue;
+      if (frequent.any((x) => x.id == p.id)) continue;
+      frequent.add(p);
+    }
+    for (final e in sortedLegacy) {
+      if (frequent.length >= limit) break;
+      final p = byNameUnit[e.key];
+      if (p == null) continue;
+      if (frequent.any((x) => x.id == p.id)) continue;
+      frequent.add(p);
+    }
+
+    if (frequent.length < limit) {
+      final rest = List<Product>.from(allProducts)
+        ..sort((a, b) => a.name.compareTo(b.name));
+      for (final p in rest) {
+        if (frequent.length >= limit) break;
+        if (!frequent.any((x) => x.id == p.id)) frequent.add(p);
+      }
+    }
+
+    return frequent.take(limit).toList();
+  }
+
   // ✅ NUEVO: Obtener productos por grupo
   static Future<List<Product>> getProductsByGroup(String groupName) async {
     final results = await _database!.query('products',
@@ -1026,17 +1110,19 @@ class SQLiteDatabaseService {
       'payment_breakdown': sale.paymentBreakdown != null
           ? jsonEncode(sale.paymentBreakdown!.map((p) => p.toMap()).toList())
           : null,
-      'items': jsonEncode(sale.items
-          .map((item) => {
-                'name': item.name,
-                'price': item.price,
-                'quantity': item.quantity,
-                'unit': item.unit,
-                'discount': item.discount,
-                'discountPercentage': item.discountPercentage,
-                'ivaPercentage': item.ivaPercentage,
-              })
-          .toList()), // Guardar como JSON string
+      'items': jsonEncode(sale.items.map((item) {
+        final m = <String, dynamic>{
+          'name': item.name,
+          'price': item.price,
+          'quantity': item.quantity,
+          'unit': item.unit,
+          'discount': item.discount,
+          'discountPercentage': item.discountPercentage,
+          'ivaPercentage': item.ivaPercentage,
+        };
+        if (item.productId != null) m['productId'] = item.productId;
+        return m;
+      }).toList()), // Guardar como JSON string
       // ✅ Cliente asociado (para reimpresión con nombre en ticket)
       'customer_id': sale.customerId,
       'client_id': sale.clientId,
@@ -1161,6 +1247,7 @@ class SQLiteDatabaseService {
                     ivaPercentage: item['ivaPercentage'] is int
                         ? item['ivaPercentage'] as int
                         : (item['ivaPercentage'] as num?)?.toInt() ?? 19,
+                    productId: (item['productId'] as num?)?.toInt(),
                   ))
               .toList();
         } else {
@@ -1233,6 +1320,7 @@ class SQLiteDatabaseService {
                   ivaPercentage: item['ivaPercentage'] is int
                       ? item['ivaPercentage'] as int
                       : (item['ivaPercentage'] as num?)?.toInt() ?? 19,
+                  productId: (item['productId'] as num?)?.toInt(),
                 ))
             .toList();
       }

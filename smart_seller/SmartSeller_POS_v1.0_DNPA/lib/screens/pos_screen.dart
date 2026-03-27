@@ -44,6 +44,8 @@ class _PosScreenState extends State<PosScreen> {
   final FocusNode _keyboardListenerFocus = FocusNode();
 
   List<Product> _products = [];
+  /// Según ventas reales (cantidades en historial); se actualiza al vender.
+  List<Product> _frequentProducts = [];
   bool _isLoading = true;
   String _currentMode = 'barcode'; // barcode, quantity, payment
   Product? _selectedProduct;
@@ -71,6 +73,12 @@ class _PosScreenState extends State<PosScreen> {
       print('🔧 DEBUG: Foco restaurado correctamente');
     };
 
+    _posController.onSaleCompleted = () {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshFrequentProducts();
+      });
+    };
+
     _loadProducts();
 
     // ✅ Auto-focus al barcode al iniciar
@@ -96,6 +104,7 @@ class _PosScreenState extends State<PosScreen> {
 
   @override
   void dispose() {
+    _posController.onSaleCompleted = null;
     _barcodeController.dispose();
     _quantityController.dispose();
     _barcodeFocus.dispose();
@@ -130,6 +139,8 @@ class _PosScreenState extends State<PosScreen> {
     setState(() => _isLoading = true);
     try {
       _products = await SQLiteDatabaseService.getAllProducts();
+      _frequentProducts =
+          await SQLiteDatabaseService.getFrequentProductsForPos(limit: 12);
     } catch (e) {
       Get.snackbar('Error', 'Error cargando productos: $e');
     } finally {
@@ -137,6 +148,14 @@ class _PosScreenState extends State<PosScreen> {
       // ✅ Asegurar focus después de cargar productos
       _ensureBarcodeFocus();
     }
+  }
+
+  Future<void> _refreshFrequentProducts() async {
+    try {
+      final next =
+          await SQLiteDatabaseService.getFrequentProductsForPos(limit: 12);
+      if (mounted) setState(() => _frequentProducts = next);
+    } catch (_) {}
   }
 
   String quitarTildes(String texto) {
@@ -813,11 +832,12 @@ class _PosScreenState extends State<PosScreen> {
                         crossAxisSpacing: 8,
                         mainAxisSpacing: 8,
                       ),
-                      itemCount: _products.take(12).length,
+                      itemCount: _frequentProducts.length,
                       itemBuilder: (context, index) {
-                        final product = _products[index];
+                        final product = _frequentProducts[index];
 
                         return _ProductButton(
+                          key: ValueKey<int>(product.id ?? index),
                           product: product,
                           teclaNumero: '', // ❌ SIN NÚMERO DE TECLA
                           onTap: () => _selectProduct(product),
@@ -1907,6 +1927,7 @@ class _PosScreenState extends State<PosScreen> {
       quantity: quantity,
       availableStock: _selectedProduct!.stock,
       ivaPercentage: _selectedProduct!.ivaPercentage,
+      productId: _selectedProduct!.id,
     );
 
     Get.snackbar(
@@ -3086,6 +3107,7 @@ class _ProductButton extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ProductButton({
+    super.key,
     required this.product,
     required this.teclaNumero,
     required this.onTap,
@@ -3098,6 +3120,7 @@ class _ProductButton extends StatelessWidget {
       if (product.imageUrl!.startsWith('http')) {
         return CachedNetworkImage(
           imageUrl: product.imageUrl!,
+          cacheKey: 'pid_${product.id}_${product.imageUrl}',
           width: double.infinity,
           fit: BoxFit.cover,
           placeholder: (context, url) => Container(
@@ -3126,6 +3149,7 @@ class _ProductButton extends StatelessWidget {
       else {
         return Image.file(
           File(product.imageUrl!),
+          key: ValueKey<String>('file_${product.id}_${product.imageUrl}'),
           width: double.infinity,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) => _buildDefaultIcon(),
