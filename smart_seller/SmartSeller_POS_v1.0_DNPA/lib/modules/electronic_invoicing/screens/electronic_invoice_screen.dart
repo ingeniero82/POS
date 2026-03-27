@@ -967,7 +967,7 @@ class _ElectronicInvoiceScreenState extends State<ElectronicInvoiceScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('IVA (19%):'),
+                          const Text('Impuestos:'),
                           Text('\$${_controller.iva.value.toStringAsFixed(2)}'),
                         ],
                       ),

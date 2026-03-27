@@ -858,8 +858,7 @@ class _PosScreenState extends State<PosScreen> {
         // así siempre se ven al menos 2-3 productos además del subtotal e IVA.
         const double minCartHeight = 220.0;
         final availableHeight = constraints.maxHeight;
-        const fixedHeights = 16.0 * 4 +
-            80 +
+        const fixedHeights = 16.0 * 3 +
             80 +
             120 +
             80; // aprox. clientes + totales + botones
@@ -875,10 +874,6 @@ class _PosScreenState extends State<PosScreen> {
                 children: [
                   // ✅ Selección de cliente del sistema
                   _buildCustomerSelection(),
-                  const SizedBox(height: 16),
-
-                  // ✅ Cliente para facturación electrónica
-                  _buildElectronicInvoiceClient(),
                   const SizedBox(height: 16),
 
                   // Totales
@@ -996,146 +991,6 @@ class _PosScreenState extends State<PosScreen> {
                         label: const Text('Seleccionar Cliente'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ✅ NUEVO: Widget para cliente de facturación electrónica
-  Widget _buildElectronicInvoiceClient() {
-    return Card(
-      color: Colors.green[50],
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Cliente Facturación Electrónica',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                GetBuilder<PosController>(
-                  id: PosController.customerTabsId,
-                  builder: (c) {
-                    if (c.currentClient != null) {
-                      final validationSummary =
-                          ClientValidationService.getClientValidationSummary(
-                              c.currentClient!);
-                      final canReceiveInvoice =
-                          validationSummary['canReceiveElectronicInvoice']
-                              as bool;
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: canReceiveInvoice
-                              ? Colors.green[100]
-                              : Colors.red[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          canReceiveInvoice ? '✅ Válido' : '❌ Incompleto',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: canReceiveInvoice
-                                ? Colors.green[800]
-                                : Colors.red[800],
-                          ),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            GetBuilder<PosController>(
-              id: PosController.customerTabsId,
-              builder: (c) {
-                if (c.currentClient != null) {
-                  final client = c.currentClient!;
-                  final validationSummary =
-                      ClientValidationService.getClientValidationSummary(
-                          client);
-                  final canReceiveInvoice =
-                      validationSummary['canReceiveElectronicInvoice'] as bool;
-                  final missingFields =
-                      validationSummary['missingFields'] as List<String>;
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        client.businessName,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: canReceiveInvoice
-                              ? Colors.green[800]
-                              : Colors.red[800],
-                        ),
-                      ),
-                      Text(
-                        '${client.documentType} ${client.documentNumber}',
-                        style:
-                            const TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      Text(
-                        client.email ?? 'Sin email',
-                        style:
-                            const TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      if (client.city != null && client.department != null)
-                        Text(
-                          '${client.city}, ${client.department}',
-                          style:
-                              const TextStyle(fontSize: 14, color: Colors.grey),
-                        ),
-                      if (!canReceiveInvoice && missingFields.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Faltan: ${missingFields.join(', ')}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.red[700],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ],
-                  );
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Sin cliente para facturación electrónica',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _showClientSelectionDialog,
-                        icon: const Icon(Icons.person_add),
-                        label: const Text('Seleccionar Cliente'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -2178,6 +2033,32 @@ class _PosScreenState extends State<PosScreen> {
         );
         return;
       }
+      final currentClient = _posController.currentClient;
+      if (currentClient == null) {
+        Get.snackbar(
+          'Cliente requerido',
+          'Para facturación electrónica selecciona o crea un cliente.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        _showClientSelectionDialog(continueToElectronic: true);
+        return;
+      }
+      final validationSummary =
+          ClientValidationService.getClientValidationSummary(currentClient);
+      final canReceiveElectronicInvoice =
+          validationSummary['canReceiveElectronicInvoice'] as bool? ?? false;
+      if (!canReceiveElectronicInvoice) {
+        Get.snackbar(
+          'Cliente incompleto',
+          'Completa datos del cliente o selecciona otro para facturación electrónica.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+        _showClientSelectionDialog(continueToElectronic: true);
+        return;
+      }
       _openElectronicInvoiceModal();
     }).catchError((_) {
       Get.snackbar(
@@ -2526,6 +2407,7 @@ class _PosScreenState extends State<PosScreen> {
         'quantity': item.quantity,
         'price': item.price,
         'total': item.quantity * item.price,
+        'ivaPercentage': item.ivaPercentage,
       };
     }).toList();
 
@@ -2574,7 +2456,7 @@ class _PosScreenState extends State<PosScreen> {
             SizedBox(height: 16),
             Text('F1: Mostrar ayuda'),
             Text('F2: Reimpresión de facturas'),
-            Text('F3: Facturación electrónica (directo)'),
+            Text('F3: Facturación electrónica (selecciona/crea cliente si falta)'),
             Text('F4: Contabilidad / Caja'),
             Text('F5: Abrir cajón monedero'),
             Text('F6: Finalizar venta (métodos de pago)'),
@@ -2598,11 +2480,13 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   // ✅ NUEVO: Método para mostrar diálogo de selección de cliente
-  void _showClientSelectionDialog() {
+  void _showClientSelectionDialog({bool continueToElectronic = false}) {
+    // Mostrar clientes activos al abrir, sin necesidad de teclear.
+    _posController.searchClients('');
     Get.dialog(
       Dialog(
         child: Container(
-          width: 600,
+          width: 720,
           height: 500,
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -2611,13 +2495,28 @@ class _PosScreenState extends State<PosScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Seleccionar Cliente para Facturación Electrónica',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  const Expanded(
+                    child: Text(
+                      'Seleccionar Cliente para Facturación Electrónica',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.fade,
+                    ),
                   ),
-                  IconButton(
-                    onPressed: () => Get.back(),
-                    icon: const Icon(Icons.close),
+                  const SizedBox(width: 8),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _showQuickCreateElectronicClientDialog(
+                            continueToElectronic: continueToElectronic),
+                        icon: const Icon(Icons.person_add),
+                        label: const Text('Crear cliente'),
+                      ),
+                      IconButton(
+                        onPressed: () => Get.back(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -2637,6 +2536,11 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 6),
+              Text(
+                'Esta búsqueda es para clientes de Facturación Electrónica (DIAN).',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
               const SizedBox(height: 16),
 
               // Lista de resultados
@@ -2647,10 +2551,24 @@ class _PosScreenState extends State<PosScreen> {
                   }
 
                   if (_posController.clientSearchResults.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No se encontraron clientes',
-                        style: TextStyle(color: Colors.grey),
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'No se encontraron clientes',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                _showQuickCreateElectronicClientDialog(
+                                    continueToElectronic:
+                                        continueToElectronic),
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Crear cliente ahora'),
+                          ),
+                        ],
                       ),
                     );
                   }
@@ -2719,7 +2637,9 @@ class _PosScreenState extends State<PosScreen> {
                           onTap: () {
                             _posController.selectClient(client);
                             setState(() {});
-                            Get.back();
+                            if (continueToElectronic) {
+                              _continueElectronicFlowAfterClientSelected();
+                            }
                           },
                         ),
                       );
@@ -2732,6 +2652,209 @@ class _PosScreenState extends State<PosScreen> {
         ),
       ),
     ).then((_) => _restoreFocusForF6());
+  }
+
+  // Alta rápida desde POS para usar facturación electrónica sin salir del flujo.
+  void _showQuickCreateElectronicClientDialog(
+      {bool continueToElectronic = false}) {
+    final docType = ValueNotifier<String>('NIT');
+    final docController = TextEditingController();
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final phoneController = TextEditingController();
+    final addressController = TextEditingController();
+    final cityController = TextEditingController();
+    final departmentController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Crear cliente FE'),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ValueListenableBuilder<String>(
+                  valueListenable: docType,
+                  builder: (_, value, __) => DropdownButtonFormField<String>(
+                    initialValue: value,
+                    items: const [
+                      DropdownMenuItem(value: 'NIT', child: Text('NIT')),
+                      DropdownMenuItem(value: 'CC', child: Text('CC')),
+                      DropdownMenuItem(value: 'CE', child: Text('CE')),
+                      DropdownMenuItem(value: 'TI', child: Text('TI')),
+                      DropdownMenuItem(value: 'PASAPORTE', child: Text('PASAPORTE')),
+                    ],
+                    onChanged: (v) => docType.value = v ?? 'NIT',
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de documento *',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: docController,
+                  decoration: const InputDecoration(
+                    labelText: 'Documento *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre o razón social *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Teléfono',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'Dirección *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: cityController,
+                  decoration: const InputDecoration(
+                    labelText: 'Ciudad *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: departmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Departamento *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final document = docController.text.trim();
+              final name = nameController.text.trim();
+              final email = emailController.text.trim();
+              final address = addressController.text.trim();
+              final city = cityController.text.trim();
+              final department = departmentController.text.trim();
+
+              if (document.isEmpty ||
+                  name.isEmpty ||
+                  email.isEmpty ||
+                  address.isEmpty ||
+                  city.isEmpty ||
+                  department.isEmpty) {
+                Get.snackbar(
+                  'Campos obligatorios',
+                  'Complete documento, razón social, email, dirección, ciudad y departamento.',
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                );
+                return;
+              }
+
+              try {
+                final existing =
+                    await SQLiteDatabaseService.getClientByDocument(document);
+                if (existing != null) {
+                  _posController.selectClient(existing);
+                  Get.back();
+                  if (continueToElectronic) {
+                    _continueElectronicFlowAfterClientSelected();
+                  }
+                  Get.snackbar(
+                    'Cliente existente',
+                    'Ya existía y quedó seleccionado.',
+                    backgroundColor: Colors.blue,
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
+
+                final now = DateTime.now();
+                final client = Client(
+                  documentType: docType.value,
+                  documentNumber: document,
+                  businessName: name,
+                  email: email,
+                  phone: phoneController.text.trim(),
+                  address: address,
+                  city: city,
+                  department: department,
+                  country: 'Colombia',
+                  fiscalResponsibility: 'Responsable de IVA',
+                  createdAt: now,
+                  updatedAt: now,
+                );
+
+                await SQLiteDatabaseService.createClient(client);
+                final created =
+                    await SQLiteDatabaseService.getClientByDocument(document);
+                if (created != null) {
+                  _posController.selectClient(created);
+                  if (continueToElectronic) {
+                    _continueElectronicFlowAfterClientSelected();
+                  }
+                }
+                await _posController.searchClients('');
+                Get.back();
+                Get.snackbar(
+                  'Cliente creado',
+                  'Cliente FE creado y seleccionado.',
+                  backgroundColor: Colors.green,
+                  colorText: Colors.white,
+                );
+              } catch (e) {
+                Get.snackbar(
+                  'Error',
+                  'No se pudo crear el cliente: $e',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+              }
+            },
+            child: const Text('Guardar y seleccionar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _continueElectronicFlowAfterClientSelected() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 120), () {
+        if (mounted) _finalizeSaleElectronic();
+      });
+    });
   }
 
   // Funciones de autorización
@@ -3802,9 +3925,22 @@ class _ElectronicInvoiceModalContentState
   }
 
   Widget _buildProductsTab() {
-    final subtotal = widget.cartTotal;
-    final iva = subtotal * 0.19;
-    final total = subtotal + iva;
+    final subtotal = widget.cartProducts.fold<double>(
+      0.0,
+      (sum, p) => sum + ((p['total'] as num?)?.toDouble() ?? 0.0),
+    );
+    final iva19 = widget.cartProducts.fold<double>(0.0, (sum, p) {
+      final pct = (p['ivaPercentage'] as num?)?.toInt() ?? 19;
+      final base = ((p['total'] as num?)?.toDouble() ?? 0.0);
+      return pct == 19 ? sum + (base * 0.19) : sum;
+    });
+    final iva5 = widget.cartProducts.fold<double>(0.0, (sum, p) {
+      final pct = (p['ivaPercentage'] as num?)?.toInt() ?? 19;
+      final base = ((p['total'] as num?)?.toDouble() ?? 0.0);
+      return pct == 5 ? sum + (base * 0.05) : sum;
+    });
+    final ivaTotal = iva19 + iva5;
+    final total = subtotal + ivaTotal;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -3871,7 +4007,15 @@ class _ElectronicInvoiceModalContentState
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('IVA (19%):'),
-                        Text('\$${NumberFormat('#,###').format(iva)}'),
+                        Text('\$${NumberFormat('#,###').format(iva19)}'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('IVA (5%):'),
+                        Text('\$${NumberFormat('#,###').format(iva5)}'),
                       ],
                     ),
                     const SizedBox(height: 8),

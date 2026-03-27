@@ -146,12 +146,21 @@ class ElectronicInvoiceController extends GetxController {
   
   void _calculateTotals() {
     double sub = 0.0;
+    double taxes = 0.0;
     for (final product in invoiceProducts) {
-      sub += product['total'];
+      final lineTotal = (product['total'] as num?)?.toDouble() ?? 0.0;
+      sub += lineTotal;
+      final p = product['product'];
+      if (p is Product) {
+        final pct = p.ivaPercentage;
+        if (pct > 0) taxes += lineTotal * (pct / 100.0);
+      } else {
+        taxes += lineTotal * 0.19; // retrocompatibilidad de ítems sin producto tipado
+      }
     }
     
     subtotal.value = sub;
-    iva.value = sub * 0.19; // 19% IVA
+    iva.value = taxes;
     total.value = sub + iva.value;
   }
   

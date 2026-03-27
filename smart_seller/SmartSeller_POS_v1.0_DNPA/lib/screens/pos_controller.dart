@@ -126,6 +126,18 @@ class PosController extends GetxController {
     }
   }
 
+  String _normalizeForSearch(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[áàäâã]'), 'a')
+        .replaceAll(RegExp(r'[éèëê]'), 'e')
+        .replaceAll(RegExp(r'[íìïî]'), 'i')
+        .replaceAll(RegExp(r'[óòöôõ]'), 'o')
+        .replaceAll(RegExp(r'[úùüû]'), 'u')
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
   @override
   void onReady() {
     super.onReady();
@@ -341,25 +353,34 @@ class PosController extends GetxController {
     );
   }
 
-  // ✅ NUEVO: Método para buscar clientes de facturación electrónica
+  // ✅ Método para buscar clientes de facturación electrónica (BD real)
   Future<void> searchClients(String query) async {
-    if (query.trim().isEmpty) {
-      clientSearchResults.clear();
-      return;
-    }
-
     try {
       isSearchingClient.value = true;
-      // Por ahora simulamos la búsqueda, en el futuro se conectará con la base de datos
       final allClients = await _getAllClients();
 
-      // Filtrar por nombre, email, documento o teléfono
+      // Si no hay texto, mostrar todos los clientes activos ordenados.
+      if (query.trim().isEmpty) {
+        clientSearchResults.value = allClients;
+        return;
+      }
+
+      // Filtrar por nombre, email, documento o teléfono (tolerante a tildes y formato)
+      final searchLower = query.toLowerCase().trim();
+      final searchNormalized = _normalizeForSearch(query);
       final filtered = allClients.where((client) {
-        final searchLower = query.toLowerCase();
-        return client.businessName.toLowerCase().contains(searchLower) ||
+        final byName = client.businessName.toLowerCase().contains(searchLower) ||
+            _normalizeForSearch(client.businessName).contains(searchNormalized);
+        final byEmail =
             (client.email?.toLowerCase().contains(searchLower) ?? false) ||
-            client.documentNumber.toLowerCase().contains(searchLower) ||
-            (client.phone?.contains(query) ?? false);
+                _normalizeForSearch(client.email ?? '')
+                    .contains(searchNormalized);
+        final byDoc = client.documentNumber.toLowerCase().contains(searchLower) ||
+            _normalizeForSearch(client.documentNumber)
+                .contains(searchNormalized);
+        final byPhone = (client.phone?.contains(query.trim()) ?? false) ||
+            _normalizeForSearch(client.phone ?? '').contains(searchNormalized);
+        return byName || byEmail || byDoc || byPhone;
       }).toList();
 
       clientSearchResults.value = filtered;
@@ -397,40 +418,9 @@ class PosController extends GetxController {
     );
   }
 
-  // ✅ NUEVO: Método temporal para obtener clientes (simulado)
+  // Obtener clientes desde SQLite (facturación electrónica)
   Future<List<Client>> _getAllClients() async {
-    // Simular delay de base de datos
-    await Future.delayed(const Duration(milliseconds: 100));
-
-    // Retornar clientes de ejemplo
-    return [
-      Client(
-        documentType: 'CC',
-        documentNumber: '123456789',
-        businessName: 'Juan Pérez',
-        email: 'juan.perez@email.com',
-        phone: '3001234567',
-        address: 'Calle 123 #45-67',
-        city: 'Bogotá',
-        department: 'Cundinamarca',
-        fiscalResponsibility: 'Responsable de IVA',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      Client(
-        documentType: 'NIT',
-        documentNumber: '900123456-7',
-        businessName: 'Empresa ABC Ltda',
-        email: 'contacto@empresaabc.com',
-        phone: '6012345678',
-        address: 'Carrera 78 #90-12',
-        city: 'Bogotá',
-        department: 'Cundinamarca',
-        fiscalResponsibility: 'Responsable de IVA',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    ];
+    return SQLiteDatabaseService.getAllClients();
   }
 
   // ✅ NUEVO: Método para mostrar modal de selección de cliente (retorna Future para que la pantalla restaure foco al cerrar y F6 funcione)
