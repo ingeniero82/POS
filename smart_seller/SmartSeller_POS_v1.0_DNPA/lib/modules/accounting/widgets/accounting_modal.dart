@@ -4,20 +4,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'dart:convert';
+import 'package:intl/intl.dart';
 import '../models/accounting_entry.dart';
 import '../models/cash_session.dart';
 import '../models/payment_method.dart';
 import '../models/transaction_category.dart';
 import '../services/accounting_service.dart';
+import '../services/accounting_reports_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../services/print_service.dart';
 import '../../../utils/puntos_miles_input_formatter.dart';
 import 'electronic_invoice_payment_modal.dart';
 import '../../../screens/pos_controller.dart';
 
 class AccountingModal extends StatefulWidget {
   final Function(AccountingEntry)? onTransactionProcessed;
+  final VoidCallback? onStartCashCount;
 
-  const AccountingModal({super.key, this.onTransactionProcessed});
+  const AccountingModal({
+    super.key,
+    this.onTransactionProcessed,
+    this.onStartCashCount,
+  });
 
   @override
   State<AccountingModal> createState() => _AccountingModalState();
@@ -270,6 +279,9 @@ class _AccountingModalState extends State<AccountingModal>
 
   Future<void> _closeCashSessionDialog() async {
     if (_currentSession == null || _currentSession!.id == null) return;
+    final closingSessionId = _currentSession!.id!;
+    // Abrir cajón al iniciar arqueo (si el POS provee callback)
+    widget.onStartCashCount?.call();
     final amountController = TextEditingController(text: '');
     final notesController = TextEditingController(text: '');
     final confirmed = await Get.dialog<bool>(
@@ -360,10 +372,210 @@ class _AccountingModalState extends State<AccountingModal>
         setState(() {});
         Get.snackbar('Éxito',
             'Caja cerrada correctamente. Monto registrado: \$${_formatMontoColombia(finalAmount)}');
+        final shouldPrint = await Get.dialog<bool>(
+          AlertDialog(
+            title: const Text('Cierre completado'),
+            content: const Text('¿Deseas imprimir el ticket de cierre de caja ahora?'),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(result: false),
+                child: const Text('No'),
+              ),
+              FilledButton(
+                onPressed: () => Get.back(result: true),
+                child: const Text('Sí, imprimir'),
+              ),
+            ],
+          ),
+          barrierDismissible: true,
+        );
+        if (shouldPrint == true) {
+          await _printCashCloseTicket(closingSessionId);
+        }
       } catch (e) {
         Get.snackbar('Error', 'No se pudo cerrar la caja: $e');
       }
     }
+  }
+
+  Future<void> _printCashCloseTicket(int sessionId) async {
+    try {
+      final data = await AccountingReportsService.getCierreDeCajaData(sessionId);
+      if (data == null) {
+        Get.snackbar('Aviso', 'No se encontraron datos del cierre para imprimir.');
+        return;
+      }
+      final text = _buildCierreTicketText(data);
+      final ok = await PrintService.instance
+          .printRawToPrinter(utf8.encode(text), printerName: null);
+      if (ok) {
+        Get.snackbar('Éxito', 'Ticket de cierre enviado a impresión',
+            backgroundColor: Colors.green, colorText: Colors.white);
+      } else {
+        Get.snackbar('Error', 'No se pudo imprimir el cierre',
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Error imprimiendo cierre: $e',
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
+  }
+
+  String _buildCierreTicketText(Map<String, dynamic> data) {
+    const w = 80;
+    final sepW = '=' * w;
+    final dashW = '-' * w;
+    final openDate = data['openDate'] as DateTime;
+    final closeDate = data['closeDate'] as DateTime;
+    final userName = data['userName'] as String? ?? 'Cajero';
+    final initialAmount = (data['initialAmount'] as num?)?.toDouble() ?? 0.0;
+    final numVentas = data['numVentas'] as int? ?? 0;
+    final ticketPromedio = (data['ticketPromedio'] as num?)?.toDouble() ?? 0.0;
+    final ventaBruta = (data['ventaBruta'] as num?)?.toDouble() ?? 0.0;
+    final descuentos = (data['descuentos'] as num?)?.toDouble() ?? 0.0;
+    final devoluciones = (data['devoluciones'] as num?)?.toDouble() ?? 0.0;
+    final ventaNeta = (data['ventaNeta'] as num?)?.toDouble() ?? 0.0;
+    final ivaIncluido = (data['ivaIncluido'] as num?)?.toDouble() ?? 0.0;
+    final ventasPorTarifaIva =
+        (data['ventasPorTarifaIva'] as Map<String, dynamic>? ?? {})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+    final ivaPorTarifa = (data['ivaPorTarifa'] as Map<String, dynamic>? ?? {})
+        .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+    final byMethod = data['byMethod'] as Map<String, dynamic>? ?? {};
+    final ventasEfectivo = (data['ventasEfectivo'] as num?)?.toDouble() ?? 0.0;
+    final otrosIngresos = (data['otrosIngresos'] as num?)?.toDouble() ?? 0.0;
+    final retiros = (data['retiros'] as num?)?.toDouble() ?? 0.0;
+    final gastos = (data['gastos'] as num?)?.toDouble() ?? 0.0;
+    final devolucionesEfectivo =
+        (data['devolucionesEfectivo'] as num?)?.toDouble() ?? 0.0;
+    final saldoEsperado = (data['saldoEsperado'] as num?)?.toDouble() ?? 0.0;
+    final saldoReal = (data['saldoReal'] as num?)?.toDouble() ?? 0.0;
+    final diferencia = (data['diferencia'] as num?)?.toDouble() ?? 0.0;
+    final retirosList = data['retirosList'] as List<dynamic>? ?? [];
+    final sessionId = data['sessionId'] as int? ?? 0;
+
+    final sb = StringBuffer();
+    String fmtNum(double n) => n.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+    String padL(String s, int len) =>
+        s.length >= len ? s : ' ' * (len - s.length) + s;
+    void lineLR(String left, String right) {
+      final pad = w - left.length - right.length;
+      sb.writeln(pad > 0
+          ? left + (' ' * pad) + right
+          : (left + right).substring(0, w));
+    }
+
+    void lineVal(String label, String value) =>
+        sb.writeln(label + padL(value, w - label.length));
+    void center(String s) {
+      final len = s.length > w ? w : s.length;
+      final pad = (w - len) ~/ 2;
+      sb.writeln((' ' * pad) +
+          (len == s.length ? s : s.substring(0, w)) +
+          (' ' * (w - pad - len)));
+    }
+
+    sb.writeln(sepW);
+    center('CIERRE DE CAJA');
+    sb.writeln(sepW);
+    lineLR('Fecha: ${DateFormat('dd/MM/yyyy').format(closeDate)}',
+        'Hora cierre: ${DateFormat('HH:mm:ss').format(closeDate)}');
+    lineLR(
+        'Caja: ${sessionId.toString().padLeft(2, '0')}', 'Cajero: $userName');
+    lineLR('Turno: Mañana-Noche',
+        'Apertura: ${DateFormat('HH:mm:ss').format(openDate)}');
+    sb.writeln(sepW);
+    sb.writeln('');
+    sb.writeln('RESUMEN DE VENTAS');
+    sb.writeln(dashW);
+    lineVal('Número de ventas:', '$numVentas');
+    lineVal('Ticket promedio:', '\$${fmtNum(ticketPromedio)}');
+    lineVal('Venta bruta:', '\$${fmtNum(ventaBruta)}');
+    lineVal('Descuentos:', '-\$${fmtNum(descuentos)}');
+    lineVal('Devoluciones:', '-\$${fmtNum(devoluciones)}');
+    final numAnuladas = data['numAnuladas'] as int? ?? 0;
+    final montoAnuladas = (data['montoAnuladas'] as num?)?.toDouble() ?? 0.0;
+    lineVal('Facturas canceladas / anuladas:',
+        '$numAnuladas factura(s) · -\$${fmtNum(montoAnuladas)}');
+    sb.writeln(dashW);
+    lineVal('VENTA NETA:', '\$${fmtNum(ventaNeta)}');
+    lineVal('IVA incluido:', '\$${fmtNum(ivaIncluido)}');
+    final orderedRates = ventasPorTarifaIva.keys.toList()
+      ..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    for (final rate in orderedRates) {
+      final ventaTarifa = ventasPorTarifaIva[rate] ?? 0.0;
+      final ivaTarifa = ivaPorTarifa[rate] ?? 0.0;
+      lineVal(
+        '  IVA ${rate}%:',
+        'Ventas \$${fmtNum(ventaTarifa)} | Imp \$${fmtNum(ivaTarifa)}',
+      );
+    }
+    sb.writeln(sepW);
+    sb.writeln('');
+    sb.writeln('FORMAS DE PAGO');
+    sb.writeln(dashW);
+    double totalCobrado = 0;
+    for (final e in byMethod.entries) {
+      final amount = (e.value['amount'] is num)
+          ? (e.value['amount'] as num).toDouble()
+          : 0.0;
+      final count = (e.value['count'] is int) ? e.value['count'] as int : 0;
+      totalCobrado += amount;
+      final ventaStr = count == 1 ? '1 venta' : '$count ventas';
+      final metodo = '${e.key}:';
+      sb.writeln((metodo.padRight(25) +
+              padL('\$${fmtNum(amount)}', 20) +
+              padL(ventaStr, 15))
+          .padRight(w));
+    }
+    sb.writeln(dashW);
+    sb.writeln(('TOTAL COBRADO:'.padRight(25) +
+            padL('\$${fmtNum(totalCobrado)}', 20) +
+            padL('$numVentas ventas', 15))
+        .padRight(w));
+    sb.writeln(sepW);
+    sb.writeln('');
+    sb.writeln('ARQUEO DE CAJA (EFECTIVO)');
+    sb.writeln(dashW);
+    lineVal('Fondo inicial:', '\$${fmtNum(initialAmount)}');
+    lineVal('(+) Ventas efectivo:', '\$${fmtNum(ventasEfectivo)}');
+    lineVal('(+) Otros ingresos:', '\$${fmtNum(otrosIngresos)}');
+    lineVal('(-) Retiros:', '-\$${fmtNum(retiros)}');
+    lineVal('(-) Gastos:', '-\$${fmtNum(gastos)}');
+    lineVal('(-) Devoluciones efectivo:', '-\$${fmtNum(devolucionesEfectivo)}');
+    sb.writeln(dashW);
+    lineVal('SALDO ESPERADO:', '\$${fmtNum(saldoEsperado)}');
+    lineVal('SALDO REAL:', '\$${fmtNum(saldoReal)}');
+    final diffStr = diferencia < 0
+        ? '-\$${fmtNum(-diferencia)}  ⚠️'
+        : (diferencia > 0 ? '\$${fmtNum(diferencia)}' : '\$0');
+    lineVal('DIFERENCIA:', diffStr);
+    sb.writeln(sepW);
+    sb.writeln('');
+    sb.writeln('RETIROS DE EFECTIVO');
+    sb.writeln(dashW);
+    if (retirosList.isEmpty) {
+      sb.writeln('(Ninguno)');
+    } else {
+      for (final r in retirosList) {
+        final t = r is Map ? (r['time'] as String? ?? '') : '';
+        final d = r is Map ? (r['description'] as String? ?? '') : '';
+        final a = r is Map ? ((r['amount'] as num?)?.toDouble() ?? 0) : 0.0;
+        lineLR('$t    $d', '\$${fmtNum(a)}');
+      }
+      sb.writeln(dashW);
+      lineVal('Total retirado:', '\$${fmtNum(retiros)}');
+    }
+    sb.writeln(sepW);
+    sb.writeln('');
+    center('_________________________');
+    center('Firma del Cajero');
+    sb.writeln('');
+    center('_________________________');
+    center('Firma del Supervisor');
+    sb.writeln(sepW);
+    return sb.toString();
   }
 
   void _clearForm() {

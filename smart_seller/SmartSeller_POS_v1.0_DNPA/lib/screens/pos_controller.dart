@@ -11,11 +11,22 @@ import '../services/auth_service.dart';
 import '../modules/accounting/services/accounting_service.dart';
 import '../modules/accounting/services/accounts_receivable_payable_service.dart';
 import '../modules/accounting/models/accounts_receivable.dart';
+import '../modules/accounting/models/receivable_payment.dart';
 
 import '../services/print_service.dart';
 import '../services/company_config_service.dart';
 import '../utils/puntos_miles_input_formatter.dart';
 import 'package:intl/intl.dart';
+
+/// Métodos de pago disponibles en POS (mixto, abono a crédito, etc.).
+const List<String> kPosPaymentMethodOptions = [
+  'Efectivo',
+  'Tarjeta',
+  'Transferencia',
+  'QR',
+  'Nequi',
+  'Daviplata',
+];
 
 class CartItem {
   final String name;
@@ -1008,10 +1019,11 @@ class PosController extends GetxController {
       return;
     }
 
-    // Mostrar opciones de pago
+    // Mostrar opciones de pago (Builder: cerrar este modal con Navigator para no dejarlo debajo del flujo crédito)
     Get.dialog(
       Dialog(
-        child: Container(
+        child: Builder(
+          builder: (paymentDialogContext) => Container(
           width: 450,
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -1097,7 +1109,12 @@ class PosController extends GetxController {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _processCreditSale(copFormat),
+                  onPressed: () {
+                    Navigator.of(paymentDialogContext, rootNavigator: true)
+                        .pop();
+                    Future.microtask(
+                        () => _openCreditReceivableDialogOnly(copFormat));
+                  },
                   icon: const Icon(Icons.schedule),
                   label: const Text('A crédito (cuenta por cobrar)'),
                   style: OutlinedButton.styleFrom(
@@ -1114,6 +1131,7 @@ class PosController extends GetxController {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
@@ -1270,15 +1288,6 @@ class PosController extends GetxController {
     controller.addListener(updateVuelto);
   }
 
-  static const List<String> _paymentMethodOptions = [
-    'Efectivo',
-    'Tarjeta',
-    'Transferencia',
-    'QR',
-    'Nequi',
-    'Daviplata',
-  ];
-
   void _showMixedPaymentDialog(NumberFormat copFormat) {
     Get.back(); // Cierra el diálogo de métodos de pago
     final totalToPay = total;
@@ -1338,7 +1347,7 @@ class PosController extends GetxController {
                               child: DropdownButton<String>(
                                 value: parts[i].method,
                                 isExpanded: true,
-                                items: _paymentMethodOptions
+                                items: kPosPaymentMethodOptions
                                     .map((m) => DropdownMenuItem(
                                         value: m, child: Text(m)))
                                     .toList(),
@@ -1527,20 +1536,37 @@ class PosController extends GetxController {
     }
   }
 
-  /// Venta a crédito: requiere cliente seleccionado. Guarda venta y crea cuenta por cobrar.
-  Future<void> _processCreditSale(NumberFormat copFormat) async {
-    Get.back(); // Cierra diálogo de métodos de pago
+  /// Abre solo el modal de crédito (el de «Método de pago» ya se cerró con Navigator desde su context).
+  void _openCreditReceivableDialogOnly(NumberFormat copFormat) {
+    Get.dialog(
+      Dialog(
+        child: _PosCreditReceivableDialog(
+          pos: this,
+          copFormat: copFormat,
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  /// Venta a crédito con abono opcional. Crea cuenta por cobrar y, si hay abono, `receivable_payments` + ingreso en caja.
+  Future<void> finalizeCreditSaleWithAbono(
+    NumberFormat copFormat,
+    double abonoInicial, {
+    String abonoPaymentMethod = 'Efectivo',
+  }) async {
     final customer = selectedCustomer.value;
     if (customer == null || customer.id == null) {
       Get.snackbar(
         'Cliente requerido',
-        'Para venta a crédito debe seleccionar un cliente (Cliente del Sistema).',
+        'Seleccione un cliente del sistema para venta a crédito.',
         backgroundColor: Colors.orange,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
       );
       return;
     }
+    final abono = abonoInicial.clamp(0.0, total);
     try {
       final sale = Sale(
         date: DateTime.now(),
@@ -1563,7 +1589,6 @@ class PosController extends GetxController {
       );
       await SQLiteDatabaseService.saveSale(sale);
       _notifySaleCompleted();
-      // No registrar ingreso en caja (es por cobrar). Crear cuenta por cobrar.
       final invoiceNumber = 'POS-${sale.id ?? 0}';
       final now = DateTime.now();
       final dueDate = now.add(const Duration(days: 30));
@@ -1580,15 +1605,53 @@ class PosController extends GetxController {
         invoiceDate: now,
         dueDate: dueDate,
         status: 'pending',
-        notes: 'Venta POS a crédito - Recibo $invoiceNumber',
+        notes: abono > 0
+            ? 'Venta POS a crédito - $invoiceNumber (abono ${abono.toStringAsFixed(0)} $abonoPaymentMethod)'
+            : 'Venta POS a crédito - $invoiceNumber',
         createdAt: now,
         updatedAt: now,
       );
-      await AccountsReceivablePayableService.createAccountsReceivable(
-          receivable);
+      final receivableId = await AccountsReceivablePayableService
+          .createAccountsReceivable(receivable);
+
+      if (abono > 0) {
+        final uid = AuthService.to.currentUser?.id ?? 0;
+        if (uid == 0) {
+          throw Exception('Usuario no válido para registrar abono');
+        }
+        await AccountsReceivablePayableService.recordReceivablePayment(
+          ReceivablePayment(
+            accountsReceivableId: receivableId,
+            amount: abono,
+            paymentDate: now,
+            paymentMethod: abonoPaymentMethod,
+            reference: invoiceNumber,
+            notes: 'Abono inicial en POS',
+            userId: uid,
+            createdAt: now,
+          ),
+        );
+        try {
+          await AccountingService.recordSaleIncome(
+            abono,
+            'Abono crédito $invoiceNumber',
+            uid,
+            paymentMethod: abonoPaymentMethod,
+            reference: 'credit_down_payment',
+          );
+        } catch (e) {
+          Get.snackbar(
+            'Aviso',
+            'Abono registrado en cuenta por cobrar. No se pudo reflejar en caja contable: $e',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 4),
+          );
+        }
+      }
+
       final customerForReceipt = selectedCustomer.value;
       final clientForReceipt = selectedClient.value;
-      // No sumar puntos en venta a crédito (se dan cuando el cliente pague)
       _showPrintConfirmationDialog(sale, 'Crédito', copFormat,
           customer: customerForReceipt, client: clientForReceipt);
     } catch (e) {
@@ -2105,6 +2168,266 @@ class PosController extends GetxController {
       _removeEmptyHeldSales();
       notifyCustomerDisplayChanged();
     }
+  }
+}
+
+/// Segundo paso al elegir venta a crédito (F6): cliente, saldo anterior, abono y saldo de esta venta.
+class _PosCreditReceivableDialog extends StatefulWidget {
+  final PosController pos;
+  final NumberFormat copFormat;
+
+  const _PosCreditReceivableDialog({
+    required this.pos,
+    required this.copFormat,
+  });
+
+  @override
+  State<_PosCreditReceivableDialog> createState() =>
+      _PosCreditReceivableDialogState();
+}
+
+class _PosCreditReceivableDialogState extends State<_PosCreditReceivableDialog> {
+  final TextEditingController _abonoController = TextEditingController();
+  String _abonoPaymentMethod = 'Efectivo';
+
+  @override
+  void dispose() {
+    _abonoController.dispose();
+    super.dispose();
+  }
+
+  double _parseAbono(double totalVenta) {
+    final raw = parseMontoPuntosMiles(_abonoController.text) ?? 0.0;
+    if (raw < 0) return 0.0;
+    if (raw > totalVenta) return totalVenta;
+    return raw;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final totalVenta = widget.pos.total;
+      final customer = widget.pos.selectedCustomer.value;
+      final abono = _parseAbono(totalVenta);
+      final saldoEstaVenta = totalVenta - abono;
+
+      return Container(
+        width: 440,
+        constraints: const BoxConstraints(maxHeight: 520),
+        padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Venta a crédito (cuenta por cobrar)',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Total del carrito: ${widget.copFormat.format(totalVenta)}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4CAF50),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Cliente (sistema / puntos)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (customer == null)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await widget.pos.showCustomerSelectionModal();
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.person_search),
+                  label: const Text('Elegir cliente'),
+                )
+              else
+                Card(
+                  child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(customer.name),
+                    subtitle: Text(
+                      customer.documentNumber?.trim().isNotEmpty == true
+                          ? customer.documentNumber!
+                          : (customer.email),
+                    ),
+                    trailing: TextButton(
+                      onPressed: () async {
+                        await widget.pos.showCustomerSelectionModal();
+                        setState(() {});
+                      },
+                      child: const Text('Cambiar'),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              FutureBuilder<double>(
+                key: ValueKey(customer?.id ?? -1),
+                future: customer?.id != null
+                    ? AccountsReceivablePayableService.getPendingTotalForCustomer(
+                        customer!.id!)
+                    : Future.value(0.0),
+                builder: (context, snap) {
+                  final prev = snap.data ?? 0.0;
+                  final loading = snap.connectionState == ConnectionState.waiting &&
+                      customer?.id != null;
+                  final totalClienteEst = prev + saldoEstaVenta;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (loading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Center(
+                              child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )),
+                        ),
+                      Text(
+                        'Saldo pendiente anterior (cuentas por cobrar):',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      Text(
+                        widget.copFormat.format(prev),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Abono ahora (opcional)',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _abonoController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                          PuntosMilesInputFormatter(),
+                        ],
+                        decoration: const InputDecoration(
+                          prefixText: '\$ ',
+                          border: OutlineInputBorder(),
+                          hintText: '0 — dejar vacío si no hay abono',
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      if (abono > 0) ...[
+                        const SizedBox(height: 12),
+                        InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Método de pago del abono',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _abonoPaymentMethod,
+                              isExpanded: true,
+                              items: kPosPaymentMethodOptions
+                                  .map(
+                                    (m) => DropdownMenuItem(
+                                      value: m,
+                                      child: Text(m),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v != null) {
+                                  setState(() => _abonoPaymentMethod = v);
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Saldo por cobrar (esta venta): ${widget.copFormat.format(saldoEstaVenta)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Saldo total estimado del cliente: ${widget.copFormat.format(totalClienteEst)}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Get.back(),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: customer == null || customer.id == null
+                          ? null
+                          : () async {
+                              Get.back();
+                              await widget.pos.finalizeCreditSaleWithAbono(
+                                widget.copFormat,
+                                abono,
+                                abonoPaymentMethod: abono > 0
+                                    ? _abonoPaymentMethod
+                                    : 'Efectivo',
+                              );
+                            },
+                      child: const Text('Confirmar crédito'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 }
 

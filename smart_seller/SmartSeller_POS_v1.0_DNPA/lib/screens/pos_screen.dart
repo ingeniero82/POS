@@ -13,6 +13,7 @@ import '../widgets/reprint_menu_widget.dart';
 import '../modules/accounting/widgets/accounting_modal.dart';
 import '../modules/accounting/services/accounting_service.dart';
 import '../services/auth_service.dart';
+import '../services/print_service.dart';
 
 import '../services/client_validation_service.dart';
 import '../models/client.dart';
@@ -2098,12 +2099,31 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _openCashDrawer() {
-    Get.snackbar(
-      'Cajón abierto',
-      'Comando enviado para abrir el cajón monedero',
-      backgroundColor: Colors.blue,
-      colorText: Colors.white,
-    );
+    final printService = PrintService.instance;
+    printService.openCashDrawer().then((opened) {
+      if (opened) {
+        Get.snackbar(
+          'Cajón abierto',
+          'Cajón monedero abierto correctamente',
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          'No se pudo abrir',
+          'Verifica impresora/cajón y configuración de puerto',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      }
+    }).catchError((_) {
+      Get.snackbar(
+        'Error',
+        'Ocurrió un error al intentar abrir el cajón',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    });
   }
 
   void _finalizeSale() {
@@ -3205,6 +3225,7 @@ class _PosScreenState extends State<PosScreen> {
   void _showAccountingModal() {
     Get.dialog(
       AccountingModal(
+        onStartCashCount: _openCashDrawer,
         onTransactionProcessed: (entry) {
           // Callback cuando se procesa una transacción
           Get.snackbar(

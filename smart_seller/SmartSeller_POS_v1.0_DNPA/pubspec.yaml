@@ -47,6 +47,7 @@ dependencies:
   sqflite_common_ffi: ^2.3.6
   flutter_typeahead: ^4.0.0
   libserialport: ^0.3.0+1
+  flutter_libserialport: ^0.3.0
   cached_network_image: ^3.3.0
   image_picker: ^1.0.4
   crypto: ^3.0.3

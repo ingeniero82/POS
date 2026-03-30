@@ -666,6 +666,10 @@ class AccountingReportsService {
       double ivaIncluido = 0.0; // Suma de IVA real por ítem (0% = exento)
       final byMethod =
           <String, Map<String, dynamic>>{}; // method -> { amount, count }
+      final ventasPorTarifaIva = <String, double>{};
+      final ivaPorTarifa = <String, double>{};
+      final ivaByProductIdCache = <int, int>{};
+      final ivaByNameUnitCache = <String, int>{};
 
       for (final s in salesRows) {
         final anulada = (s['anulada'] as int? ?? 0) == 1;
@@ -696,27 +700,86 @@ class AccountingReportsService {
             final list = jsonDecode(itemsStr) as List<dynamic>?;
             if (list != null) {
               for (final e in list) {
-                final item = e as Map<String, dynamic>;
+                if (e is! Map) continue;
+                final item = Map<String, dynamic>.from(e);
                 final price = (item['price'] is num)
                     ? (item['price'] as num).toDouble()
                     : 0.0;
                 final qty = (item['quantity'] is int)
                     ? item['quantity'] as int
                     : (item['quantity'] as num?)?.toInt() ?? 0;
-                final ivaPct = (item['ivaPercentage'] is int)
+                int? ivaPct = (item['ivaPercentage'] is int)
                     ? item['ivaPercentage'] as int
-                    : (item['ivaPercentage'] as num?)?.toInt() ?? 19;
+                    : (item['ivaPercentage'] as num?)?.toInt();
+                if (ivaPct == null) {
+                  final productId = (item['productId'] is int)
+                      ? item['productId'] as int
+                      : (item['productId'] as num?)?.toInt();
+                  if (productId != null) {
+                    ivaPct = ivaByProductIdCache[productId];
+                    if (ivaPct == null) {
+                      final productRows = await db.query(
+                        'products',
+                        columns: ['ivaPercentage'],
+                        where: 'id = ?',
+                        whereArgs: [productId],
+                        limit: 1,
+                      );
+                      if (productRows.isNotEmpty) {
+                        ivaPct = (productRows.first['ivaPercentage'] as num?)
+                                ?.toInt() ??
+                            0;
+                      } else {
+                        ivaPct = 0;
+                      }
+                      ivaByProductIdCache[productId] = ivaPct;
+                    }
+                  } else {
+                    final name = (item['name'] as String? ?? '').trim();
+                    final unit = (item['unit'] as String? ?? '').trim();
+                    final key = '${name.toLowerCase()}|${unit.toLowerCase()}';
+                    ivaPct = ivaByNameUnitCache[key];
+                    if (ivaPct == null && name.isNotEmpty) {
+                      final productRows = await db.query(
+                        'products',
+                        columns: ['ivaPercentage'],
+                        where: 'LOWER(name) = ? AND LOWER(unit) = ?',
+                        whereArgs: [name.toLowerCase(), unit.toLowerCase()],
+                        limit: 1,
+                      );
+                      if (productRows.isNotEmpty) {
+                        ivaPct = (productRows.first['ivaPercentage'] as num?)
+                                ?.toInt() ??
+                            0;
+                      } else {
+                        ivaPct = 0;
+                      }
+                      ivaByNameUnitCache[key] = ivaPct;
+                    }
+                    ivaPct ??= 0;
+                  }
+                }
                 final revenue = price * qty;
-                if (ivaPct > 0)
+                final rateKey = ivaPct.toString();
+                ventasPorTarifaIva[rateKey] =
+                    (ventasPorTarifaIva[rateKey] ?? 0.0) + revenue;
+                if (ivaPct > 0) {
+                  final ivaAmount = revenue * (ivaPct / 100) / (1 + ivaPct / 100);
+                  ivaPorTarifa[rateKey] =
+                      (ivaPorTarifa[rateKey] ?? 0.0) + ivaAmount;
                   ivaIncluido += revenue * (ivaPct / 100) / (1 + ivaPct / 100);
+                } else {
+                  ivaPorTarifa.putIfAbsent(rateKey, () => 0.0);
+                }
               }
             }
           } else {
-            // Ventas antiguas sin ivaPercentage en ítems: estimar con 19%
-            ivaIncluido += total / 1.19 * 0.19;
+            // Sin detalle de IVA por ítem, se asume exento para no sobreestimar.
+            ivaIncluido += 0.0;
           }
         } catch (_) {
-          ivaIncluido += total / 1.19 * 0.19;
+          // Si no se puede parsear el detalle, evitar inflar IVA por defecto.
+          ivaIncluido += 0.0;
         }
 
         final pbStr = s['payment_breakdown'] as String?;
@@ -820,6 +883,8 @@ class AccountingReportsService {
         'devoluciones': devoluciones,
         'ventaNeta': ventaNeta,
         'ivaIncluido': ivaIncluido,
+        'ventasPorTarifaIva': ventasPorTarifaIva,
+        'ivaPorTarifa': ivaPorTarifa,
         'byMethod': byMethod,
         'ventasEfectivo': ventasEfectivo,
         'otrosIngresos': otrosIngresos,

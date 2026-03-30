@@ -504,6 +504,11 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     final devoluciones = (data['devoluciones'] as num?)?.toDouble() ?? 0.0;
     final ventaNeta = (data['ventaNeta'] as num?)?.toDouble() ?? 0.0;
     final ivaIncluido = (data['ivaIncluido'] as num?)?.toDouble() ?? 0.0;
+    final ventasPorTarifaIva =
+        (data['ventasPorTarifaIva'] as Map<String, dynamic>? ?? {})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+    final ivaPorTarifa = (data['ivaPorTarifa'] as Map<String, dynamic>? ?? {})
+        .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
     final byMethod = data['byMethod'] as Map<String, dynamic>? ?? {};
     final ventasEfectivo = (data['ventasEfectivo'] as num?)?.toDouble() ?? 0.0;
     final otrosIngresos = (data['otrosIngresos'] as num?)?.toDouble() ?? 0.0;
@@ -564,6 +569,16 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     sb.writeln(dashW);
     lineVal('VENTA NETA:', '\$${fmtNum(ventaNeta)}');
     lineVal('IVA incluido:', '\$${fmtNum(ivaIncluido)}');
+    final orderedRates = ventasPorTarifaIva.keys.toList()
+      ..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    for (final rate in orderedRates) {
+      final ventaTarifa = ventasPorTarifaIva[rate] ?? 0.0;
+      final ivaTarifa = ivaPorTarifa[rate] ?? 0.0;
+      lineVal(
+        '  IVA ${rate}%:',
+        'Ventas \$${fmtNum(ventaTarifa)} | Imp \$${fmtNum(ivaTarifa)}',
+      );
+    }
     sb.writeln(sepW);
     sb.writeln('');
     sb.writeln('FORMAS DE PAGO');
@@ -1540,6 +1555,26 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                           bold: true),
                       _dataRow('IVA incluido',
                           '\$${_currencyFormat.format((d['ivaIncluido'] as num?)?.toDouble() ?? 0)}'),
+                      ...(() {
+                        final ventasPorTarifaIva =
+                            (d['ventasPorTarifaIva'] as Map<String, dynamic>? ??
+                                    {})
+                                .map((k, v) =>
+                                    MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+                        final ivaPorTarifa =
+                            (d['ivaPorTarifa'] as Map<String, dynamic>? ?? {})
+                                .map((k, v) =>
+                                    MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+                        final orderedRates = ventasPorTarifaIva.keys.toList()
+                          ..sort((a, b) => (int.tryParse(a) ?? 0)
+                              .compareTo(int.tryParse(b) ?? 0));
+                        return orderedRates
+                            .map((rate) => _dataRow(
+                                  'IVA $rate%',
+                                  'Ventas \$${_currencyFormat.format(ventasPorTarifaIva[rate] ?? 0)} · Imp \$${_currencyFormat.format(ivaPorTarifa[rate] ?? 0)}',
+                                ))
+                            .toList();
+                      })(),
                     ],
                   ),
                 ],

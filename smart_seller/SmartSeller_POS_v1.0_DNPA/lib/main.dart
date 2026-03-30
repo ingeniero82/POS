@@ -17,6 +17,7 @@ import 'screens/printer_config_screen.dart';
 import 'screens/groups_screen.dart';
 import 'screens/suppliers_screen.dart';
 import 'screens/inventory_movements_screen.dart';
+import 'screens/balanza_diagnostico_screen.dart';
 import 'modules/accounting/screens/accounts_receivable_payable_screen.dart';
 import 'modules/accounting/screens/accounting_reports_screen.dart';
 
@@ -233,6 +234,11 @@ class MyApp extends StatelessWidget {
           name: '/electronic-invoicing/queue',
           page: () => const PendingInvoiceQueueScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/balanza-diagnostico',
+          page: () => const BalanzaDiagnosticoScreen(),
+          middlewares: [AuthMiddleware()],
         ),
       ],
     );

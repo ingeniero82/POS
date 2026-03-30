@@ -6,6 +6,52 @@ import '../models/accounts_payable.dart';
 import '../models/receivable_payment.dart';
 import '../models/payable_payment.dart';
 
+/// Un cliente con todas sus cuentas por cobrar agregadas (lista sin duplicar nombre).
+class ReceivableCustomerSummary {
+  final int customerId;
+  final String customerName;
+  final String customerDocument;
+  final double totalPending;
+  final double totalPaid;
+  final double totalInvoiced;
+  final int documentCount;
+  final List<AccountsReceivable> accounts;
+
+  ReceivableCustomerSummary({
+    required this.customerId,
+    required this.customerName,
+    required this.customerDocument,
+    required this.totalPending,
+    required this.totalPaid,
+    required this.totalInvoiced,
+    required this.documentCount,
+    required this.accounts,
+  });
+}
+
+/// Un proveedor con todas sus cuentas por pagar agregadas.
+class PayableSupplierSummary {
+  final int supplierId;
+  final String supplierName;
+  final String supplierDocument;
+  final double totalPending;
+  final double totalPaid;
+  final double totalInvoiced;
+  final int documentCount;
+  final List<AccountsPayable> accounts;
+
+  PayableSupplierSummary({
+    required this.supplierId,
+    required this.supplierName,
+    required this.supplierDocument,
+    required this.totalPending,
+    required this.totalPaid,
+    required this.totalInvoiced,
+    required this.documentCount,
+    required this.accounts,
+  });
+}
+
 class AccountsReceivablePayableService {
   static const String _receivableTableName = 'accounts_receivable';
   static const String _payableTableName = 'accounts_payable';
@@ -123,6 +169,195 @@ class AccountsReceivablePayableService {
       print('❌ Error al registrar pago: $e');
       rethrow;
     }
+  }
+
+  /// Suma de `pending_amount` de cuentas por cobrar del cliente (excluye pagadas).
+  static Future<double> getPendingTotalForCustomer(int customerId) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return 0.0;
+
+      final rows = await db.rawQuery(
+        'SELECT COALESCE(SUM(pending_amount), 0) AS t FROM $_receivableTableName WHERE customer_id = ? AND status != ?',
+        [customerId, 'paid'],
+      );
+      if (rows.isEmpty) return 0.0;
+      return (rows.first['t'] as num?)?.toDouble() ?? 0.0;
+    } catch (e) {
+      print('❌ Error sumando saldo por cobrar del cliente: $e');
+      return 0.0;
+    }
+  }
+
+  /// Pagos registrados contra una cuenta por cobrar (abonos).
+  static Future<List<ReceivablePayment>> getPaymentsForReceivable(
+      int accountsReceivableId) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return [];
+
+      final maps = await db.query(
+        _receivablePaymentsTableName,
+        where: 'accounts_receivable_id = ?',
+        whereArgs: [accountsReceivableId],
+        orderBy: 'payment_date DESC',
+      );
+      return maps.map((m) => ReceivablePayment.fromMap(m)).toList();
+    } catch (e) {
+      print('❌ Error obteniendo pagos de cuenta por cobrar: $e');
+      return [];
+    }
+  }
+
+  /// Pagos de múltiples cuentas por cobrar en una sola consulta.
+  static Future<Map<int, List<ReceivablePayment>>> getPaymentsForReceivables(
+      List<int> accountsReceivableIds) async {
+    try {
+      if (accountsReceivableIds.isEmpty) return {};
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return {};
+
+      final placeholders =
+          List.filled(accountsReceivableIds.length, '?').join(',');
+      final maps = await db.rawQuery(
+        'SELECT * FROM $_receivablePaymentsTableName '
+        'WHERE accounts_receivable_id IN ($placeholders) '
+        'ORDER BY payment_date DESC',
+        accountsReceivableIds,
+      );
+
+      final out = <int, List<ReceivablePayment>>{};
+      for (final id in accountsReceivableIds) {
+        out[id] = <ReceivablePayment>[];
+      }
+      for (final m in maps) {
+        final p = ReceivablePayment.fromMap(m);
+        out.putIfAbsent(p.accountsReceivableId, () => <ReceivablePayment>[])
+            .add(p);
+      }
+      return out;
+    } catch (e) {
+      print('❌ Error obteniendo pagos agrupados por cuentas por cobrar: $e');
+      return {};
+    }
+  }
+
+  /// Pagos registrados contra una cuenta por pagar.
+  static Future<List<PayablePayment>> getPaymentsForPayable(
+      int accountsPayableId) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return [];
+
+      final maps = await db.query(
+        _payablePaymentsTableName,
+        where: 'accounts_payable_id = ?',
+        whereArgs: [accountsPayableId],
+        orderBy: 'payment_date DESC',
+      );
+      return maps.map((m) => PayablePayment.fromMap(m)).toList();
+    } catch (e) {
+      print('❌ Error obteniendo pagos de cuenta por pagar: $e');
+      return [];
+    }
+  }
+
+  /// Pagos de múltiples cuentas por pagar en una sola consulta.
+  static Future<Map<int, List<PayablePayment>>> getPaymentsForPayables(
+      List<int> accountsPayableIds) async {
+    try {
+      if (accountsPayableIds.isEmpty) return {};
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return {};
+
+      final placeholders = List.filled(accountsPayableIds.length, '?').join(',');
+      final maps = await db.rawQuery(
+        'SELECT * FROM $_payablePaymentsTableName '
+        'WHERE accounts_payable_id IN ($placeholders) '
+        'ORDER BY payment_date DESC',
+        accountsPayableIds,
+      );
+
+      final out = <int, List<PayablePayment>>{};
+      for (final id in accountsPayableIds) {
+        out[id] = <PayablePayment>[];
+      }
+      for (final m in maps) {
+        final p = PayablePayment.fromMap(m);
+        out.putIfAbsent(p.accountsPayableId, () => <PayablePayment>[]).add(p);
+      }
+      return out;
+    } catch (e) {
+      print('❌ Error obteniendo pagos agrupados por cuentas por pagar: $e');
+      return {};
+    }
+  }
+
+  /// Agrupa cuentas por cobrar por [customerId] (un renglón por cliente).
+  static Future<List<ReceivableCustomerSummary>>
+      getReceivablesGroupedByCustomer() async {
+    final all = await getAllAccountsReceivable();
+    final byCustomer = <int, List<AccountsReceivable>>{};
+    for (final a in all) {
+      byCustomer.putIfAbsent(a.customerId, () => []).add(a);
+    }
+    final out = <ReceivableCustomerSummary>[];
+    for (final e in byCustomer.entries) {
+      final list = List<AccountsReceivable>.from(e.value)
+        ..sort((a, b) => b.invoiceDate.compareTo(a.invoiceDate));
+      final first = list.first;
+      double pending = 0, paid = 0, invoiced = 0;
+      for (final x in list) {
+        pending += x.pendingAmount;
+        paid += x.paidAmount;
+        invoiced += x.totalAmount;
+      }
+      out.add(ReceivableCustomerSummary(
+        customerId: e.key,
+        customerName: first.customerName,
+        customerDocument: first.customerDocument,
+        totalPending: pending,
+        totalPaid: paid,
+        totalInvoiced: invoiced,
+        documentCount: list.length,
+        accounts: list,
+      ));
+    }
+    out.sort((a, b) => b.totalPending.compareTo(a.totalPending));
+    return out;
+  }
+
+  /// Agrupa cuentas por pagar por proveedor.
+  static Future<List<PayableSupplierSummary>> getPayablesGroupedBySupplier() async {
+    final all = await getAllAccountsPayable();
+    final bySup = <int, List<AccountsPayable>>{};
+    for (final a in all) {
+      bySup.putIfAbsent(a.supplierId, () => []).add(a);
+    }
+    final out = <PayableSupplierSummary>[];
+    for (final e in bySup.entries) {
+      final list = List<AccountsPayable>.from(e.value)
+        ..sort((a, b) => b.invoiceDate.compareTo(a.invoiceDate));
+      final first = list.first;
+      double pending = 0, paid = 0, invoiced = 0;
+      for (final x in list) {
+        pending += x.pendingAmount;
+        paid += x.paidAmount;
+        invoiced += x.totalAmount;
+      }
+      out.add(PayableSupplierSummary(
+        supplierId: e.key,
+        supplierName: first.supplierName,
+        supplierDocument: first.supplierDocument,
+        totalPending: pending,
+        totalPaid: paid,
+        totalInvoiced: invoiced,
+        documentCount: list.length,
+        accounts: list,
+      ));
+    }
+    out.sort((a, b) => b.totalPending.compareTo(a.totalPending));
+    return out;
   }
 
   // Obtener cuenta por cobrar por ID
