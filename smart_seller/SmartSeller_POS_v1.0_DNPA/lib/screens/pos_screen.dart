@@ -733,7 +733,12 @@ class _PosScreenState extends State<PosScreen> {
             Text('Código: ${_selectedProduct!.code}'),
             Text(
                 'Precio: \$${NumberFormat('#,###').format(_selectedProduct!.price)}'),
-            Text('Stock: ${_selectedProduct!.stock}'),
+            Text(
+              _selectedProduct!.isWeighted &&
+                      _selectedProduct!.weightedStockInKg
+                  ? 'Stock: ${_selectedProduct!.stockKg.toStringAsFixed(3)} kg'
+                  : 'Stock: ${_selectedProduct!.stock} ${_selectedProduct!.unit}',
+            ),
             const SizedBox(height: 16),
 
             // Campo de cantidad
@@ -1775,6 +1780,12 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
 
+    // Paso 2 (manual): si es producto pesado, pedir peso en kg y calcular total automático.
+    if (_selectedProduct!.isWeighted) {
+      _showWeightedAddDialog();
+      return;
+    }
+
     _posController.addToCart(
       _selectedProduct!.name,
       _selectedProduct!.price,
@@ -1794,6 +1805,124 @@ class _PosScreenState extends State<PosScreen> {
     );
 
     _cancelSelection();
+  }
+
+  void _showWeightedAddDialog() {
+    final product = _selectedProduct;
+    if (product == null) return;
+
+    final pricePerKg = product.pricePerKg;
+    if (pricePerKg == null || pricePerKg <= 0) {
+      Get.snackbar(
+        'Configurar producto pesado',
+        'Este producto no tiene precio por kg válido en inventario.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final weightController = TextEditingController();
+    double calculated = 0.0;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (_, setStateDialog) {
+            void recalc() {
+              final kg = double.tryParse(
+                  weightController.text.trim().replaceAll(',', '.'));
+              calculated = (kg != null && kg > 0) ? (kg * pricePerKg) : 0.0;
+            }
+
+            void submitWeightedAdd() {
+              final kg = double.tryParse(
+                  weightController.text.trim().replaceAll(',', '.'));
+              if (kg == null || kg <= 0) {
+                Get.snackbar(
+                  'Peso inválido',
+                  'Ingresa un peso válido mayor que 0.',
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+                return;
+              }
+              final total = kg * pricePerKg;
+              final useKgStock = product.weightedStockInKg;
+              _posController.addToCart(
+                product.name,
+                total,
+                product.unit,
+                quantity: 1,
+                availableStock: useKgStock ? null : product.stock,
+                availableStockKg: useKgStock ? product.stockKg : null,
+                weightKg: useKgStock ? kg : null,
+                ivaPercentage: product.ivaPercentage,
+                productId: product.id,
+                mergeExisting: false,
+              );
+
+              Navigator.of(dialogContext).pop();
+              Get.snackbar(
+                '✅ Agregado por peso',
+                '${product.name} · ${kg.toStringAsFixed(3)} kg · \$${NumberFormat('#,###').format(total)}',
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 2),
+              );
+              _cancelSelection();
+            }
+
+            return AlertDialog(
+              title: Text('Producto pesado: ${product.name}'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Precio por kg: \$${NumberFormat('#,###').format(pricePerKg)}'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: weightController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      autofocus: true,
+                      onChanged: (_) {
+                        setStateDialog(recalc);
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Peso (kg) *',
+                        hintText: 'Ej: 0.750',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Total: \$${NumberFormat('#,###').format(calculated)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: submitWeightedAdd,
+                  child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _cancelSelection() {

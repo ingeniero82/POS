@@ -74,6 +74,7 @@ class SQLiteDatabaseService {
     // Llama a la migración después de abrir la base de datos
     await migrateAddPricePerKg();
     await migrateAddWeightColumns();
+    await migrateAddWeightedStockKgColumns();
 
     // Crear grupos por defecto si no existen
     await migrateAddGroupsTable();
@@ -250,7 +251,9 @@ class SQLiteDatabaseService {
         pricePerKg REAL,
         weight REAL,
         minWeight REAL,
-        maxWeight REAL
+        maxWeight REAL,
+        weightedStockInKg INTEGER NOT NULL DEFAULT 0,
+        stockKg REAL NOT NULL DEFAULT 0
       )
     ''');
 
@@ -1100,6 +1103,24 @@ class SQLiteDatabaseService {
 
   // ================== VENTAS ==================
 
+  static Future<Map<String, dynamic>?> _productRowForSaleItem(
+      SaleItem item) async {
+    if (item.productId != null && item.productId! > 0) {
+      final r = await _database!.query(
+        'products',
+        where: 'id = ?',
+        whereArgs: [item.productId],
+      );
+      if (r.isNotEmpty) return r.first;
+    }
+    final r2 = await _database!.query(
+      'products',
+      where: 'name = ? AND unit = ? AND isActive = ?',
+      whereArgs: [item.name, item.unit, 1],
+    );
+    return r2.isNotEmpty ? r2.first : null;
+  }
+
   // Guardar venta. Asigna sale.id con el ID autoincremental (primera venta = 1, luego 2, 3...).
   static Future<void> saveSale(Sale sale) async {
     final id = await _database!.insert('sales', {
@@ -1121,6 +1142,7 @@ class SQLiteDatabaseService {
           'ivaPercentage': item.ivaPercentage,
         };
         if (item.productId != null) m['productId'] = item.productId;
+        if (item.weightKg != null) m['weightKg'] = item.weightKg;
         return m;
       }).toList()), // Guardar como JSON string
       // ✅ Cliente asociado (para reimpresión con nombre en ticket)
@@ -1136,23 +1158,36 @@ class SQLiteDatabaseService {
     sale.id = id;
 
     // Ajustar stock: venta normal = descontar; devolución = sumar (productos vuelven)
+    final nowStr = DateTime.now().toIso8601String();
     for (final item in sale.items) {
-      final results = await _database!.query(
-        'products',
-        where: 'name = ? AND unit = ? AND isActive = 1',
-        whereArgs: [item.name, item.unit],
-      );
-      if (results.isNotEmpty) {
-        final productData = results.first;
-        int currentStock = productData['stock'] as int;
+      final row = await _productRowForSaleItem(item);
+      if (row == null) continue;
+      final product = Product.fromMap(row);
+      if (product.isWeighted &&
+          product.weightedStockInKg &&
+          item.weightKg != null &&
+          item.weightKg! > 0) {
+        final kg = item.weightKg!;
+        final currentKg = (row['stockKg'] as num?)?.toDouble() ?? 0.0;
+        final newKg = sale.isReturn
+            ? currentKg + kg
+            : (currentKg - kg).clamp(0.0, 1e15);
+        await _database!.update(
+          'products',
+          {'stockKg': newKg, 'updatedAt': nowStr},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      } else {
+        int currentStock = row['stock'] as int;
         int newStock = sale.isReturn
             ? currentStock + item.quantity
             : (currentStock - item.quantity).clamp(0, 0x7fffffff);
         await _database!.update(
           'products',
-          {'stock': newStock, 'updatedAt': DateTime.now().toIso8601String()},
+          {'stock': newStock, 'updatedAt': nowStr},
           where: 'id = ?',
-          whereArgs: [productData['id']],
+          whereArgs: [row['id']],
         );
       }
     }
@@ -1248,6 +1283,7 @@ class SQLiteDatabaseService {
                         ? item['ivaPercentage'] as int
                         : (item['ivaPercentage'] as num?)?.toInt() ?? 19,
                     productId: (item['productId'] as num?)?.toInt(),
+                    weightKg: (item['weightKg'] as num?)?.toDouble(),
                   ))
               .toList();
         } else {
@@ -1321,6 +1357,7 @@ class SQLiteDatabaseService {
                       ? item['ivaPercentage'] as int
                       : (item['ivaPercentage'] as num?)?.toInt() ?? 19,
                   productId: (item['productId'] as num?)?.toInt(),
+                  weightKg: (item['weightKg'] as num?)?.toDouble(),
                 ))
             .toList();
       }
@@ -1364,20 +1401,29 @@ class SQLiteDatabaseService {
     );
     // Devolver stock por cada ítem
     for (final item in sale.items) {
-      final results = await _database!.query(
-        'products',
-        where: 'name = ? AND unit = ? AND isActive = 1',
-        whereArgs: [item.name, item.unit],
-      );
-      if (results.isNotEmpty) {
-        final productData = results.first;
-        int currentStock = productData['stock'] as int;
+      final row = await _productRowForSaleItem(item);
+      if (row == null) continue;
+      final product = Product.fromMap(row);
+      if (product.isWeighted &&
+          product.weightedStockInKg &&
+          item.weightKg != null &&
+          item.weightKg! > 0) {
+        final kg = item.weightKg!;
+        final currentKg = (row['stockKg'] as num?)?.toDouble() ?? 0.0;
+        await _database!.update(
+          'products',
+          {'stockKg': currentKg + kg, 'updatedAt': now},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      } else {
+        int currentStock = row['stock'] as int;
         int newStock = currentStock + item.quantity;
         await _database!.update(
           'products',
           {'stock': newStock, 'updatedAt': now},
           where: 'id = ?',
-          whereArgs: [productData['id']],
+          whereArgs: [row['id']],
         );
       }
     }
@@ -1522,6 +1568,30 @@ class SQLiteDatabaseService {
       print('✅ Migración: Campo pricePerKg agregado a la tabla products');
     } else {
       print('ℹ️ La tabla products ya tiene el campo pricePerKg');
+    }
+  }
+
+  /// Inventario para productos pesados: unidades ([stock]) o kilogramos ([stockKg]).
+  static Future<void> migrateAddWeightedStockKgColumns() async {
+    var result = await _database!.rawQuery("PRAGMA table_info(products)");
+    if (!result.any((col) => col['name'] == 'weightedStockInKg')) {
+      try {
+        await _database!.execute(
+            'ALTER TABLE products ADD COLUMN weightedStockInKg INTEGER NOT NULL DEFAULT 0');
+        print('✅ Migración: weightedStockInKg agregado a products');
+      } catch (e) {
+        print('ℹ️ weightedStockInKg: $e');
+      }
+    }
+    result = await _database!.rawQuery("PRAGMA table_info(products)");
+    if (!result.any((col) => col['name'] == 'stockKg')) {
+      try {
+        await _database!.execute(
+            'ALTER TABLE products ADD COLUMN stockKg REAL NOT NULL DEFAULT 0');
+        print('✅ Migración: stockKg agregado a products');
+      } catch (e) {
+        print('ℹ️ stockKg: $e');
+      }
     }
   }
 

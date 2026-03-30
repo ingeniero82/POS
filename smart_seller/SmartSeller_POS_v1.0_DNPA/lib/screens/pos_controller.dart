@@ -29,6 +29,9 @@ class CartItem {
   /// Coincide con `products.id` cuando el ítem viene del catálogo POS.
   final int? productId;
 
+  /// Kg vendidos (inventario por kg). Si es null, el stock se controla por [quantity] en unidades.
+  final double? weightKg;
+
   CartItem({
     required this.name,
     required this.price,
@@ -36,6 +39,7 @@ class CartItem {
     this.quantity = 1,
     this.ivaPercentage = 19,
     this.productId,
+    this.weightKg,
   });
 
   double get total => price * quantity;
@@ -48,7 +52,8 @@ class CartItem {
       unit: unit,
       quantity: quantity,
       ivaPercentage: ivaPercentage,
-      productId: productId);
+      productId: productId,
+      weightKg: weightKg);
 }
 
 /// Carrito guardado en espera para atender otro cliente y recuperar después.
@@ -165,6 +170,7 @@ class PosController extends GetxController {
                   'quantity': i.quantity,
                   'ivaPercentage': i.ivaPercentage,
                   if (i.productId != null) 'productId': i.productId,
+                  if (i.weightKg != null) 'weightKg': i.weightKg,
                 })
             .toList(),
         'customerId': selectedCustomer.value?.id,
@@ -198,6 +204,7 @@ class PosController extends GetxController {
           quantity: (item['quantity'] as num?)?.toInt() ?? 1,
           ivaPercentage: (item['ivaPercentage'] as num?)?.toInt() ?? 19,
           productId: (item['productId'] as num?)?.toInt(),
+          weightKg: (item['weightKg'] as num?)?.toDouble(),
         );
       }).toList();
       cartItems.assignAll(items);
@@ -248,6 +255,7 @@ class PosController extends GetxController {
                           'quantity': i.quantity,
                           'ivaPercentage': i.ivaPercentage,
                           if (i.productId != null) 'productId': i.productId,
+                          if (i.weightKg != null) 'weightKg': i.weightKg,
                         })
                     .toList(),
               })
@@ -279,6 +287,7 @@ class PosController extends GetxController {
             quantity: (item['quantity'] as num?)?.toInt() ?? 1,
             ivaPercentage: (item['ivaPercentage'] as num?)?.toInt() ?? 19,
             productId: (item['productId'] as num?)?.toInt(),
+            weightKg: (item['weightKg'] as num?)?.toDouble(),
           );
         }).toList();
         if (items.isEmpty) continue;
@@ -574,21 +583,34 @@ class PosController extends GetxController {
     String unit, {
     int quantity = 1,
     int? availableStock,
+    double? availableStockKg,
+    double? weightKg,
     int ivaPercentage = 19,
     int? productId,
+    bool mergeExisting = true,
   }) {
     // Buscar si el producto ya existe en el carrito (por id de catálogo o nombre+unidad)
-    final existingIndex = cartItems.indexWhere((item) {
-      if (productId != null &&
-          item.productId != null &&
-          item.productId == productId) {
-        return true;
-      }
-      return item.name == name && item.unit == unit;
-    });
+    final existingIndex = mergeExisting
+        ? cartItems.indexWhere((item) {
+            if (productId != null &&
+                item.productId != null &&
+                item.productId == productId) {
+              return true;
+            }
+            return item.name == name && item.unit == unit;
+          })
+        : -1;
+
+    double kgInCartForProduct() {
+      if (productId == null) return 0;
+      return cartItems
+          .where((i) => i.productId == productId && i.weightKg != null)
+          .fold<double>(
+              0.0, (s, i) => s + i.weightKg! * i.quantity);
+    }
 
     if (existingIndex >= 0) {
-      // Si existe, verificar stock antes de aumentar
+      // Si existe, verificar stock antes de aumentar (solo unidades; ítems por kg no se fusionan)
       final currentQuantity = cartItems[existingIndex].quantity;
       if (availableStock != null &&
           currentQuantity + quantity > availableStock) {
@@ -605,7 +627,21 @@ class PosController extends GetxController {
       cartItems.refresh(); // Notificar cambios
     } else {
       // Si no existe, verificar stock antes de agregar
-      if (availableStock != null && quantity > availableStock) {
+      if (availableStockKg != null &&
+          weightKg != null &&
+          weightKg > 0) {
+        if (kgInCartForProduct() + weightKg * quantity >
+            availableStockKg + 1e-9) {
+          Get.snackbar(
+            'Sin stock',
+            'No hay kilogramos suficientes de $name',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      } else if (availableStock != null && quantity > availableStock) {
         Get.snackbar(
           'Sin stock',
           'El producto $name no tiene unidades disponibles',
@@ -622,6 +658,7 @@ class PosController extends GetxController {
         quantity: quantity,
         ivaPercentage: ivaPercentage,
         productId: productId,
+        weightKg: weightKg,
       ));
     }
   }
@@ -638,6 +675,7 @@ class PosController extends GetxController {
         quantity: item.quantity,
         ivaPercentage: item.ivaPercentage,
         productId: item.productId,
+        weightKg: item.weightKg,
       );
       cartItems[index] = updatedItem;
       cartItems.refresh();
@@ -791,6 +829,7 @@ class PosController extends GetxController {
         quantity: item.quantity,
         ivaPercentage: item.ivaPercentage,
         productId: item.productId,
+        weightKg: item.weightKg,
       ));
     }
     heldSales.removeAt(index);
@@ -1455,6 +1494,7 @@ class PosController extends GetxController {
                   unit: item.unit,
                   ivaPercentage: item.ivaPercentage,
                   productId: item.productId,
+                  weightKg: item.weightKg,
                 ))
             .toList(),
       );
@@ -1517,6 +1557,7 @@ class PosController extends GetxController {
                   unit: item.unit,
                   ivaPercentage: item.ivaPercentage,
                   productId: item.productId,
+                  weightKg: item.weightKg,
                 ))
             .toList(),
       );
@@ -1641,6 +1682,7 @@ class PosController extends GetxController {
                   unit: item.unit,
                   ivaPercentage: item.ivaPercentage,
                   productId: item.productId,
+                  weightKg: item.weightKg,
                 ))
             .toList(),
       );

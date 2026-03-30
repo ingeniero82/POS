@@ -442,8 +442,12 @@ class _ProductCard extends StatelessWidget {
             ] else ...[
               Text('Precio:  ${copFormat.format(product.price)}'),
             ],
-            Text('Stock:  ${product.stock} ${product.unit}'),
-            if (product.stock <= product.minStock)
+            Text(
+              product.isWeighted && product.weightedStockInKg
+                  ? 'Stock:  ${product.stockKg} kg'
+                  : 'Stock:  ${product.stock} ${product.unit}',
+            ),
+            if (product.isLowStock)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(

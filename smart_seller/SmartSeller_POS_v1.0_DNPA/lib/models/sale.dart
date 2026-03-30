@@ -80,6 +80,9 @@ class SaleItem {
   /// ID en tabla `products` (POS). Permite "productos frecuentes" y reportes sin depender solo de nombre/unidad.
   int? productId;
 
+  /// Kg vendidos (producto pesado con inventario por kg). Si es null, el descuento de stock usa [quantity] en unidades.
+  double? weightKg;
+
   // Constructor
   SaleItem({
     required this.name,
@@ -90,5 +93,6 @@ class SaleItem {
     this.discountPercentage,
     this.ivaPercentage = 19,
     this.productId,
+    this.weightKg,
   });
 }

@@ -27,11 +27,18 @@ class Product {
   double? minWeight; // Peso mínimo para venta
   double? maxWeight; // Peso máximo para venta
 
+  /// Si es true y [isWeighted], el inventario se controla en kg ([stockKg]); si false, en unidades ([stock]).
+  bool weightedStockInKg = false;
+  /// Kilogramos disponibles cuando [weightedStockInKg] es true.
+  double stockKg = 0;
+
   // Campos calculados
   double get profit => price - cost;
   // ✅ CORREGIDO: Fórmula estándar de POS: (Precio de venta - Costo) / Precio de venta × 100
   double get profitMargin => price > 0 ? ((price - cost) / price) * 100 : 0;
-  bool get isLowStock => stock <= minStock;
+  bool get isLowStock => isWeighted && weightedStockInKg
+      ? stockKg <= minStock
+      : stock <= minStock;
   
   // Para productos pesados, el precio se calcula dinámicamente
   double get calculatedPrice {
@@ -64,6 +71,8 @@ class Product {
     this.weight,
     this.minWeight,
     this.maxWeight,
+    this.weightedStockInKg = false,
+    this.stockKg = 0,
   });
   
   // Constructor desde Map (para base de datos)
@@ -89,6 +98,8 @@ class Product {
     weight = map['weight'];
     minWeight = map['minWeight'];
     maxWeight = map['maxWeight'];
+    weightedStockInKg = (map['weightedStockInKg'] as int? ?? 0) == 1;
+    stockKg = (map['stockKg'] as num?)?.toDouble() ?? 0.0;
   }
   
   // Convertir a Map (para base de datos)
@@ -115,6 +126,8 @@ class Product {
       'weight': weight,
       'minWeight': minWeight,
       'maxWeight': maxWeight,
+      'weightedStockInKg': weightedStockInKg ? 1 : 0,
+      'stockKg': stockKg,
     };
   }
   
@@ -141,6 +154,8 @@ class Product {
     double? weight,
     double? minWeight,
     double? maxWeight,
+    bool? weightedStockInKg,
+    double? stockKg,
   }) {
     return Product(
       id: id ?? this.id,
@@ -164,6 +179,8 @@ class Product {
       weight: weight ?? this.weight,
       minWeight: minWeight ?? this.minWeight,
       maxWeight: maxWeight ?? this.maxWeight,
+      weightedStockInKg: weightedStockInKg ?? this.weightedStockInKg,
+      stockKg: stockKg ?? this.stockKg,
     );
   }
 }

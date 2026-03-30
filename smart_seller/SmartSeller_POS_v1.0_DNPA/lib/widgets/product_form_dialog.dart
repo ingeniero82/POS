@@ -22,6 +22,11 @@ enum PriceCalculationMode {
   fixedMargin // Utilidad fija (nueva funcionalidad)
 }
 
+enum WeightedPricingMode {
+  manualSalePerKg,
+  byProfitPercentage,
+}
+
 class _ProductFormDialogState extends State<ProductFormDialog>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
@@ -38,6 +43,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
   final _ingresoController = TextEditingController();
   final _unitController = TextEditingController();
   final _groupController = TextEditingController();
+  final _profitPerKgVisualController = TextEditingController();
 
   // ✅ NUEVO: Controlador para % de utilidad
   final _profitMarginController = TextEditingController();
@@ -61,6 +67,14 @@ class _ProductFormDialogState extends State<ProductFormDialog>
   /// IVA configurado para facturación electrónica: 0, 5 o 19 (%). Se guarda en BD.
   int _ivaPercentage = 19;
 
+  /// Marca visual para producto por peso.
+  bool _isWeightedProduct = false;
+  WeightedPricingMode _weightedPricingMode = WeightedPricingMode.manualSalePerKg;
+
+  /// Producto pesado: inventario en kg ([true]) o en unidades ([false]).
+  bool _weightedStockInKg = false;
+  final _stockKgController = TextEditingController();
+
   // Controlador para las pestañas
   late TabController _tabController;
 
@@ -83,6 +97,11 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       _selectedGroup = widget.product!.category;
       _groupController.text = _selectedGroup ?? '';
       _isActive = widget.product!.isActive;
+      _isWeightedProduct = widget.product!.isWeighted;
+      _weightedStockInKg = widget.product!.weightedStockInKg;
+      final sk = widget.product!.stockKg;
+      _stockKgController.text =
+          sk > 0 ? sk.toString().replaceAll(RegExp(r'\.0$'), '') : '';
 
       // ✅ NUEVO: Inicializar imagen del producto
       _currentImagePath = widget.product!.imageUrl;
@@ -105,6 +124,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
   void dispose() {
     _tabController.dispose();
     _ingresoController.dispose();
+    _stockKgController.dispose();
+    _profitPerKgVisualController.dispose();
     // ✅ NUEVO: Dispose de los nuevos controladores
     _profitMarginController.dispose();
     super.dispose();
@@ -264,20 +285,83 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         }
       }
 
-      // Al editar: stock = stock actual + ingreso (no reemplazar). Al crear: stock = valor del campo.
-      final int newStock = widget.product != null
-          ? (widget.product!.stock +
-                  (int.tryParse(_ingresoController.text.trim()) ?? 0))
-              .clamp(0, 0x7fffffff)
-          : int.parse(_stockController.text);
+      double? _parseKgInput(String input) {
+        final v = input.trim().replaceAll(',', '.');
+        if (v.isEmpty) return 0.0;
+        return double.tryParse(v);
+      }
 
+      // Stock: producto no pesado = unidades; pesado + unidades = unidades; pesado + kg = stockKg.
+      late final int newStock;
+      late final double newStockKg;
+      final bool invKg = _isWeightedProduct && _weightedStockInKg;
+
+      if (!_isWeightedProduct) {
+        newStock = widget.product != null
+            ? (widget.product!.stock +
+                    (int.tryParse(_ingresoController.text.trim()) ?? 0))
+                .clamp(0, 0x7fffffff)
+            : int.parse(_stockController.text);
+        newStockKg = 0.0;
+      } else if (invKg) {
+        newStock = 0;
+        if (widget.product != null) {
+          final delta = _parseKgInput(_ingresoController.text) ?? 0.0;
+          newStockKg = (widget.product!.stockKg + delta).clamp(0.0, 1e15);
+        } else {
+          final kg = _parseKgInput(_stockKgController.text);
+          if (kg == null || kg < 0) {
+            setState(() => _isLoading = false);
+            Get.snackbar(
+              'Stock inválido',
+              'Ingresa los kilogramos iniciales (puede ser 0).',
+              backgroundColor: Colors.orange,
+              colorText: Colors.white,
+            );
+            return;
+          }
+          newStockKg = kg;
+        }
+      } else {
+        newStock = widget.product != null
+            ? (widget.product!.stock +
+                    (int.tryParse(_ingresoController.text.trim()) ?? 0))
+                .clamp(0, 0x7fffffff)
+            : int.parse(_stockController.text);
+        newStockKg = 0.0;
+      }
+
+      final salePrice = parseMontoPuntosMiles(_priceController.text) ?? 0;
+      final costValue = parseMontoPuntosMiles(_costController.text) ?? 0;
+      if (_isWeightedProduct) {
+        if (salePrice <= 0) {
+          setState(() => _isLoading = false);
+          Get.snackbar(
+            'Dato requerido',
+            'Para producto pesado ingresa una venta por kg mayor que 0.',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          return;
+        }
+        if (costValue <= 0) {
+          setState(() => _isLoading = false);
+          Get.snackbar(
+            'Dato requerido',
+            'Para producto pesado ingresa un costo por kg mayor que 0.',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      }
       final product = Product(
         code: code,
         shortCode: shortCode,
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim(),
-        price: parseMontoPuntosMiles(_priceController.text) ?? 0,
-        cost: parseMontoPuntosMiles(_costController.text) ?? 0,
+        price: salePrice,
+        cost: costValue,
         stock: newStock,
         minStock: int.parse(_minStockController.text),
         unit: _unitController.text.trim(),
@@ -288,6 +372,10 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         imageUrl: _currentImagePath,
         // Si marcó "Exento de IVA" en información básica, se guarda 0%; si no, el % de la pestaña Facturación electrónica (5 o 19).
         ivaPercentage: _exentoIva ? 0 : _ivaPercentage,
+        isWeighted: _isWeightedProduct,
+        pricePerKg: _isWeightedProduct ? salePrice : null,
+        weightedStockInKg: invKg,
+        stockKg: newStockKg,
       );
 
       if (widget.product == null) {
@@ -327,6 +415,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
               _priceController.clear();
               _costController.clear();
               _stockController.clear();
+              _stockKgController.clear();
               _minStockController.clear();
               _unitController.clear();
 
@@ -334,6 +423,10 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                 _selectedGroup = null;
                 _groupController.text = '';
                 _isActive = true;
+                _isWeightedProduct = false;
+                _weightedStockInKg = false;
+                _weightedPricingMode = WeightedPricingMode.manualSalePerKg;
+                _profitPerKgVisualController.clear();
               });
             },
             barrierDismissible: false,
@@ -792,20 +885,30 @@ class _ProductFormDialogState extends State<ProductFormDialog>
               Expanded(
                 child: TextFormField(
                   controller: _priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Precio de Venta *',
+                  decoration: InputDecoration(
+                    labelText:
+                        _isWeightedProduct ? 'Venta por kg *' : 'Precio de Venta *',
                     border: OutlineInputBorder(),
                     prefixText: '\$',
-                    hintText: 'Ej: 15.000',
+                    hintText:
+                        _isWeightedProduct ? 'Ej: 3.000' : 'Ej: 15.000',
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [PuntosMilesInputFormatter()],
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'El precio es obligatorio';
+                      return _isWeightedProduct
+                          ? 'La venta por kg es obligatoria'
+                          : 'El precio es obligatorio';
                     }
-                    if (parseMontoPuntosMiles(value) == null) {
-                      return 'Precio inválido';
+                    final p = parseMontoPuntosMiles(value);
+                    if (p == null) {
+                      return _isWeightedProduct
+                          ? 'Venta por kg inválida'
+                          : 'Precio inválido';
+                    }
+                    if (_isWeightedProduct && p <= 0) {
+                      return 'La venta por kg debe ser mayor que 0';
                     }
                     return null;
                   },
@@ -860,6 +963,67 @@ class _ProductFormDialogState extends State<ProductFormDialog>
           ),
           const SizedBox(height: 16),
 
+          CheckboxListTile(
+            value: _isWeightedProduct,
+            onChanged: (value) {
+              setState(() {
+                _isWeightedProduct = value ?? false;
+                if (!_isWeightedProduct) {
+                  _weightedPricingMode = WeightedPricingMode.manualSalePerKg;
+                  _profitPerKgVisualController.clear();
+                  _weightedStockInKg = false;
+                }
+              });
+            },
+            title: const Text('Producto pesado (báscula)'),
+            subtitle: const Text(
+                'Para este paso solo cambia la etiqueta visual de costo a costo por kg.'),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+          if (_isWeightedProduct) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: RadioListTile<WeightedPricingMode>(
+                      value: WeightedPricingMode.manualSalePerKg,
+                      groupValue: _weightedPricingMode,
+                      onChanged: (value) {
+                        setState(() {
+                          _weightedPricingMode = value!;
+                        });
+                      },
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Venta por kg manual'),
+                    ),
+                  ),
+                  Expanded(
+                    child: RadioListTile<WeightedPricingMode>(
+                      value: WeightedPricingMode.byProfitPercentage,
+                      groupValue: _weightedPricingMode,
+                      onChanged: (value) {
+                        setState(() {
+                          _weightedPricingMode = value!;
+                        });
+                      },
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Por % utilidad'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+
           // Producto exento de IVA (visible al crear/editar). Si se marca, se guarda IVA 0% y no hace falta marcarlo en Facturación electrónica.
           CheckboxListTile(
             value: _exentoIva,
@@ -887,14 +1051,28 @@ class _ProductFormDialogState extends State<ProductFormDialog>
               Expanded(
                 child: TextFormField(
                   controller: _costController,
-                  decoration: const InputDecoration(
-                    labelText: 'Precio de Costo',
+                  decoration: InputDecoration(
+                    labelText:
+                        _isWeightedProduct ? 'Costo por kg *' : 'Precio de Costo',
                     border: OutlineInputBorder(),
                     prefixText: '\$',
-                    hintText: 'Ej: 10.000',
+                    hintText:
+                        _isWeightedProduct ? 'Ej: 2.000' : 'Ej: 10.000',
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [PuntosMilesInputFormatter()],
+                  validator: _isWeightedProduct
+                      ? (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'El costo por kg es obligatorio';
+                          }
+                          final c = parseMontoPuntosMiles(value);
+                          if (c == null || c <= 0) {
+                            return 'El costo por kg debe ser mayor que 0';
+                          }
+                          return null;
+                        }
+                      : null,
                 ),
               ),
               const SizedBox(width: 16),
@@ -902,6 +1080,29 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                   child: Container()), // Espacio vacío para mantener el layout
             ],
           ),
+          if (_isWeightedProduct &&
+              _weightedPricingMode == WeightedPricingMode.byProfitPercentage) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _profitPerKgVisualController,
+                    decoration: const InputDecoration(
+                      labelText: '% utilidad por kg',
+                      border: OutlineInputBorder(),
+                      hintText: 'Ej: 30',
+                      suffixText: '%',
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Container()),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
 
           // Descripción
@@ -1367,86 +1568,280 @@ class _ProductFormDialogState extends State<ProductFormDialog>
           Row(
             children: [
               Expanded(
-                child: widget.product != null
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Stock actual',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.grey.shade700),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 16),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400),
-                              borderRadius: BorderRadius.circular(4),
-                              color: Colors.grey.shade100,
-                            ),
-                            child: Text(
-                              '${widget.product!.stock} unidades',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+                child: _isWeightedProduct
+                    ? (widget.product != null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return ToggleButtons(
+                                    borderRadius: BorderRadius.circular(8),
+                                    constraints: BoxConstraints(
+                                      minHeight: 40,
+                                      minWidth: (constraints.maxWidth - 8) / 2,
+                                    ),
+                                    isSelected: [
+                                      !_weightedStockInKg,
+                                      _weightedStockInKg,
+                                    ],
+                                    onPressed: (i) {
+                                      setState(
+                                          () => _weightedStockInKg = i == 1);
+                                    },
+                                    children: const [
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        child: Text('Unidades'),
+                                      ),
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        child: Text('kg'),
+                                      ),
+                                    ],
+                                  );
+                                },
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _ingresoController,
+                              const SizedBox(height: 8),
+                              Text(
+                                'Stock actual',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Colors.grey.shade700),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 16),
+                                decoration: BoxDecoration(
+                                  border:
+                                      Border.all(color: Colors.grey.shade400),
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: Colors.grey.shade100,
+                                ),
+                                child: Text(
+                                  _weightedStockInKg
+                                      ? '${widget.product!.stockKg} kg'
+                                      : '${widget.product!.stock} unidades',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _ingresoController,
+                                decoration: InputDecoration(
+                                  labelText: _weightedStockInKg
+                                      ? 'Ingreso (kg a sumar o restar)'
+                                      : 'Ingreso (unidades a agregar o quitar)',
+                                  border: const OutlineInputBorder(),
+                                  hintText: '0',
+                                  suffixText:
+                                      _weightedStockInKg ? 'kg' : 'unidades',
+                                  helperText: _weightedStockInKg
+                                      ? 'Ej: 2,5 suma; -1 resta kg'
+                                      : 'Ej: 10 suma 10 al stock',
+                                ),
+                                keyboardType: _weightedStockInKg
+                                    ? const TextInputType.numberWithOptions(
+                                        decimal: true, signed: true)
+                                    : TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return null;
+                                  }
+                                  if (_weightedStockInKg) {
+                                    if (double.tryParse(value
+                                            .trim()
+                                            .replaceAll(',', '.')) ==
+                                        null) {
+                                      return 'Número inválido';
+                                    }
+                                  } else {
+                                    if (int.tryParse(value) == null) {
+                                      return 'Ingrese un número entero';
+                                    }
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return ToggleButtons(
+                                    borderRadius: BorderRadius.circular(8),
+                                    constraints: BoxConstraints(
+                                      minHeight: 40,
+                                      minWidth: (constraints.maxWidth - 8) / 2,
+                                    ),
+                                    isSelected: [
+                                      !_weightedStockInKg,
+                                      _weightedStockInKg,
+                                    ],
+                                    onPressed: (i) {
+                                      setState(
+                                          () => _weightedStockInKg = i == 1);
+                                    },
+                                    children: const [
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        child: Text('Unidades'),
+                                      ),
+                                      Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        child: Text('kg'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              if (!_weightedStockInKg)
+                                TextFormField(
+                                  controller: _stockController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Stock Actual *',
+                                    border: OutlineInputBorder(),
+                                    hintText: '0',
+                                    suffixText: 'unidades',
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  validator: (value) {
+                                    if (value == null ||
+                                        value.trim().isEmpty) {
+                                      return 'El stock es obligatorio';
+                                    }
+                                    if (int.tryParse(value) == null) {
+                                      return 'Stock inválido';
+                                    }
+                                    return null;
+                                  },
+                                )
+                              else
+                                TextFormField(
+                                  controller: _stockKgController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Stock inicial (kg) *',
+                                    border: OutlineInputBorder(),
+                                    hintText: 'Ej: 25,5',
+                                    suffixText: 'kg',
+                                  ),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  validator: (value) {
+                                    if (value == null ||
+                                        value.trim().isEmpty) {
+                                      return 'Ingresa el stock en kg (0 si no aplica)';
+                                    }
+                                    final x = double.tryParse(value
+                                        .trim()
+                                        .replaceAll(',', '.'));
+                                    if (x == null || x < 0) {
+                                      return 'Valor inválido';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                            ],
+                          ))
+                    : (widget.product != null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Stock actual',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Colors.grey.shade700),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 16),
+                                decoration: BoxDecoration(
+                                  border:
+                                      Border.all(color: Colors.grey.shade400),
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: Colors.grey.shade100,
+                                ),
+                                child: Text(
+                                  '${widget.product!.stock} unidades',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _ingresoController,
+                                decoration: const InputDecoration(
+                                  labelText:
+                                      'Ingreso (unidades a agregar o quitar)',
+                                  border: OutlineInputBorder(),
+                                  hintText: '0',
+                                  suffixText: 'unidades',
+                                  helperText:
+                                      'Ej: 10 para sumar 10 al stock actual',
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return null;
+                                  }
+                                  if (int.tryParse(value) == null) {
+                                    return 'Ingrese un número';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          )
+                        : TextFormField(
+                            controller: _stockController,
                             decoration: const InputDecoration(
-                              labelText:
-                                  'Ingreso (unidades a agregar o quitar)',
+                              labelText: 'Stock Actual *',
                               border: OutlineInputBorder(),
                               hintText: '0',
                               suffixText: 'unidades',
-                              helperText:
-                                  'Ej: 10 para sumar 10 al stock actual',
                             ),
                             keyboardType: TextInputType.number,
                             validator: (value) {
-                              if (value == null || value.trim().isEmpty)
-                                return null;
-                              if (int.tryParse(value) == null)
-                                return 'Ingrese un número';
+                              if (value == null || value.trim().isEmpty) {
+                                return 'El stock es obligatorio';
+                              }
+                              if (int.tryParse(value) == null) {
+                                return 'Stock inválido';
+                              }
                               return null;
                             },
-                          ),
-                        ],
-                      )
-                    : TextFormField(
-                        controller: _stockController,
-                        decoration: const InputDecoration(
-                          labelText: 'Stock Actual *',
-                          border: OutlineInputBorder(),
-                          hintText: '0',
-                          suffixText: 'unidades',
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'El stock es obligatorio';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Stock inválido';
-                          }
-                          return null;
-                        },
-                      ),
+                          )),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: TextFormField(
                   controller: _minStockController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Stock Mínimo *',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                     hintText: '5',
-                    suffixText: 'unidades',
+                    suffixText: _isWeightedProduct && _weightedStockInKg
+                        ? 'kg (alerta)'
+                        : 'unidades',
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
