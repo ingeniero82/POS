@@ -57,6 +57,7 @@ class AccountsReceivablePayableService {
   static const String _payableTableName = 'accounts_payable';
   static const String _receivablePaymentsTableName = 'receivable_payments';
   static const String _payablePaymentsTableName = 'payable_payments';
+  static const double _pendingEpsilon = 0.009;
 
   // ==================== CUENTAS POR COBRAR ====================
 
@@ -299,6 +300,7 @@ class AccountsReceivablePayableService {
     final all = await getAllAccountsReceivable();
     final byCustomer = <int, List<AccountsReceivable>>{};
     for (final a in all) {
+      if (a.pendingAmount <= _pendingEpsilon) continue;
       byCustomer.putIfAbsent(a.customerId, () => []).add(a);
     }
     final out = <ReceivableCustomerSummary>[];
@@ -332,6 +334,7 @@ class AccountsReceivablePayableService {
     final all = await getAllAccountsPayable();
     final bySup = <int, List<AccountsPayable>>{};
     for (final a in all) {
+      if (a.pendingAmount <= _pendingEpsilon) continue;
       bySup.putIfAbsent(a.supplierId, () => []).add(a);
     }
     final out = <PayableSupplierSummary>[];

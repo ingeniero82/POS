@@ -101,6 +101,9 @@ class PosController extends GetxController {
   /// Para recibo: monto recibido y vuelto en pago efectivo (se pasan al imprimir).
   double? _lastCashReceived;
   double? _lastChange;
+  double? _creditReceiptAbono;
+  double? _creditReceiptPending;
+  String? _creditReceiptMethod;
   void setLastCashPayment(double received, double change) {
     _lastCashReceived = received;
     _lastChange = change;
@@ -1632,12 +1635,15 @@ class PosController extends GetxController {
           ),
         );
         try {
-          await AccountingService.recordSaleIncome(
+          await AccountingService.recordReceivableCollection(
             abono,
-            'Abono crédito $invoiceNumber',
+            customer.name,
+            invoiceNumber,
             uid,
+            isFullPayment: false,
             paymentMethod: abonoPaymentMethod,
             reference: 'credit_down_payment',
+            notes: 'Abono inicial en POS',
           );
         } catch (e) {
           Get.snackbar(
@@ -1649,6 +1655,13 @@ class PosController extends GetxController {
           );
         }
       }
+
+      // Contexto de impresión para recibo de venta a crédito (F6).
+      _lastCashReceived = null;
+      _lastChange = null;
+      _creditReceiptAbono = abono;
+      _creditReceiptPending = (total - abono).clamp(0.0, total);
+      _creditReceiptMethod = abono > 0 ? abonoPaymentMethod : null;
 
       final customerForReceipt = selectedCustomer.value;
       final clientForReceipt = selectedClient.value;
@@ -2096,6 +2109,9 @@ class PosController extends GetxController {
           paymentMethod: sale.paymentMethod,
           receivedAmount: _lastCashReceived,
           changeAmount: _lastChange,
+          creditDownPayment: _creditReceiptAbono,
+          creditPendingAmount: _creditReceiptPending,
+          creditPaymentMethod: _creditReceiptMethod,
           customer: customer ?? selectedCustomer.value,
           client: client ?? selectedClient.value,
           vatAt19: taxAt19 > 0 ? taxAt19 : null,
@@ -2103,6 +2119,9 @@ class PosController extends GetxController {
 
       _lastCashReceived = null;
       _lastChange = null;
+      _creditReceiptAbono = null;
+      _creditReceiptPending = null;
+      _creditReceiptMethod = null;
       Get.back(); // Cerrar diálogo de imprimiendo
 
       if (success) {

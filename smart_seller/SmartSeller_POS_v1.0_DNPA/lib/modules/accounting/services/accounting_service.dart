@@ -503,6 +503,49 @@ class AccountingService {
     }
   }
 
+  // Registrar recaudo de cuenta por cobrar (abono o pago total).
+  static Future<void> recordReceivableCollection(
+    double amount,
+    String customerName,
+    String invoiceNumber,
+    int userId, {
+    required bool isFullPayment,
+    String? paymentMethod,
+    String? reference,
+    String? notes,
+  }) async {
+    try {
+      final openSession = await getOpenCashSession();
+      if (openSession == null) {
+        throw Exception('No hay sesión de caja abierta');
+      }
+
+      final entry = AccountingEntry(
+        type: 'income',
+        amount: amount,
+        description: isFullPayment
+            ? 'Pago total CxC: $customerName · $invoiceNumber'
+            : 'Abono CxC: $customerName · $invoiceNumber',
+        category: 'Cuentas por Cobrar',
+        date: DateTime.now(),
+        paymentMethod: paymentMethod ?? 'Efectivo',
+        userId: userId,
+        cashSessionId: openSession.id,
+        reference: reference ?? 'accounts_receivable_payment',
+        notes: notes,
+        documentNumber: invoiceNumber,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await createAccountingEntry(entry);
+      print('✅ Recaudo CxC registrado: \$$amount - $invoiceNumber');
+    } catch (e) {
+      print('❌ Error al registrar recaudo CxC: $e');
+      rethrow;
+    }
+  }
+
   // ✅ NUEVO: Registrar gasto operativo
   static Future<void> recordOperationalExpense(
       double amount, String description, String category, int userId,

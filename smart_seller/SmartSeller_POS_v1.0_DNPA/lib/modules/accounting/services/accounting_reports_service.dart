@@ -632,7 +632,8 @@ class AccountingReportsService {
       final row = sessionRows.first;
 
       final openDate = DateTime.parse(row['open_date'] as String);
-      final hasCloseDate = row['close_date'] != null && (row['close_date'] as String).trim().isNotEmpty;
+      final hasCloseDate = row['close_date'] != null &&
+          (row['close_date'] as String).trim().isNotEmpty;
       // Si la sesión está abierta (sin cierre), incluir ventas hasta hoy para que anulaciones del día se vean
       final closeDate = hasCloseDate
           ? DateTime.parse(row['close_date'] as String)
@@ -764,7 +765,8 @@ class AccountingReportsService {
                 ventasPorTarifaIva[rateKey] =
                     (ventasPorTarifaIva[rateKey] ?? 0.0) + revenue;
                 if (ivaPct > 0) {
-                  final ivaAmount = revenue * (ivaPct / 100) / (1 + ivaPct / 100);
+                  final ivaAmount =
+                      revenue * (ivaPct / 100) / (1 + ivaPct / 100);
                   ivaPorTarifa[rateKey] =
                       (ivaPorTarifa[rateKey] ?? 0.0) + ivaAmount;
                   ivaIncluido += revenue * (ivaPct / 100) / (1 + ivaPct / 100);
@@ -814,7 +816,8 @@ class AccountingReportsService {
       final ticketPromedio = numVentas > 0 ? ventaBruta / numVentas : 0.0;
 
       final entries = await db.rawQuery(
-        'SELECT type, category, amount, description, date FROM accounting_entries WHERE cash_session_id = ? ORDER BY date',
+        'SELECT type, category, amount, description, date, payment_method, reference, document_number '
+        'FROM accounting_entries WHERE cash_session_id = ? ORDER BY date',
         [sessionId],
       );
 
@@ -823,35 +826,66 @@ class AccountingReportsService {
           gastos = 0,
           devolucionesEfectivo = 0;
       final retirosList = <Map<String, dynamic>>[];
+      final cashIncomeDetails = <Map<String, dynamic>>[];
+      final cashExpenseDetails = <Map<String, dynamic>>[];
 
       for (final e in entries) {
         final type = e['type'] as String? ?? '';
         final category = (e['category'] as String? ?? '').toUpperCase();
         final amount = (e['amount'] as num?)?.toDouble() ?? 0.0;
         final desc = e['description'] as String? ?? '';
+        final paymentMethod = e['payment_method'] as String?;
+        final reference = e['reference'] as String?;
+        final documentNumber = e['document_number'] as String?;
         final date =
             e['date'] != null ? DateTime.parse(e['date'] as String) : null;
+        final isCashMovement = _isCashPaymentMethod(paymentMethod);
 
-        if (type == 'income') {
-          if (category.contains('VENTA') || category.contains('SALES'))
-            continue;
-          otrosIngresos += amount;
-        } else if (type == 'expense') {
-          if (category.contains('RETIRO') ||
-              desc.toLowerCase().contains('retiro')) {
-            retiros += amount;
-            retirosList.add({
+        Map<String, dynamic> detailEntry() => {
               'time': date != null
                   ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
                   : '',
               'description': desc,
-              'amount': amount
-            });
+              'category': e['category'] as String? ?? '',
+              'amount': amount,
+              'paymentMethod': paymentMethod ?? 'N/A',
+              'reference': reference,
+              'documentNumber': documentNumber,
+            };
+
+        if (type == 'income') {
+          if (category.contains('VENTA') || category.contains('SALES')) {
+            continue;
+          }
+          if (isCashMovement) {
+            otrosIngresos += amount;
+            cashIncomeDetails.add(detailEntry());
+          }
+        } else if (type == 'expense') {
+          if (category.contains('RETIRO') ||
+              desc.toLowerCase().contains('retiro')) {
+            if (isCashMovement) {
+              retiros += amount;
+              retirosList.add({
+                'time': date != null
+                    ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
+                    : '',
+                'description': desc,
+                'amount': amount
+              });
+              cashExpenseDetails.add(detailEntry());
+            }
           } else if (category.contains('DEVOLUCIÓN') ||
               category.contains('RETURN')) {
-            devolucionesEfectivo += amount;
+            if (isCashMovement) {
+              devolucionesEfectivo += amount;
+              cashExpenseDetails.add(detailEntry());
+            }
           } else {
-            gastos += amount;
+            if (isCashMovement) {
+              gastos += amount;
+              cashExpenseDetails.add(detailEntry());
+            }
           }
         }
       }
@@ -895,11 +929,28 @@ class AccountingReportsService {
         'saldoReal': saldoReal,
         'diferencia': diferencia,
         'retirosList': retirosList,
+        'cashIncomeDetails': cashIncomeDetails,
+        'cashExpenseDetails': cashExpenseDetails,
       };
     } catch (e) {
       print('❌ Error getCierreDeCajaData: $e');
       return null;
     }
+  }
+
+  static bool _isCashPaymentMethod(String? method) {
+    final normalized = (method ?? '')
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .trim();
+    return normalized.isEmpty ||
+        normalized == 'cash' ||
+        normalized == 'efectivo' ||
+        normalized == 'caja';
   }
 
   /// Ventas del día (excluye devoluciones): lista de ventas con totales.
@@ -1321,8 +1372,9 @@ class AccountingReportsService {
               dynamic>>{}; // key: name|unit -> {code, name, unit, quantity, revenue}
       for (final r in rows) {
         final itemsStr = r['items'] as String?;
-        if (itemsStr == null || itemsStr.isEmpty || !itemsStr.contains('['))
+        if (itemsStr == null || itemsStr.isEmpty || !itemsStr.contains('[')) {
           continue;
+        }
         try {
           final list = jsonDecode(itemsStr) as List<dynamic>?;
           if (list == null) continue;
@@ -1824,8 +1876,9 @@ class AccountingReportsService {
               columns: ['fullName'],
               where: 'id = ?',
               whereArgs: [r['user_id']]);
-          if (u.isNotEmpty && u.first['fullName'] != null)
+          if (u.isNotEmpty && u.first['fullName'] != null) {
             userName = u.first['fullName'] as String;
+          }
         }
 
         list.add({

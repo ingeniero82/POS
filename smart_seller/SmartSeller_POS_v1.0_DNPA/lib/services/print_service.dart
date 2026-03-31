@@ -119,16 +119,19 @@ class PrintService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (paperWidth != null) await prefs.setInt(_kReceiptPaperWidth, paperWidth);
-    if (marginLeft != null)
+    if (marginLeft != null) {
       await prefs.setInt(_kReceiptMarginLeft, marginLeft.clamp(0, 10));
+    }
     if (colDesc != null) await prefs.setInt(_kReceiptColDesc, colDesc);
     if (colCant != null) await prefs.setInt(_kReceiptColCant, colCant);
     if (colPrice != null) await prefs.setInt(_kReceiptColPrice, colPrice);
-    if (colSubtotal != null)
+    if (colSubtotal != null) {
       await prefs.setInt(_kReceiptColSubtotal, colSubtotal);
-    if (spaceBetweenPriceAndCant != null)
+    }
+    if (spaceBetweenPriceAndCant != null) {
       await prefs.setInt(
           _kReceiptSpacePriceCant, spaceBetweenPriceAndCant.clamp(1, 4));
+    }
   }
 
   /// Obtener formato actual del recibo (ancho fijo 48 para alineación correcta).
@@ -567,6 +570,9 @@ class PrintService {
       String? paymentMethod,
       double? receivedAmount,
       double? changeAmount,
+      double? creditDownPayment,
+      double? creditPendingAmount,
+      String? creditPaymentMethod,
       double? vatAt19,
       double? vatAt5}) async {
     if (!_isConnected) {
@@ -605,6 +611,9 @@ class PrintService {
             reprintReason: reprintReason,
             receivedAmount: receivedAmount,
             changeAmount: changeAmount,
+            creditDownPayment: creditDownPayment,
+            creditPendingAmount: creditPendingAmount,
+            creditPaymentMethod: creditPaymentMethod,
             vatAt19: vatAt19,
             vatAt5: vatAt5);
       } else {
@@ -616,6 +625,9 @@ class PrintService {
             reprintReason: reprintReason,
             receivedAmount: receivedAmount,
             changeAmount: changeAmount,
+            creditDownPayment: creditDownPayment,
+            creditPendingAmount: creditPendingAmount,
+            creditPaymentMethod: creditPaymentMethod,
             vatAt19: vatAt19,
             vatAt5: vatAt5);
       }
@@ -635,6 +647,9 @@ class PrintService {
       String? reprintReason,
       double? receivedAmount,
       double? changeAmount,
+      double? creditDownPayment,
+      double? creditPendingAmount,
+      String? creditPaymentMethod,
       double? vatAt19,
       double? vatAt5}) async {
     try {
@@ -649,6 +664,9 @@ class PrintService {
           copyType: 'CLIENTE',
           receivedAmount: receivedAmount,
           changeAmount: changeAmount,
+          creditDownPayment: creditDownPayment,
+          creditPendingAmount: creditPendingAmount,
+          creditPaymentMethod: creditPaymentMethod,
           vatAt19: vatAt19,
           vatAt5: vatAt5);
 
@@ -671,6 +689,9 @@ class PrintService {
           copyType: 'NEGOCIO',
           receivedAmount: receivedAmount,
           changeAmount: changeAmount,
+          creditDownPayment: creditDownPayment,
+          creditPendingAmount: creditPendingAmount,
+          creditPaymentMethod: creditPaymentMethod,
           vatAt19: vatAt19,
           vatAt5: vatAt5);
 
@@ -698,6 +719,9 @@ class PrintService {
       String? copyType,
       double? receivedAmount,
       double? changeAmount,
+      double? creditDownPayment,
+      double? creditPendingAmount,
+      String? creditPaymentMethod,
       double? vatAt19,
       double? vatAt5}) async {
     if (!_isConnected) {
@@ -942,8 +966,8 @@ class PrintService {
         commands.addAll(_newLine());
       }
       if (hasVat5) {
-        commands.addAll(_formatText(_lineLeftRight(
-            fmt, 'IVA (5%):', currencyFormat.format(vatAt5!))));
+        commands.addAll(_formatText(
+            _lineLeftRight(fmt, 'IVA (5%):', currencyFormat.format(vatAt5!))));
         commands.addAll(_newLine());
       }
       if (!hasVat19 && !hasVat5) {
@@ -964,23 +988,48 @@ class PrintService {
       commands.addAll(_formatText(_separatorLine(fmt)));
       commands.addAll(_newLine());
       commands.addAll(_newLine());
-      commands.addAll(_formatText(_lineLeftRight(fmt, 'FORMA DE PAGO:',
-          (sale.paymentMethod ?? 'EFECTIVO').toUpperCase())));
+      final saleMethod = (sale.paymentMethod ?? '').toLowerCase();
+      final isCreditSale = saleMethod == 'crédito' || saleMethod == 'credito';
+      final creditAbono = (creditDownPayment ?? 0).clamp(0.0, total);
+      final creditPending =
+          (creditPendingAmount ?? (total - creditAbono)).clamp(0.0, total);
+      final creditMethodLabel =
+          creditAbono > 0 ? (creditPaymentMethod ?? 'NO DEFINIDO') : 'N/A';
+      final paymentLabel = isCreditSale
+          ? (creditAbono > 0
+              ? (creditPaymentMethod ?? 'ABONO').toUpperCase()
+              : 'CREDITO SIN ABONO')
+          : (sale.paymentMethod ?? 'EFECTIVO').toUpperCase();
+      commands
+          .addAll(_formatText(_lineLeftRight(fmt, 'FORMA DE PAGO:', paymentLabel)));
       commands.addAll(_newLine());
-      if ((sale.paymentMethod ?? '').toLowerCase() == 'crédito' ||
-          (sale.paymentMethod ?? '').toLowerCase() == 'credito') {
+      if (isCreditSale) {
         commands.addAll(_boldOn);
         commands
             .addAll(_formatText('*** VENTA A CRÉDITO - FIRMA DEL CLIENTE ***'));
         commands.addAll(_newLine());
         commands.addAll(_boldOff);
+        commands.addAll(_formatText(
+            _lineLeftRight(fmt, 'TOTAL A CREDITO:', currencyFormat.format(total))));
+        commands.addAll(_newLine());
+        commands.addAll(_formatText(_lineLeftRight(
+            fmt, 'ABONO INICIAL:', currencyFormat.format(creditAbono))));
+        commands.addAll(_newLine());
+        commands.addAll(_formatText(_lineLeftRight(fmt, 'MEDIO PAGO ABONO:',
+            creditMethodLabel.toUpperCase())));
+        commands.addAll(_newLine());
+        commands.addAll(_boldOn);
+        commands.addAll(_formatText(_lineLeftRight(
+            fmt, 'SALDO PENDIENTE:', currencyFormat.format(creditPending))));
+        commands.addAll(_newLine());
+        commands.addAll(_boldOff);
       }
-      if (receivedAmount != null && receivedAmount >= 0) {
+      if (!isCreditSale && receivedAmount != null && receivedAmount >= 0) {
         commands.addAll(_formatText(_lineLeftRight(
             fmt, 'Recibido:', currencyFormat.format(receivedAmount))));
         commands.addAll(_newLine());
       }
-      if (changeAmount != null && changeAmount >= 0) {
+      if (!isCreditSale && changeAmount != null && changeAmount >= 0) {
         commands.addAll(_formatText(_lineLeftRight(
             fmt, 'Su cambio:', currencyFormat.format(changeAmount))));
         commands.addAll(_newLine());
@@ -1254,8 +1303,9 @@ class PrintService {
     print('        ${companyConfig?.address ?? 'Dirección'}');
     print('        Tel: ${companyConfig?.phone ?? 'Teléfono'}');
     if (companyConfig?.email != null) print('        ${companyConfig!.email}');
-    if (companyConfig?.taxId != null)
+    if (companyConfig?.taxId != null) {
       print('        NIT: ${companyConfig!.taxId}');
+    }
     print(_separatorLine(fmt));
     print(_lineLeftRight(fmt, 'Fecha: ${dateFormatter.format(sale.date)}',
         'Hora: ${timeFormatter.format(sale.date)}'));
@@ -1288,11 +1338,18 @@ class PrintService {
     print(_lineLeftRight(fmt, 'SUBTOTAL:', '\$$subtotalStr'));
     final hasVat19 = (vatAt19 ?? 0) > 0;
     final hasVat5 = (vatAt5 ?? 0) > 0;
-    if (hasVat19) print(_lineLeftRight(fmt, 'IVA (19%):', '\$${currencyFormat.format(vatAt19!)}'));
-    if (hasVat5) print(_lineLeftRight(fmt, 'IVA (5%):', '\$${currencyFormat.format(vatAt5!)}'));
+    if (hasVat19)
+      print(_lineLeftRight(
+          fmt, 'IVA (19%):', '\$${currencyFormat.format(vatAt19!)}'));
+    if (hasVat5)
+      print(_lineLeftRight(
+          fmt, 'IVA (5%):', '\$${currencyFormat.format(vatAt5!)}'));
     if (!hasVat19 && !hasVat5) {
-      if (taxes > 0) print(_lineLeftRight(fmt, 'IVA:', '\$$taxesStr'));
-      else print(_lineLeftRight(fmt, 'IVA:', '\$0'));
+      if (taxes > 0) {
+        print(_lineLeftRight(fmt, 'IVA:', '\$$taxesStr'));
+      } else {
+        print(_lineLeftRight(fmt, 'IVA:', '\$0'));
+      }
     }
     print(_lineLeftRight(fmt, 'DESCUENTO:', '\$$discountStr'));
     print(_dashLine(fmt));

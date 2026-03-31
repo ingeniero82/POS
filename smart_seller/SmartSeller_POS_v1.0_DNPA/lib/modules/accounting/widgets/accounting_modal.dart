@@ -375,7 +375,8 @@ class _AccountingModalState extends State<AccountingModal>
         final shouldPrint = await Get.dialog<bool>(
           AlertDialog(
             title: const Text('Cierre completado'),
-            content: const Text('¿Deseas imprimir el ticket de cierre de caja ahora?'),
+            content: const Text(
+                '¿Deseas imprimir el ticket de cierre de caja ahora?'),
             actions: [
               TextButton(
                 onPressed: () => Get.back(result: false),
@@ -400,9 +401,11 @@ class _AccountingModalState extends State<AccountingModal>
 
   Future<void> _printCashCloseTicket(int sessionId) async {
     try {
-      final data = await AccountingReportsService.getCierreDeCajaData(sessionId);
+      final data =
+          await AccountingReportsService.getCierreDeCajaData(sessionId);
       if (data == null) {
-        Get.snackbar('Aviso', 'No se encontraron datos del cierre para imprimir.');
+        Get.snackbar(
+            'Aviso', 'No se encontraron datos del cierre para imprimir.');
         return;
       }
       final text = _buildCierreTicketText(data);
@@ -452,6 +455,9 @@ class _AccountingModalState extends State<AccountingModal>
     final saldoReal = (data['saldoReal'] as num?)?.toDouble() ?? 0.0;
     final diferencia = (data['diferencia'] as num?)?.toDouble() ?? 0.0;
     final retirosList = data['retirosList'] as List<dynamic>? ?? [];
+    final cashIncomeDetails = data['cashIncomeDetails'] as List<dynamic>? ?? [];
+    final cashExpenseDetails =
+        data['cashExpenseDetails'] as List<dynamic>? ?? [];
     final sessionId = data['sessionId'] as int? ?? 0;
 
     final sb = StringBuffer();
@@ -474,6 +480,34 @@ class _AccountingModalState extends State<AccountingModal>
       sb.writeln((' ' * pad) +
           (len == s.length ? s : s.substring(0, w)) +
           (' ' * (w - pad - len)));
+    }
+
+    String extractEntity(String description) {
+      final d = description.trim();
+      if (d.isEmpty) return 'Sin detalle';
+      if (d.contains(':')) {
+        final right = d.split(':').skip(1).join(':').trim();
+        if (right.contains('·')) {
+          return right.split('·').first.trim();
+        }
+        if (right.isNotEmpty) return right;
+      }
+      if (d.contains('·')) {
+        return d.split('·').first.trim();
+      }
+      return d.length > 28 ? d.substring(0, 28) : d;
+    }
+
+    Map<String, List<Map<String, dynamic>>> groupByEntity(List<dynamic> raw) {
+      final out = <String, List<Map<String, dynamic>>>{};
+      for (final item in raw) {
+        final m =
+            item is Map ? Map<String, dynamic>.from(item) : <String, dynamic>{};
+        final desc = m['description'] as String? ?? '';
+        final key = extractEntity(desc);
+        out.putIfAbsent(key, () => <Map<String, dynamic>>[]).add(m);
+      }
+      return out;
     }
 
     sb.writeln(sepW);
@@ -507,7 +541,7 @@ class _AccountingModalState extends State<AccountingModal>
       final ventaTarifa = ventasPorTarifaIva[rate] ?? 0.0;
       final ivaTarifa = ivaPorTarifa[rate] ?? 0.0;
       lineVal(
-        '  IVA ${rate}%:',
+        '  IVA $rate%:',
         'Ventas \$${fmtNum(ventaTarifa)} | Imp \$${fmtNum(ivaTarifa)}',
       );
     }
@@ -566,6 +600,54 @@ class _AccountingModalState extends State<AccountingModal>
       }
       sb.writeln(dashW);
       lineVal('Total retirado:', '\$${fmtNum(retiros)}');
+    }
+    sb.writeln(sepW);
+    sb.writeln('');
+    sb.writeln('DETALLE ENTRADAS DE CAJA (EFECTIVO)');
+    sb.writeln(dashW);
+    if (cashIncomeDetails.isEmpty) {
+      sb.writeln('(Sin entradas adicionales en efectivo)');
+    } else {
+      final grouped = groupByEntity(cashIncomeDetails);
+      for (final entry in grouped.entries) {
+        sb.writeln('[${entry.key}]');
+        double subtotal = 0.0;
+        for (final m in entry.value) {
+          final t = m['time'] as String? ?? '';
+          final d = m['description'] as String? ?? '';
+          final pm = m['paymentMethod'] as String? ?? 'N/A';
+          final a = (m['amount'] as num?)?.toDouble() ?? 0.0;
+          subtotal += a;
+          lineLR('  $t  $pm  $d', '\$${fmtNum(a)}');
+        }
+        lineVal('  Subtotal ${entry.key}:', '\$${fmtNum(subtotal)}');
+        sb.writeln(dashW);
+      }
+      lineVal('Total entradas caja:', '\$${fmtNum(otrosIngresos)}');
+    }
+    sb.writeln(sepW);
+    sb.writeln('');
+    sb.writeln('DETALLE SALIDAS DE CAJA (EFECTIVO)');
+    sb.writeln(dashW);
+    if (cashExpenseDetails.isEmpty) {
+      sb.writeln('(Sin salidas en efectivo)');
+    } else {
+      final grouped = groupByEntity(cashExpenseDetails);
+      for (final entry in grouped.entries) {
+        sb.writeln('[${entry.key}]');
+        double subtotal = 0.0;
+        for (final m in entry.value) {
+          final t = m['time'] as String? ?? '';
+          final d = m['description'] as String? ?? '';
+          final pm = m['paymentMethod'] as String? ?? 'N/A';
+          final a = (m['amount'] as num?)?.toDouble() ?? 0.0;
+          subtotal += a;
+          lineLR('  $t  $pm  $d', '-\$${fmtNum(a)}');
+        }
+        lineVal('  Subtotal ${entry.key}:', '-\$${fmtNum(subtotal)}');
+        sb.writeln(dashW);
+      }
+      lineVal('Total salidas caja:', '-\$${fmtNum(retiros + gastos + devolucionesEfectivo)}');
     }
     sb.writeln(sepW);
     sb.writeln('');

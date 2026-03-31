@@ -1,9 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../models/customer.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/company_config_service.dart';
+import '../modules/accounting/models/accounts_receivable.dart';
+import '../modules/accounting/models/receivable_payment.dart';
+import '../modules/accounting/services/accounts_receivable_payable_service.dart';
+import '../services/print_service.dart';
 import 'package:intl/intl.dart';
 
 class CustomersScreen extends StatefulWidget {
@@ -14,6 +20,12 @@ class CustomersScreen extends StatefulWidget {
 }
 
 class _CustomersScreenState extends State<CustomersScreen> {
+  static final NumberFormat _money = NumberFormat.currency(
+    locale: 'es_CO',
+    symbol: '\$ ',
+    decimalDigits: 0,
+  );
+
   List<Customer> customers = [];
   bool isLoading = true;
   String searchQuery = '';
@@ -285,6 +297,16 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ),
             ),
             const PopupMenuItem(
+              value: 'credit_history',
+              child: Row(
+                children: [
+                  Icon(Icons.history),
+                  SizedBox(width: 8),
+                  Text('Historial crédito'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
@@ -302,6 +324,9 @@ class _CustomersScreenState extends State<CustomersScreen> {
                 break;
               case 'view':
                 _showCustomerDetails(customer);
+                break;
+              case 'credit_history':
+                _showCustomerCreditHistory(customer);
                 break;
               case 'delete':
                 _showDeleteConfirmation(customer);
@@ -596,6 +621,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () {
+              Get.back();
+              _showCustomerCreditHistory(customer);
+            },
+            icon: const Icon(Icons.history),
+            label: const Text('Historial crédito'),
+          ),
           TextButton(
             onPressed: () => Get.back(),
             child: const Text('Cerrar'),
@@ -603,6 +636,359 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ],
       ),
     );
+  }
+
+  Future<Map<String, dynamic>> _loadCustomerCreditHistory(Customer customer) async {
+    final all = await AccountsReceivablePayableService.getAllAccountsReceivable();
+    final accounts = all.where((a) => a.customerId == customer.id).toList()
+      ..sort((a, b) => b.invoiceDate.compareTo(a.invoiceDate));
+    final ids = accounts.map((a) => a.id).whereType<int>().toList();
+    final paymentsByReceivableId =
+        await AccountsReceivablePayableService.getPaymentsForReceivables(ids);
+    return {
+      'accounts': accounts,
+      'payments': paymentsByReceivableId,
+    };
+  }
+
+  void _showCustomerCreditHistory(Customer customer) {
+    final future = _loadCustomerCreditHistory(customer);
+    final scrollController = ScrollController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => FutureBuilder<Map<String, dynamic>>(
+        future: future,
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const AlertDialog(
+              content: SizedBox(
+                width: 320,
+                height: 120,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Cargando historial de crédito...'),
+                  ],
+                ),
+              ),
+            );
+          }
+          if (snap.hasError) {
+            return AlertDialog(
+              title: const Text('Error'),
+              content: Text('No se pudo cargar el historial: ${snap.error}'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Cerrar'),
+                ),
+              ],
+            );
+          }
+
+          final data = snap.data ?? {};
+          final accounts = (data['accounts'] as List<AccountsReceivable>? ?? []);
+          final paymentsByReceivableId =
+              (data['payments'] as Map<int, List<ReceivablePayment>>? ?? {});
+
+          return Dialog(
+            insetPadding: const EdgeInsets.all(24),
+            child: SizedBox(
+              width: 760,
+              height: 620,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Historial crédito - ${customer.name}',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Facturas crédito: ${accounts.length}',
+                                style: TextStyle(color: Colors.grey.shade700),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(dialogCtx),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 24),
+                  Expanded(
+                    child: accounts.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'Este cliente no tiene historial de cuentas por cobrar.',
+                            ),
+                          )
+                        : Scrollbar(
+                            controller: scrollController,
+                            thumbVisibility: true,
+                            child: ListView.builder(
+                              controller: scrollController,
+                              itemCount: accounts.length,
+                              itemBuilder: (context, index) {
+                                final acc = accounts[index];
+                                final id = acc.id;
+                                final payments = id != null
+                                    ? (paymentsByReceivableId[id] ?? [])
+                                    : <ReceivablePayment>[];
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 6),
+                                  child: ExpansionTile(
+                                    title: Text(
+                                      acc.invoiceNumber,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                    subtitle: Text(
+                                      '${DateFormat('dd/MM/yyyy HH:mm').format(acc.invoiceDate)} · ${_statusLabel(acc.status)}',
+                                    ),
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _buildDetailRow('Total factura',
+                                                _money.format(acc.totalAmount)),
+                                            _buildDetailRow('Pagado',
+                                                _money.format(acc.paidAmount)),
+                                            _buildDetailRow('Pendiente',
+                                                _money.format(acc.pendingAmount)),
+                                            _buildDetailRow(
+                                              'Vence',
+                                              DateFormat('dd/MM/yyyy')
+                                                  .format(acc.dueDate),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: OutlinedButton.icon(
+                                                onPressed: () =>
+                                                    _printCustomerCreditAccountReceipt(
+                                                  customer: customer,
+                                                  account: acc,
+                                                ),
+                                                icon: const Icon(Icons.print_outlined),
+                                                label: const Text('Imprimir estado factura'),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            const Text(
+                                              'Abonos / pagos',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            if (payments.isEmpty)
+                                              const Padding(
+                                                padding: EdgeInsets.only(top: 4),
+                                                child: Text(
+                                                  'Sin abonos registrados.',
+                                                  style: TextStyle(
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              )
+                                            else
+                                              ...payments.map(
+                                                (p) => ListTile(
+                                                  dense: true,
+                                                  contentPadding: EdgeInsets.zero,
+                                                  title: Text(_money.format(p.amount)),
+                                                  subtitle: Text(
+                                                    '${DateFormat('dd/MM/yyyy HH:mm').format(p.paymentDate)} · ${p.paymentMethod}'
+                                                    '${p.reference != null && p.reference!.isNotEmpty ? ' · Ref: ${p.reference}' : ''}',
+                                                  ),
+                                                  trailing: IconButton(
+                                                    tooltip: 'Reimprimir abono',
+                                                    icon: const Icon(Icons.print),
+                                                    onPressed: () =>
+                                                        _printCustomerCreditPaymentReceipt(
+                                                      customer: customer,
+                                                      account: acc,
+                                                      payment: p,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).whenComplete(() {
+      scrollController.dispose();
+    });
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'pending':
+        return 'Pendiente';
+      case 'partial':
+        return 'Parcial';
+      case 'paid':
+        return 'Pagada';
+      case 'overdue':
+        return 'Vencida';
+      default:
+        return status;
+    }
+  }
+
+  Future<void> _printCustomerCreditAccountReceipt({
+    required Customer customer,
+    required AccountsReceivable account,
+  }) async {
+    try {
+      final text = _buildCustomerCreditAccountReceiptText(
+        customer: customer,
+        account: account,
+      );
+      final ok = await PrintService.instance.printRawToPrinter(utf8.encode(text));
+      if (!mounted) return;
+      Get.snackbar(
+        ok ? 'Impresión' : 'Impresión',
+        ok
+            ? 'Estado de factura enviado a la impresora.'
+            : 'No se pudo imprimir el estado de factura.',
+        backgroundColor: ok ? Colors.green : Colors.orange,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Get.snackbar(
+        'Error',
+        'No se pudo imprimir el estado de factura: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> _printCustomerCreditPaymentReceipt({
+    required Customer customer,
+    required AccountsReceivable account,
+    required ReceivablePayment payment,
+  }) async {
+    try {
+      final text = _buildCustomerCreditPaymentReceiptText(
+        customer: customer,
+        account: account,
+        payment: payment,
+      );
+      final ok = await PrintService.instance.printRawToPrinter(utf8.encode(text));
+      if (!mounted) return;
+      Get.snackbar(
+        'Impresión',
+        ok
+            ? 'Comprobante de abono enviado a la impresora.'
+            : 'No se pudo imprimir el comprobante de abono.',
+        backgroundColor: ok ? Colors.green : Colors.orange,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Get.snackbar(
+        'Error',
+        'No se pudo reimprimir el abono: $e',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  String _buildCustomerCreditAccountReceiptText({
+    required Customer customer,
+    required AccountsReceivable account,
+  }) {
+    const width = 48;
+    final sep = '=' * width;
+    final dash = '-' * width;
+    final nf = NumberFormat('#,##0', 'es_CO');
+    String money(double value) => '\$${nf.format(value)}';
+    String fit(String v) => v.length <= width ? v : v.substring(0, width);
+    final sb = StringBuffer();
+    sb.writeln(sep);
+    sb.writeln('ESTADO FACTURA CREDITO'.padLeft(33));
+    sb.writeln(dash);
+    sb.writeln(fit('Cliente: ${customer.name}'));
+    sb.writeln(fit('Factura: ${account.invoiceNumber}'));
+    sb.writeln(fit('Estado: ${_statusLabel(account.status)}'));
+    sb.writeln(fit('Fecha: ${DateFormat('dd/MM/yyyy HH:mm').format(account.invoiceDate)}'));
+    sb.writeln(fit('Vence: ${DateFormat('dd/MM/yyyy').format(account.dueDate)}'));
+    sb.writeln(dash);
+    sb.writeln(fit('Total factura: ${money(account.totalAmount)}'));
+    sb.writeln(fit('Pagado acumulado: ${money(account.paidAmount)}'));
+    sb.writeln(fit('Saldo pendiente: ${money(account.pendingAmount)}'));
+    sb.writeln(sep);
+    sb.writeln('');
+    sb.writeln('');
+    return sb.toString();
+  }
+
+  String _buildCustomerCreditPaymentReceiptText({
+    required Customer customer,
+    required AccountsReceivable account,
+    required ReceivablePayment payment,
+  }) {
+    const width = 48;
+    final sep = '=' * width;
+    final dash = '-' * width;
+    final nf = NumberFormat('#,##0', 'es_CO');
+    String money(double value) => '\$${nf.format(value)}';
+    String fit(String v) => v.length <= width ? v : v.substring(0, width);
+    final saldoTrasAbono = (account.pendingAmount + payment.amount).clamp(0, 999999999).toDouble();
+    final sb = StringBuffer();
+    sb.writeln(sep);
+    sb.writeln('COMPROBANTE DE ABONO'.padLeft(32));
+    sb.writeln(dash);
+    sb.writeln(fit('Cliente: ${customer.name}'));
+    sb.writeln(fit('Factura: ${account.invoiceNumber}'));
+    sb.writeln(fit('Fecha abono: ${DateFormat('dd/MM/yyyy HH:mm').format(payment.paymentDate)}'));
+    sb.writeln(fit('Metodo pago: ${payment.paymentMethod}'));
+    if ((payment.reference ?? '').trim().isNotEmpty) {
+      sb.writeln(fit('Referencia: ${payment.reference!.trim()}'));
+    }
+    sb.writeln(dash);
+    sb.writeln(fit('Saldo antes abono: ${money(saldoTrasAbono)}'));
+    sb.writeln(fit('Abono aplicado: ${money(payment.amount)}'));
+    sb.writeln(fit('Saldo pendiente: ${money(account.pendingAmount)}'));
+    sb.writeln(sep);
+    sb.writeln('');
+    sb.writeln('');
+    return sb.toString();
   }
 
   Widget _buildDetailRow(String label, String value) {
