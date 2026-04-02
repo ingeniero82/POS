@@ -2,9 +2,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(smart_seller LANGUAGES CXX)
 
-# The name of the executable created for the application. Change this to change
-# the on-disk name of your application.
-set(BINARY_NAME "smart_seller")
+# Nombre del .exe que genera CMake y que flutter run / build busca (primera línea set(BINARY_NAME ...) que lee flutter_tools).
+# smart_seller_dev evita LNK1168 al desarrollar: no pisa smart_seller.exe si quedó bloqueado por un proceso viejo.
+# smart_seller.exe para instalador: copiar tras Release con compilar_windows.bat.
+set(BINARY_NAME "smart_seller_dev")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -57,6 +58,14 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# flutter_assets / native_assets / app.so los genera el tool en la carpeta
+# literal "build/" del proyecto (FlutterProject.buildDirectory), aunque
+# flutter config --build-dir mueva la salida nativa a otra ruta. Instalar
+# siempre desde esa raíz evita MSB3073 "cannot find .../flutter_assets".
+get_filename_component(_project_root "${CMAKE_SOURCE_DIR}/.." ABSOLUTE)
+file(TO_CMAKE_PATH "${_project_root}" _project_root)
+set(DART_ASSET_STAGING "${_project_root}/build")
+set(AOT_LIBRARY "${DART_ASSET_STAGING}/windows/app.so")
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
@@ -88,10 +97,12 @@ if(PLUGIN_BUNDLED_LIBRARIES)
 endif()
 
 # Copy the native assets provided by the build.dart from all packages.
-set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
-install(DIRECTORY "${NATIVE_ASSETS_DIR}"
-   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
-   COMPONENT Runtime)
+set(NATIVE_ASSETS_DIR "${DART_ASSET_STAGING}/native_assets/windows/")
+if(EXISTS "${NATIVE_ASSETS_DIR}")
+  install(DIRECTORY "${NATIVE_ASSETS_DIR}"
+     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+     COMPONENT Runtime)
+endif()
 
 # Fully re-copy the assets directory on each build to avoid having stale files
 # from a previous install.
@@ -99,7 +110,7 @@ set(FLUTTER_ASSET_DIR_NAME "flutter_assets")
 install(CODE "
   file(REMOVE_RECURSE \"${INSTALL_BUNDLE_DATA_DIR}/${FLUTTER_ASSET_DIR_NAME}\")
   " COMPONENT Runtime)
-install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
+install(DIRECTORY "${DART_ASSET_STAGING}/${FLUTTER_ASSET_DIR_NAME}"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)
 
 # Install the AOT library on non-Debug builds only.

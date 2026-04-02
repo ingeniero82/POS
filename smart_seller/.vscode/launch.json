@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SmartSeller POS (Windows)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "${workspaceFolder}/SmartSeller_POS_v1.0_DNPA",
+      "program": "lib/main.dart",
+      "args": ["-d", "windows"],
+      "preLaunchTask": "kill-smart-seller-windows"
+    }
+  ]
+}

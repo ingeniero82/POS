@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "kill-smart-seller-windows",
+      "type": "shell",
+      "command": "taskkill /F /IM smart_seller.exe /T 2>nul & taskkill /F /IM smart_seller_dev.exe /T 2>nul & exit /b 0",
+      "options": {
+        "shell": {
+          "executable": "cmd.exe",
+          "args": ["/d", "/c"]
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "showReuseMessage": false,
+        "close": true
+      }
+    }
+  ]
+}

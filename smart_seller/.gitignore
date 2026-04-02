@@ -45,8 +45,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Visual Studio Code
-.vscode/
+# Visual Studio Code — se versiona launch/tasks para debug Windows del POS.
+# .vscode/
 
 # MacOS
 .DS_Store

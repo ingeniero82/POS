@@ -1,0 +1,48 @@
+================================================================================
+Smart Seller POS — Recuperación si no abre el debug en Windows (F5 / flutter run)
+================================================================================
+
+Qué suele fallar
+----------------
+1) Proceso colgado: smart_seller.exe o smart_seller_dev.exe deja bloqueados los DLL
+   en la carpeta de salida → CMake error MSB3073 / "Permission denied".
+2) Carpeta build-dir: si usas "flutter config --build-dir=...", los assets Dart
+   siguen en la carpeta fija "build/" del proyecto; el CMake del proyecto ya
+   está corregido para instalar desde ahí (windows/CMakeLists.txt en el repo).
+3) Zone mismatch en main: asegúrate de tener el main() con ensureInitialized
+   dentro del mismo runZonedGuarded que runApp (lib/main.dart en el repo).
+
+Qué ya está guardado en el proyecto (commit / backup)
+-------------------------------------------------------
+- windows/CMakeLists.txt → instalación de flutter_assets/native_assets desde
+  <proyecto>/build/ aunque el nativo vaya a build_spos/.
+- lib/main.dart → mismo Zone para bindings y runApp.
+- compilar_windows.bat → busca Release en build\ o build_spos\.
+- .vscode (carpeta padre smart_seller y/o esta app) → F5 en Windows + tarea
+  que intenta cerrar ejecutables antes de depurar.
+
+Configuración global de Flutter (NO va en Git; hay que reaplicar en PC nueva)
+-----------------------------------------------------------------------------
+En cada máquina, o si "vuelve a pasar", ejecuta una vez:
+
+  flutter config --build-dir=build_spos
+  flutter config --no-enable-android
+
+O ejecuta: scripts\recuperar_debug_windows.bat
+
+Recuperación rápida (orden recomendado)
+---------------------------------------
+1) Cierra la app POS si está abierta.
+2) Ejecuta scripts\recuperar_debug_windows.bat
+3) En Cursor: Run and Debug → "SmartSeller POS (Windows)" → F5.
+4) Si sigue fallando por permisos: Administrador de tareas → Finalizar tarea
+   en smart_seller / smart_seller_dev (como administrador si hace falta).
+5) Último recurso: reiniciar Windows y volver al paso 2.
+
+Volver a la carpeta clásica "build" (opcional, tras reinicio y sin procesos)
+-----------------------------------------------------------------------------
+  flutter config --build-dir=
+  flutter clean
+  (Opcional) borrar manualmente carpetas build y build_spos si no están bloqueadas.
+
+================================================================================

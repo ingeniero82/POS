@@ -39,3 +39,7 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# smart_seller.exe (copia para instalador) se genera en compilar_windows.bat tras
+# flutter build windows --release, para no fallar el POST_BUILD en Debug (archivo
+# bloqueado, o CONFIGURATIONS mal interpretado en TARGET ... POST_BUILD).
