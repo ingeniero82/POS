@@ -2,6 +2,11 @@
 Smart Seller POS — Recuperación si no abre el debug en Windows (F5 / flutter run)
 ================================================================================
 
+Inno Setup: los scripts en installer\ (.iss) toman Release de build_spos\ o build\
+según exista. Antes de compilar el instalador: flutter build windows --release.
+El .iss empaqueta smart_seller_dev.exe como smart_seller.exe en el PC cliente.
+compilar_windows.bat sigue siendo opcional (copia local smart_seller.exe para pruebas).
+
 Qué suele fallar
 ----------------
 1) Proceso colgado: smart_seller.exe o smart_seller_dev.exe deja bloqueados los DLL
