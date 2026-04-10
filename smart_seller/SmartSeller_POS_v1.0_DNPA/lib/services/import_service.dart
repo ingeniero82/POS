@@ -84,6 +84,42 @@ class ImportService {
     }
   }
 
+  /// Si el archivo trae columna de código corto se usa; si no, se trunca el código como antes.
+  static String _shortCodeFromImport(String code, String? explicit) {
+    final t = explicit?.trim() ?? '';
+    if (t.isNotEmpty) return t;
+    return code.length > 8 ? code.substring(0, 8) : code;
+  }
+
+  static String? _shortCodeFromCsv(List<String> headers, List row) {
+    String? get(String name) {
+      int idx = headers.indexWhere((h) => h == name.toLowerCase());
+      if (idx == -1 || idx >= row.length) return null;
+      return row[idx]?.toString().trim();
+    }
+    return get('código corto') ??
+        get('codigo corto') ??
+        get('codigo_corto') ??
+        get('codigocorto') ??
+        get('shortcode') ??
+        get('short_code');
+  }
+
+  static String? _shortCodeFromExcel(Map<String, int> columnMap, Sheet sheet, int row) {
+    String? getCellValue(String columnName) {
+      int? colIndex = columnMap[columnName];
+      if (colIndex == null) return null;
+      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: row));
+      return cell.value?.toString().trim();
+    }
+    return getCellValue('código corto') ??
+        getCellValue('codigo corto') ??
+        getCellValue('codigo_corto') ??
+        getCellValue('codigocorto') ??
+        getCellValue('shortcode') ??
+        getCellValue('short_code');
+  }
+
   static Product? _createProductFromCsvRow(List row, List<String> headers) {
     String? get(String name) {
       int idx = headers.indexWhere((h) => h == name.toLowerCase());
@@ -112,7 +148,7 @@ class ImportService {
     
     Product product = Product(
       code: code,
-      shortCode: code.length > 8 ? code.substring(0, 8) : code,
+      shortCode: _shortCodeFromImport(code, _shortCodeFromCsv(headers, row)),
       name: name,
       description: get('descripción') ?? get('descripcion') ?? get('description') ?? '',
       price: _parseDouble(priceStr) ?? 0.0,
@@ -168,7 +204,7 @@ class ImportService {
     // Crear producto
     Product product = Product(
       code: code,
-      shortCode: code.length > 8 ? code.substring(0, 8) : code,
+      shortCode: _shortCodeFromImport(code, _shortCodeFromExcel(columnMap, sheet, row)),
       name: name,
       description: getCellValue('descripción') ?? getCellValue('descripcion') ?? getCellValue('description') ?? '',
       price: _parseDouble(priceStr) ?? 0.0,
@@ -280,17 +316,17 @@ class ImportService {
   
   static String getExcelTemplate() {
     return '''
-CÓDIGO	NOMBRE	DESCRIPCIÓN	PRECIO	COSTO	STOCK	STOCK MÍNIMO	CATEGORÍA	UNIDAD	ES_PESADO	PRECIO_POR_KG	PESO_MIN	PESO_MAX
-PROD001	Manzana Roja	Manzana roja fresca	1.50	1.00	100	10	Frutas y Verduras	kg	true	1.50	0.1	5.0
-PROD002	Leche Entera	Leche entera 1L	2.50	2.00	50	5	Lácteos	litro	false	0.00	0.0	0.0
-PROD003	Pan Integral	Pan integral fresco	0.80	0.60	200	20	Panadería	unidad	false	0.00	0.0	0.0
-PROD004	Coca Cola	Coca Cola 500ml	1.20	0.90	150	15	Bebidas	unidad	false	0.00	0.0	0.0
-PROD005	Arroz	Arroz blanco 1kg	3.00	2.50	80	8	Abarrotes	kg	false	0.00	0.0	0.0
-PROD006	Detergente	Detergente líquido	4.50	3.50	30	3	Limpieza	unidad	false	0.00	0.0	0.0
-PROD007	Jabón	Jabón de baño	1.80	1.40	60	6	Cuidado Personal	unidad	false	0.00	0.0	0.0
-PROD008	Pollo	Pollo entero	8.00	6.50	25	3	Carnes	kg	true	8.00	0.5	3.0
-PROD009	Queso	Queso fresco	5.00	4.00	40	4	Lácteos	kg	true	5.00	0.1	2.0
-PROD010	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1.0
+CÓDIGO	CÓDIGO CORTO	NOMBRE	DESCRIPCIÓN	PRECIO	COSTO	STOCK	STOCK MÍNIMO	CATEGORÍA	UNIDAD	ES_PESADO	PRECIO_POR_KG	PESO_MIN	PESO_MAX
+PROD001	MZ001	Manzana Roja	Manzana roja fresca	1.50	1.00	100	10	Frutas y Verduras	kg	true	1.50	0.1	5.0
+PROD002	LC001	Leche Entera	Leche entera 1L	2.50	2.00	50	5	Lácteos	litro	false	0.00	0.0	0.0
+PROD003	PN001	Pan Integral	Pan integral fresco	0.80	0.60	200	20	Panadería	unidad	false	0.00	0.0	0.0
+PROD004	CC001	Coca Cola	Coca Cola 500ml	1.20	0.90	150	15	Bebidas	unidad	false	0.00	0.0	0.0
+PROD005	AR001	Arroz	Arroz blanco 1kg	3.00	2.50	80	8	Abarrotes	kg	false	0.00	0.0	0.0
+PROD006	DT001	Detergente	Detergente líquido	4.50	3.50	30	3	Limpieza	unidad	false	0.00	0.0	0.0
+PROD007	JB001	Jabón	Jabón de baño	1.80	1.40	60	6	Cuidado Personal	unidad	false	0.00	0.0	0.0
+PROD008	PL001	Pollo	Pollo entero	8.00	6.50	25	3	Carnes	kg	true	8.00	0.5	3.0
+PROD009	QS001	Queso	Queso fresco	5.00	4.00	40	4	Lácteos	kg	true	5.00	0.1	2.0
+PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1.0
 ''';
   }
 
@@ -299,12 +335,13 @@ PROD010	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1
     
     // Encabezados mejorados para Excel
     rows.add([
-      'CÓDIGO', 'NOMBRE', 'DESCRIPCIÓN', 'PRECIO', 'COSTO', 'STOCK', 'STOCK MÍNIMO', 'CATEGORÍA', 'UNIDAD', 'ES_PESADO', 'PRECIO_POR_KG', 'PESO_MIN', 'PESO_MAX'
+      'CÓDIGO', 'CÓDIGO CORTO', 'NOMBRE', 'DESCRIPCIÓN', 'PRECIO', 'COSTO', 'STOCK', 'STOCK MÍNIMO', 'CATEGORÍA', 'UNIDAD', 'ES_PESADO', 'PRECIO_POR_KG', 'PESO_MIN', 'PESO_MAX'
     ]);
     
     for (final p in products) {
       rows.add([
         p.code,
+        p.shortCode,
         p.name,
         p.description,
         // Formatear precios para Excel (sin decimales si son enteros)
@@ -344,18 +381,19 @@ PROD010	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1
       
       // Configurar encabezados con formato
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'CÓDIGO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'NOMBRE';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'DESCRIPCIÓN';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0)).value = 'PRECIO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0)).value = 'COSTO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'STOCK';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'STOCK MÍNIMO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value = 'CATEGORÍA';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value = 'UNIDAD';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value = 'ES_PESADO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: 0)).value = 'PRECIO_POR_KG';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: 0)).value = 'PESO_MIN';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: 0)).value = 'PESO_MAX';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'CÓDIGO CORTO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'NOMBRE';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0)).value = 'DESCRIPCIÓN';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0)).value = 'PRECIO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'COSTO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'STOCK';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value = 'STOCK MÍNIMO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value = 'CATEGORÍA';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value = 'UNIDAD';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: 0)).value = 'ES_PESADO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: 0)).value = 'PRECIO_POR_KG';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: 0)).value = 'PESO_MIN';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: 0)).value = 'PESO_MAX';
       
       // Llenar datos de productos
       for (int i = 0; i < products.length; i++) {
@@ -363,22 +401,23 @@ PROD010	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1
         final row = i + 1;
         
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = p.code;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = p.name;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = p.description;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = p.price;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = p.cost;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = p.stock;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = p.minStock;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = p.category;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = p.unit;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = p.isWeighted ? 'SÍ' : 'NO';
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row)).value = p.pricePerKg ?? '';
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = p.minWeight ?? '';
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = p.maxWeight ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = p.shortCode;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = p.name;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = p.description;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = p.price;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = p.cost;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = p.stock;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = p.minStock;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = p.category;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = p.unit;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row)).value = p.isWeighted ? 'SÍ' : 'NO';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = p.pricePerKg ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = p.minWeight ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: row)).value = p.maxWeight ?? '';
       }
       
       // Ajustar ancho de columnas automáticamente
-      for (int i = 0; i < 13; i++) {
+      for (int i = 0; i < 14; i++) {
         // Nota: setColumnWidth no está disponible en esta versión
         // Las columnas se ajustarán automáticamente en Excel
       }
