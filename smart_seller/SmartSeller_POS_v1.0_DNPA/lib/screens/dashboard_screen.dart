@@ -107,6 +107,15 @@ class DashboardScreen extends StatelessWidget {
                             Get.toNamed('/proveedores');
                           },
                         ),
+                      if (authService.hasPermission(Permission.viewClients))
+                        _SidebarButton(
+                          icon: Icons.request_quote,
+                          label: 'Precios por proveedor',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/precios-proveedor');
+                          },
+                        ),
                       // Cuentas por Cobrar y Pagar - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewReports))
                         _SidebarButton(

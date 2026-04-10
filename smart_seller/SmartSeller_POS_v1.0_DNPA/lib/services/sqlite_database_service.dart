@@ -92,6 +92,9 @@ class SQLiteDatabaseService {
     // ✅ NUEVO: Migración para tablas de proveedores y contabilidad
     await migrateAddSuppliersTables();
 
+    // ✅ Fase 1: precios de compra producto–proveedor (tabla aparte, sin historial)
+    await migrateAddProductSupplierPricesTable();
+
     // ✅ NUEVO: Migración para tablas de contabilidad
     await migrateAddAccountingTables();
 
@@ -2345,6 +2348,36 @@ class SQLiteDatabaseService {
       print('✅ Tablas de proveedores creadas exitosamente');
     } catch (e) {
       print('❌ Error creando tablas de proveedores: $e');
+    }
+  }
+
+  /// Fase 1: catálogo de precio de compra por producto y proveedor (único par).
+  static Future<void> migrateAddProductSupplierPricesTable() async {
+    try {
+      final exists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='product_supplier_prices'",
+      );
+      if (exists.isNotEmpty) {
+        print('✅ Tabla product_supplier_prices ya existe');
+        return;
+      }
+
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS product_supplier_prices (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          supplier_id INTEGER NOT NULL,
+          supplier_reference TEXT,
+          purchase_price REAL NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(product_id, supplier_id),
+          FOREIGN KEY (product_id) REFERENCES products(id),
+          FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+        )
+      ''');
+      print('✅ Tabla product_supplier_prices creada');
+    } catch (e) {
+      print('❌ Error creando product_supplier_prices: $e');
     }
   }
 

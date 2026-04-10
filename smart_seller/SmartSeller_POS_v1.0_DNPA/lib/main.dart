@@ -16,6 +16,7 @@ import 'screens/company_config_screen.dart';
 import 'screens/printer_config_screen.dart';
 import 'screens/groups_screen.dart';
 import 'screens/suppliers_screen.dart';
+import 'screens/product_supplier_prices_screen.dart';
 import 'screens/inventory_movements_screen.dart';
 import 'screens/balanza_diagnostico_screen.dart';
 import 'modules/accounting/screens/accounts_receivable_payable_screen.dart';
@@ -200,6 +201,11 @@ class MyApp extends StatelessWidget {
           name: '/proveedores',
           page: () => const SuppliersScreen(),
           middlewares: [AuthMiddleware()], // Solo usuarios autenticados
+        ),
+        GetPage(
+          name: '/precios-proveedor',
+          page: () => const ProductSupplierPricesScreen(),
+          middlewares: [AuthMiddleware()],
         ),
         GetPage(
           name: '/cuentas-cobrar-pagar',
