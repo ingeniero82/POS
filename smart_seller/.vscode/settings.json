@@ -1,3 +1,13 @@
 {
-  "dart.flutterDeviceId": "windows"
+  "dart.flutterDeviceId": "windows",
+  "dart.analysisExcludedFolders": [
+    "lib",
+    "android",
+    "ios",
+    "web",
+    "linux",
+    "macos",
+    "windows",
+    "test"
+  ]
 }

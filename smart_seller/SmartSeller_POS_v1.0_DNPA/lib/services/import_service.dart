@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import '../models/product.dart';
 import 'sqlite_database_service.dart';
 import 'package:csv/csv.dart';
@@ -372,9 +373,22 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
     await file.writeAsBytes([...bom, ...utf8.encode(csv)]);
   }
 
+  /// El diálogo "Guardar como" a veces devuelve la ruta sin extensión si el usuario cambia el nombre;
+  /// sin `.xlsx` Windows muestra el archivo como genérico y Excel no lo abre bien.
+  static String _ensureXlsxOutputPath(String filePath) {
+    final trimmed = filePath.trim();
+    final ext = p.extension(trimmed).toLowerCase();
+    if (ext == '.xlsx') return trimmed;
+    if (ext == '.xls' || ext == '.csv') {
+      return p.join(p.dirname(trimmed), '${p.basenameWithoutExtension(trimmed)}.xlsx');
+    }
+    return '$trimmed.xlsx';
+  }
+
   // Nueva función para exportar en formato Excel (.xlsx) con mejor formato
   static Future<void> exportProductsToExcel(List<Product> products, String filePath) async {
     try {
+      final outPath = _ensureXlsxOutputPath(filePath);
       // Crear un archivo Excel real con formato visual
       var excel = Excel.createExcel();
       var sheet = excel['Productos'];
@@ -425,7 +439,7 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
       // Guardar archivo Excel
       final bytes = excel.encode();
       if (bytes != null) {
-        final file = File(filePath.replaceAll('.csv', '.xlsx'));
+        final file = File(outPath);
         await file.writeAsBytes(bytes);
       } else {
         throw Exception('Error al generar archivo Excel');
