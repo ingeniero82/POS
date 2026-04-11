@@ -3,7 +3,8 @@
 class Product {
   int? id;
   late String code;
-  late String shortCode;
+  /// Opcional. Si es null, en caja solo aplica búsqueda por [code] o por nombre.
+  String? shortCode;
   late String name;
   late String description;
   late double price;
@@ -52,7 +53,7 @@ class Product {
   Product({
     this.id,
     required this.code,
-    required this.shortCode,
+    this.shortCode,
     required this.name,
     required this.description,
     required this.price,
@@ -79,7 +80,12 @@ class Product {
   Product.fromMap(Map<String, dynamic> map) {
     id = map['id'];
     code = map['code'];
-    shortCode = map['shortCode'];
+    final sc = map['shortCode'];
+    if (sc == null || sc.toString().trim().isEmpty) {
+      shortCode = null;
+    } else {
+      shortCode = sc.toString();
+    }
     name = map['name'];
     description = map['description'];
     price = map['price'];
@@ -107,7 +113,9 @@ class Product {
     return {
       'id': id,
       'code': code,
-      'shortCode': shortCode,
+      'shortCode': (shortCode == null || shortCode!.trim().isEmpty)
+          ? null
+          : shortCode!.trim(),
       'name': name,
       'description': description,
       'price': price,

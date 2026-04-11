@@ -85,40 +85,71 @@ class ImportService {
     }
   }
 
-  /// Si el archivo trae columna de código corto se usa; si no, se trunca el código como antes.
-  static String _shortCodeFromImport(String code, String? explicit) {
+  /// Solo usa columna explícita; si va vacía, no se inventa código corto (queda null en BD).
+  static String? _shortCodeFromImport(String? explicit) {
     final t = explicit?.trim() ?? '';
-    if (t.isNotEmpty) return t;
-    return code.length > 8 ? code.substring(0, 8) : code;
+    if (t.isEmpty) return null;
+    return t;
+  }
+
+  /// Normaliza encabezado para comparar (minúsculas, sin tildes, espacios simples).
+  static String _normalizeHeader(String raw) {
+    var s = raw.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+    const map = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ñ': 'n',
+    };
+    map.forEach((k, v) => s = s.replaceAll(k, v));
+    return s.replaceAll('.', '').replaceAll('_', ' ');
+  }
+
+  /// Detecta columnas tipo "código corto", "ref", etc. (más flexible que igualdad exacta).
+  static bool _headerIsShortCodeColumn(String rawHeader) {
+    final h = _normalizeHeader(rawHeader);
+    if (h.isEmpty) return false;
+    const exact = [
+      'codigo corto',
+      'codigocorto',
+      'shortcode',
+      'short code',
+      'corto',
+      'ref',
+      'referencia',
+      'sku corto',
+      'skucorto',
+    ];
+    if (exact.contains(h)) return true;
+    if (h.contains('corto') &&
+        (h.contains('cod') || h.contains('cód') || h.contains('sku'))) {
+      return true;
+    }
+    return false;
   }
 
   static String? _shortCodeFromCsv(List<String> headers, List row) {
-    String? get(String name) {
-      int idx = headers.indexWhere((h) => h == name.toLowerCase());
-      if (idx == -1 || idx >= row.length) return null;
-      return row[idx]?.toString().trim();
+    for (int i = 0; i < headers.length; i++) {
+      if (!_headerIsShortCodeColumn(headers[i].toString())) continue;
+      if (i >= row.length) continue;
+      final v = row[i]?.toString().trim();
+      if (v != null && v.isNotEmpty) return v;
     }
-    return get('código corto') ??
-        get('codigo corto') ??
-        get('codigo_corto') ??
-        get('codigocorto') ??
-        get('shortcode') ??
-        get('short_code');
+    return null;
   }
 
-  static String? _shortCodeFromExcel(Map<String, int> columnMap, Sheet sheet, int row) {
-    String? getCellValue(String columnName) {
-      int? colIndex = columnMap[columnName];
-      if (colIndex == null) return null;
-      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: row));
-      return cell.value?.toString().trim();
+  static String? _shortCodeFromExcel(
+      Map<String, int> columnMap, Sheet sheet, int row) {
+    for (final e in columnMap.entries) {
+      if (!_headerIsShortCodeColumn(e.key)) continue;
+      final cell = sheet.cell(CellIndex.indexByColumnRow(
+          columnIndex: e.value, rowIndex: row));
+      final v = cell.value?.toString().trim();
+      if (v != null && v.isNotEmpty) return v;
     }
-    return getCellValue('código corto') ??
-        getCellValue('codigo corto') ??
-        getCellValue('codigo_corto') ??
-        getCellValue('codigocorto') ??
-        getCellValue('shortcode') ??
-        getCellValue('short_code');
+    return null;
   }
 
   static Product? _createProductFromCsvRow(List row, List<String> headers) {
@@ -149,7 +180,7 @@ class ImportService {
     
     Product product = Product(
       code: code,
-      shortCode: _shortCodeFromImport(code, _shortCodeFromCsv(headers, row)),
+      shortCode: _shortCodeFromImport(_shortCodeFromCsv(headers, row)),
       name: name,
       description: get('descripción') ?? get('descripcion') ?? get('description') ?? '',
       price: _parseDouble(priceStr) ?? 0.0,
@@ -174,7 +205,7 @@ class ImportService {
     String? getCellValue(String columnName) {
       int? colIndex = columnMap[columnName];
       if (colIndex == null) return null;
-      
+
       var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: row));
       return cell.value?.toString().trim();
     }
@@ -205,7 +236,7 @@ class ImportService {
     // Crear producto
     Product product = Product(
       code: code,
-      shortCode: _shortCodeFromImport(code, _shortCodeFromExcel(columnMap, sheet, row)),
+      shortCode: _shortCodeFromImport(_shortCodeFromExcel(columnMap, sheet, row)),
       name: name,
       description: getCellValue('descripción') ?? getCellValue('descripcion') ?? getCellValue('description') ?? '',
       price: _parseDouble(priceStr) ?? 0.0,
@@ -290,7 +321,7 @@ class ImportService {
   
   static Future<void> saveImportedProducts(List<Product> products) async {
     try {
-        for (Product product in products) {
+      for (Product product in products) {
         // Verificar si ya existe un producto con el mismo código
         final exists = await SQLiteDatabaseService.existsProductCode(product.code);
         if (exists) {
@@ -301,8 +332,11 @@ class ImportService {
             orElse: () => product,
           );
           if (existing.id != null) {
-            // Actualizar el producto existente
             product.id = existing.id;
+            // Reimportación por etapas: celda de corto vacía no borra un corto ya guardado.
+            if (product.shortCode == null && existing.shortCode != null) {
+              product.shortCode = existing.shortCode;
+            }
             await SQLiteDatabaseService.updateProduct(product);
           }
         } else {
@@ -342,7 +376,7 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
     for (final p in products) {
       rows.add([
         p.code,
-        p.shortCode,
+        p.shortCode ?? '',
         p.name,
         p.description,
         // Formatear precios para Excel (sin decimales si son enteros)
@@ -415,7 +449,8 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
         final row = i + 1;
         
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = p.code;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = p.shortCode;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value =
+            p.shortCode ?? '';
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = p.name;
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = p.description;
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = p.price;

@@ -258,7 +258,7 @@ class ReportsService {
           (p) => p.name == item.name,
           orElse: () => Product(
             code: '',
-            shortCode: '',
+            shortCode: null,
             name: item.name,
             description: '',
             price: item.price,
@@ -424,7 +424,7 @@ class ReportsService {
           (p) => p.name == item.name,
           orElse: () => Product(
             code: '',
-            shortCode: '',
+            shortCode: null,
             name: item.name,
             description: '',
             price: item.price,
@@ -488,7 +488,7 @@ class ReportsService {
           (p) => p.name == item.name,
           orElse: () => Product(
             code: '',
-            shortCode: '',
+            shortCode: null,
             name: item.name,
             description: '',
             price: item.price,
@@ -617,7 +617,7 @@ class ReportsService {
         final product = catalog ??
             Product(
               code: '',
-              shortCode: '',
+              shortCode: null,
               name: item.name,
               description: '',
               price: item.price,

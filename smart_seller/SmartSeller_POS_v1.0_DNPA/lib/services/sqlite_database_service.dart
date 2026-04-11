@@ -113,6 +113,9 @@ class SQLiteDatabaseService {
     await _ensureSalesPaymentBreakdownColumn();
     // ✅ Asegurar columnas customer_id y client_id en sales (para reimpresión con nombre del cliente)
     await _ensureSalesCustomerClientColumns();
+
+    // Código corto opcional (NULL si no se define; evita colisiones por truncar EAN).
+    await migrateProductShortCodeNullable();
   }
 
   /// Agrega payment_breakdown a sales si no existe (para DB ya creadas sin esa columna).
@@ -237,7 +240,7 @@ class SQLiteDatabaseService {
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         code TEXT UNIQUE NOT NULL,
-        shortCode TEXT UNIQUE NOT NULL,
+        shortCode TEXT UNIQUE,
         name TEXT NOT NULL,
         description TEXT,
         price REAL NOT NULL,
@@ -1081,6 +1084,22 @@ class SQLiteDatabaseService {
     return results.isNotEmpty;
   }
 
+  /// True si otro producto activo ya usa este [shortCode].
+  static Future<bool> existsProductShortCode(String shortCode,
+      {int? excludeId}) async {
+    final sc = shortCode.trim();
+    if (sc.isEmpty) return false;
+    String whereClause = 'shortCode = ? AND isActive = ?';
+    List<dynamic> whereArgs = [sc, 1];
+    if (excludeId != null) {
+      whereClause += ' AND id != ?';
+      whereArgs.add(excludeId);
+    }
+    final results = await _database!
+        .query('products', where: whereClause, whereArgs: whereArgs);
+    return results.isNotEmpty;
+  }
+
   // ================== VENTAS ==================
 
   static Future<Map<String, dynamic>?> _productRowForSaleItem(
@@ -1602,6 +1621,79 @@ class SQLiteDatabaseService {
           'ALTER TABLE products ADD COLUMN ivaPercentage INTEGER NOT NULL DEFAULT 19');
       print('✅ Migración: Campo ivaPercentage agregado a la tabla products');
     }
+  }
+
+  /// Permite [shortCode] NULL en products (varios productos sin corto). SQLite UNIQUE acepta varios NULL.
+  static Future<void> migrateProductShortCodeNullable() async {
+    final db = _database!;
+    final info = await db.rawQuery('PRAGMA table_info(products)');
+    Map<String, Object?>? shortRow;
+    for (final row in info) {
+      if (row['name'] == 'shortCode') {
+        shortRow = row;
+        break;
+      }
+    }
+    if (shortRow == null) return;
+    final notNull = (shortRow['notnull'] as int? ?? 0) == 1;
+    if (!notNull) {
+      return;
+    }
+
+    print('🔧 Migrando products: shortCode opcional (NULL permitido)...');
+    await db.execute('PRAGMA foreign_keys = OFF');
+    try {
+      await db.transaction((txn) async {
+        await txn.execute('''
+CREATE TABLE products_new (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  shortCode TEXT UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  price REAL NOT NULL,
+  cost REAL NOT NULL,
+  stock INTEGER NOT NULL DEFAULT 0,
+  minStock INTEGER NOT NULL DEFAULT 0,
+  category TEXT NOT NULL,
+  unit TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  isActive INTEGER NOT NULL DEFAULT 1,
+  imageUrl TEXT,
+  ivaPercentage INTEGER NOT NULL DEFAULT 19,
+  isWeighted INTEGER NOT NULL DEFAULT 0,
+  pricePerKg REAL,
+  weight REAL,
+  minWeight REAL,
+  maxWeight REAL,
+  weightedStockInKg INTEGER NOT NULL DEFAULT 0,
+  stockKg REAL NOT NULL DEFAULT 0
+)
+''');
+        await txn.execute('''
+INSERT INTO products_new (
+  id, code, shortCode, name, description, price, cost, stock, minStock,
+  category, unit, createdAt, updatedAt, isActive, imageUrl,
+  ivaPercentage, isWeighted, pricePerKg, weight, minWeight, maxWeight,
+  weightedStockInKg, stockKg
+)
+SELECT
+  id, code,
+  CASE WHEN shortCode IS NULL OR TRIM(shortCode) = '' THEN NULL ELSE shortCode END,
+  name, description, price, cost, stock, minStock,
+  category, unit, createdAt, updatedAt, isActive, imageUrl,
+  ivaPercentage, isWeighted, pricePerKg, weight, minWeight, maxWeight,
+  weightedStockInKg, stockKg
+FROM products
+''');
+        await txn.execute('DROP TABLE products');
+        await txn.execute('ALTER TABLE products_new RENAME TO products');
+      });
+    } finally {
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
+    print('✅ Migración: shortCode opcional aplicada');
   }
 
   // ================== CLIENTES ==================

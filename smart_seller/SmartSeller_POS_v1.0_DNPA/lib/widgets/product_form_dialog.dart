@@ -87,7 +87,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
     _loadGroups();
     if (widget.product != null) {
       _codeController.text = widget.product!.code;
-      _shortCodeController.text = widget.product!.shortCode;
+      _shortCodeController.text = widget.product!.shortCode ?? '';
       _nameController.text = widget.product!.name;
       _priceController.text = formatMontoPuntosMiles(widget.product!.price);
       _costController.text = formatMontoPuntosMiles(widget.product!.cost);
@@ -285,7 +285,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
 
       final code = _codeController.text.trim();
       final rawShortCode = _shortCodeController.text.trim();
-      final shortCode = rawShortCode.isEmpty ? code : rawShortCode;
+      final String? shortCode =
+          rawShortCode.isEmpty ? null : rawShortCode;
       final excludeId = widget.product?.id;
 
       // Validar código de barras único
@@ -308,8 +309,10 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       // Validar código corto único solo si el usuario ingresó uno
       if (rawShortCode.isNotEmpty) {
         final existsShort = await SQLiteDatabaseService.getAllProducts();
-        if (existsShort
-            .any((p) => p.shortCode == shortCode && p.id != excludeId)) {
+        if (existsShort.any((p) =>
+            p.shortCode != null &&
+            p.shortCode == shortCode &&
+            p.id != excludeId)) {
           setState(() {
             _isLoading = false;
           });

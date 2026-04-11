@@ -395,7 +395,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
     return widget.products.where((p) {
       return p.name.toLowerCase().contains(q) ||
           (p.code.toLowerCase().contains(q)) ||
-          (p.shortCode.toLowerCase().contains(q));
+          ((p.shortCode ?? '').toLowerCase().contains(q));
     }).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }

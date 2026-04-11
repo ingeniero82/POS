@@ -64,7 +64,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         final q = _searchController.text.toLowerCase();
         final matchesSearch = product.name.toLowerCase().contains(q) ||
             product.code.toLowerCase().contains(q) ||
-            product.shortCode.toLowerCase().contains(q);
+            (product.shortCode ?? '').toLowerCase().contains(q);
         
         // Comparación de grupos dinámicos
         final matchesGroup = _selectedGroup == null || 
@@ -158,9 +158,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
         return;
       }
 
-      // Guardar productos importados
       await ImportService.saveImportedProducts(products);
-      
+
       Get.snackbar(
         'Éxito',
         '${products.length} productos importados correctamente',
@@ -433,7 +432,7 @@ class _ProductCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Código:  ${product.code}'),
-            Text('Código corto:  ${product.shortCode}'),
+            Text('Código corto:  ${product.shortCode ?? '—'}'),
             if (product.isWeighted) ...[
               Text('Precio por Kg:  ${copFormat.format(product.pricePerKg ?? 0)}'),
               if (product.weight != null)

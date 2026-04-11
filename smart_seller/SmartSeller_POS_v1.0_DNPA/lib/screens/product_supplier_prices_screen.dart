@@ -226,7 +226,7 @@ class _ProductSupplierPricesScreenState
         hits = _allProducts
             .where((p) =>
                 p.code.toLowerCase().contains(q) ||
-                p.shortCode.toLowerCase().contains(q) ||
+                (p.shortCode ?? '').toLowerCase().contains(q) ||
                 p.name.toLowerCase().contains(q))
             .take(40)
             .toList();
@@ -283,7 +283,7 @@ class _ProductSupplierPricesScreenState
                           tileColor: Colors.deepPurple.shade50,
                           title: Text(pickedProduct!.name),
                           subtitle: Text(
-                            '${pickedProduct!.code} · ${pickedProduct!.shortCode}',
+                            '${pickedProduct!.code} · ${pickedProduct!.shortCode ?? '—'}',
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.close),

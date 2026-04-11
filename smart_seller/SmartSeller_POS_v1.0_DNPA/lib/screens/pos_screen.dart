@@ -1752,7 +1752,10 @@ class _PosScreenState extends State<PosScreen> {
   void _searchProduct(String code) {
     // Primero buscar por código exacto
     final exactMatch =
-        _products.where((p) => p.code == code || p.shortCode == code).toList();
+        _products
+            .where((p) =>
+                p.code == code || (p.shortCode != null && p.shortCode == code))
+            .toList();
 
     if (exactMatch.isNotEmpty) {
       _selectProduct(exactMatch.first);
