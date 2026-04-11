@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/permissions.dart';
 import '../models/user.dart';
 import '../services/permissions_service.dart';
+import '../services/auth_service.dart';
 
 class PermissionsController extends GetxController {
   // Permisos editables por rol
@@ -70,6 +71,16 @@ class PermissionsController extends GetxController {
     return editablePermissions[role]?.contains(permission) ?? false;
   }
 
+  /// Copia profunda del mapa y reasignación para que GetX vuelva a pintar el Obx siempre.
+  void _commitRoleSet(UserRole role, Set<Permission> newSet) {
+    final next = <UserRole, Set<Permission>>{};
+    for (final r in UserRole.values) {
+      next[r] = Set<Permission>.from(editablePermissions[r] ?? {});
+    }
+    next[role] = Set<Permission>.from(newSet);
+    editablePermissions.assignAll(next);
+  }
+
   // Cambiar un permiso específico
   void togglePermission(UserRole role, Permission permission) {
     final currentPermissions = editablePermissions[role] ?? {};
@@ -81,8 +92,44 @@ class PermissionsController extends GetxController {
       newPermissions.add(permission);
     }
 
-    editablePermissions[role] = newPermissions;
+    _commitRoleSet(role, newPermissions);
   }
+
+  bool _editorIsAdmin() =>
+      AuthService.to.currentUser?.role == UserRole.admin;
+
+  /// Conjunto máximo que el “activar todos” puede asignar (sin datos de empresa si no eres admin).
+  Set<Permission> bulkFullPermissionSet() {
+    if (_editorIsAdmin()) {
+      return Set<Permission>.from(Permission.values);
+    }
+    return Permission.values
+        .where((p) =>
+            p != Permission.accessCompanyConfig &&
+            p != Permission.modifyCompanyConfig)
+        .toSet();
+  }
+
+  /// Estado del checkbox maestro: false = ninguno del conjunto aplicable, true = todos, null = parcial.
+  bool? masterCheckboxStateForRole(UserRole role) {
+    final full = bulkFullPermissionSet();
+    final cur = editablePermissions[role] ?? {};
+    if (full.isEmpty) return cur.isEmpty ? false : null;
+    final everyBulk = full.every((p) => cur.contains(p));
+    if (everyBulk) return true;
+    final anyBulk = full.any((p) => cur.contains(p));
+    return anyBulk ? null : false;
+  }
+
+  /// Activa todos los permisos aplicables al rol, o los quita todos.
+  void setAllPermissionsForRole(UserRole role, bool grant) {
+    final set = grant ? Set<Permission>.from(bulkFullPermissionSet()) : <Permission>{};
+    _commitRoleSet(role, set);
+  }
+
+  /// Para el check maestro sin tristate: solo true si están todos los del bloque aplicable.
+  bool masterCheckboxCheckedForRole(UserRole role) =>
+      masterCheckboxStateForRole(role) == true;
 
   // Guardar cambios
   Future<bool> savePermissions() async {

@@ -186,10 +186,22 @@ class RolePermissions {
       // NO tiene removeCartItem, modifyCartPrice ni reprintInvoices - requiere autorización
     },
     UserRole.maintenance: {
-      // Mantenimiento - sin Datos de Empresa (solo propietario lo otorga)
-      Permission.accessSystemConfig,
-      Permission.modifySystemConfig,
+      // Vendedor / puesta en marcha: explicar, crear y ajustar usuarios del cliente.
+      // Sin POS, inventario operativo, reportes exportables ni configuraciones (solo admin dueño).
+      Permission.viewUsers,
+      Permission.createUsers,
+      Permission.editUsers,
+      Permission.activateUsers,
       Permission.accessDashboard,
+      Permission.viewProducts,
+      Permission.viewInventory,
+      Permission.viewMovements,
+      Permission.viewReports,
+      Permission.viewSalesHistory,
+      Permission.viewClients,
+      Permission.createClients,
+      Permission.editClients,
+      Permission.allowUserCode,
     },
   };
 

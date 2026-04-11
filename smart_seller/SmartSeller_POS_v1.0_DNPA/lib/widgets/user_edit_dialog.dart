@@ -4,6 +4,7 @@ import '../models/user.dart';
 import '../services/sqlite_database_service.dart';
 import '../services/permissions_service.dart';
 import '../models/permissions.dart';
+import '../services/auth_service.dart';
 
 class UserEditDialog extends StatefulWidget {
   final User user;
@@ -29,6 +30,23 @@ class _UserEditDialogState extends State<UserEditDialog> {
   bool _obscurePassword = true;
   bool _changePassword = false;
 
+  List<UserRole> _assignableRolesForEditor() {
+    final me = AuthService.to.currentUser?.role;
+    if (me == UserRole.admin) {
+      return List<UserRole>.from(UserRole.values);
+    }
+    if (me == UserRole.maintenance) {
+      return [
+        UserRole.manager,
+        UserRole.supervisor,
+        UserRole.cashier,
+      ];
+    }
+    return UserRole.values
+        .where((r) => r != UserRole.admin && r != UserRole.maintenance)
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -38,11 +56,10 @@ class _UserEditDialogState extends State<UserEditDialog> {
     _passwordController = TextEditingController();
     _userCodeController =
         TextEditingController(text: widget.user.userCode ?? '');
-    // Solo Admin y Gerente; si el usuario tiene otro rol, mostrarlo como Gerente
-    final role = widget.user.role;
-    _selectedRole = (role == UserRole.admin || role == UserRole.manager)
-        ? role
-        : UserRole.manager;
+    final allowed = _assignableRolesForEditor();
+    _selectedRole = allowed.contains(widget.user.role)
+        ? widget.user.role
+        : allowed.first;
   }
 
   @override
@@ -91,6 +108,18 @@ class _UserEditDialogState extends State<UserEditDialog> {
     });
 
     try {
+      final allowed = _assignableRolesForEditor();
+      if (!allowed.contains(_selectedRole)) {
+        Get.snackbar(
+          'No permitido',
+          'No puedes asignar ese rol con tu usuario actual.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final username = _usernameController.text.trim();
       // Verificar si el usuario cambió y si ya existe
       if (username != widget.user.username) {
@@ -389,7 +418,9 @@ class _UserEditDialogState extends State<UserEditDialog> {
 
                   // Rol
                   DropdownButtonFormField<UserRole>(
-                    initialValue: _selectedRole,
+                    initialValue: _assignableRolesForEditor().contains(_selectedRole)
+                        ? _selectedRole
+                        : _assignableRolesForEditor().first,
                     decoration: InputDecoration(
                       labelText: 'Rol del Usuario',
                       prefixIcon: const Icon(Icons.admin_panel_settings),
@@ -399,7 +430,7 @@ class _UserEditDialogState extends State<UserEditDialog> {
                       filled: true,
                       fillColor: const Color(0xFFF6F8FA),
                     ),
-                    items: [UserRole.admin, UserRole.manager].map((role) {
+                    items: _assignableRolesForEditor().map((role) {
                       return DropdownMenuItem(
                         value: role,
                         child: Text(_getRoleText(role)),

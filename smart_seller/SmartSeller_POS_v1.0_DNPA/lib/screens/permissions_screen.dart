@@ -328,7 +328,7 @@ class PermissionsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Haz clic en los checkboxes para modificar los permisos',
+                      'Haz clic en cada casilla para afinar permisos. En la cabecera de cada rol, el check «Todos» activa o desactiva de golpe todos los permisos aplicables a esa columna (como administrador puedes incluir también Datos de la empresa).',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -416,24 +416,96 @@ class _EditablePermissionsTable extends StatelessWidget {
               children: [
                 const Padding(
                   padding: EdgeInsets.all(12),
-                  child: Text(
-                    'Permiso',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF22315B),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Permiso',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF22315B),
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Fila a fila',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 ..._tableRoleOrder.map(
                   (role) => Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      _roleDisplayName(role),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF22315B),
-                      ),
-                      textAlign: TextAlign.center,
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _roleDisplayName(role),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF22315B),
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        if (_canEditRoleColumn(currentRole, role))
+                          Tooltip(
+                            message:
+                                'Activar o quitar todos los permisos de ${_roleDisplayName(role)}. Si hay solo algunos marcados, el check aparece vacío: un clic marca todos.',
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: controller
+                                      .masterCheckboxCheckedForRole(role),
+                                  onChanged: (v) {
+                                    if (v != null) {
+                                      controller.setAllPermissionsForRole(
+                                          role, v);
+                                    }
+                                  },
+                                  activeColor: const Color(0xFF6C47FF),
+                                  checkColor: Colors.white,
+                                ),
+                                const Text(
+                                  'Todos',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                if (controller
+                                        .masterCheckboxStateForRole(role) ==
+                                    null)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      'Parcial',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          )
+                        else
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: Text(
+                              '—',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

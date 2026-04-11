@@ -64,6 +64,13 @@ class PermissionsService extends GetxService {
             loadedPermissions[UserRole.admin]!.length < defaultAdmin.length) {
           loadedPermissions[UserRole.admin] = defaultAdmin;
         }
+        final defaultMaintenance =
+            RolePermissions.getPermissions(UserRole.maintenance);
+        if (loadedPermissions[UserRole.maintenance] == null ||
+            loadedPermissions[UserRole.maintenance]!.length <
+                defaultMaintenance.length) {
+          loadedPermissions[UserRole.maintenance] = defaultMaintenance;
+        }
 
         _currentPermissions.value = loadedPermissions;
         await saveAllPermissions(loadedPermissions);

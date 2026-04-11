@@ -45,6 +45,18 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
   @override
   void initState() {
     super.initState();
+    if (!AuthService.to.hasPermission(Permission.accessCompanyConfig)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.offAllNamed('/dashboard');
+        Get.snackbar(
+          'Acceso denegado',
+          'Solo el administrador puede configurar los datos de la empresa.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      });
+      return;
+    }
     _loadCurrentConfig();
   }
 

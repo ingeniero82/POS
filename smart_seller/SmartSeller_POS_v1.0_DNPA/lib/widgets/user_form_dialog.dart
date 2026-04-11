@@ -24,6 +24,24 @@ class _UserFormDialogState extends State<UserFormDialog> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  /// Solo el admin dueño puede crear usuarios con rol administrador o mantenimiento.
+  List<UserRole> _assignableRolesForCreate() {
+    final me = AuthService.to.currentUser?.role;
+    if (me == UserRole.admin) {
+      return List<UserRole>.from(UserRole.values);
+    }
+    if (me == UserRole.maintenance) {
+      return [
+        UserRole.manager,
+        UserRole.supervisor,
+        UserRole.cashier,
+      ];
+    }
+    return UserRole.values
+        .where((r) => r != UserRole.admin && r != UserRole.maintenance)
+        .toList();
+  }
+
   @override
   void dispose() {
     _fullNameController.dispose();
@@ -71,6 +89,18 @@ class _UserFormDialogState extends State<UserFormDialog> {
     try {
       final username = _usernameController.text.trim();
       print('Verificando si existe el usuario: $username');
+
+      final allowedRoles = _assignableRolesForCreate();
+      if (!allowedRoles.contains(_selectedRole)) {
+        Get.snackbar(
+          'No permitido',
+          'No puedes asignar ese rol con tu usuario actual.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
 
       // Verificar si el usuario ya existe
       final userExists = await SQLiteDatabaseService.userExists(username);
@@ -333,7 +363,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
                   // Rol
                   DropdownButtonFormField<UserRole>(
-                    initialValue: _selectedRole,
+                    initialValue: _assignableRolesForCreate().contains(_selectedRole)
+                        ? _selectedRole
+                        : _assignableRolesForCreate().first,
                     decoration: InputDecoration(
                       labelText: 'Rol del Usuario',
                       prefixIcon: const Icon(Icons.admin_panel_settings),
@@ -343,7 +375,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       filled: true,
                       fillColor: const Color(0xFFF6F8FA),
                     ),
-                    items: UserRole.values.map((role) {
+                    items: _assignableRolesForCreate().map((role) {
                       return DropdownMenuItem(
                         value: role,
                         child: Text(_getRoleText(role)),

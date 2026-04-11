@@ -133,6 +133,18 @@ class _UsersScreenState extends State<UsersScreen> {
       return;
     }
 
+    // Solo el rol administrador puede modificar la cuenta principal (admin).
+    if (user.username.toLowerCase() == 'admin' &&
+        AuthService.to.currentUser?.role != UserRole.admin) {
+      Get.snackbar(
+        'Acceso denegado',
+        'Solo el administrador del sistema puede modificar la cuenta admin.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => UserEditDialog(user: user),

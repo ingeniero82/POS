@@ -61,7 +61,6 @@ class SQLiteDatabaseService {
     // Crear usuario admin por defecto
     await migrateAddIsWeighted();
     await _createDefaultUser();
-    await _migratePasswordsTo1234();
 
     // Ejecutar migración para agregar userCode si es necesario
     await migrateAddUserCode();
@@ -564,8 +563,8 @@ class SQLiteDatabaseService {
     );
 
     if (adminExists.isEmpty) {
-      print('🔧 Creando usuario admin por defecto...');
-      // Contraseña por defecto del admin en instalaciones nuevas (configurar según necesidad)
+      print('🔧 Creando usuario admin por defecto (dueño: acceso total)...');
+      // Solo el dueño del programa: usuario admin + esta clave tienen todos los permisos.
       const defaultAdminPassword = 'ingeniero2026@';
       final hashedPassword = SecurityService.hashPassword(defaultAdminPassword);
       await _database!.insert('users', {
@@ -581,50 +580,26 @@ class SQLiteDatabaseService {
           '✅ Usuario admin creado (admin / contraseña configurada para este ejecutable)');
     }
 
-    // Crear usuario supervisor si no existe
-    final supervisorExists = await _database!.query(
+    // Usuario de mantenimiento del vendedor (rol maintenance): admon / 1234
+    final admonExists = await _database!.query(
       'users',
       where: 'username = ?',
-      whereArgs: ['supervisor'],
+      whereArgs: ['admon'],
     );
 
-    if (supervisorExists.isEmpty) {
-      print('🔧 Creando usuario supervisor por defecto...');
-      // Hash de la contraseña por defecto
+    if (admonExists.isEmpty) {
+      print('🔧 Creando usuario de mantenimiento (vendedor)...');
       final hashedPassword = SecurityService.hashPassword('1234');
       await _database!.insert('users', {
-        'username': 'supervisor',
-        'password': hashedPassword, // Ahora se guarda hasheada
-        'fullName': 'Supervisor General',
-        'role': 'supervisor',
+        'username': 'admon',
+        'password': hashedPassword,
+        'fullName': 'Mantenimiento (vendedor)',
+        'role': 'maintenance',
         'createdAt': DateTime.now().toIso8601String(),
         'isActive': 1,
-        'userCode': 'SUP-2001',
+        'userCode': 'MANT-VEND-01',
       });
-      print(
-          '✅ Usuario supervisor creado con contraseña segura: supervisor / 1234');
-    }
-  }
-
-  /// Actualiza contraseña de admin y supervisor a 1234 (por compatibilidad).
-  static Future<void> _migratePasswordsTo1234() async {
-    try {
-      final hash1234 = SecurityService.hashPassword('1234');
-      await _database!.update(
-        'users',
-        {'password': hash1234},
-        where: 'username = ?',
-        whereArgs: ['admin'],
-      );
-      await _database!.update(
-        'users',
-        {'password': hash1234},
-        where: 'username = ?',
-        whereArgs: ['supervisor'],
-      );
-      print('✅ Contraseñas admin/supervisor actualizadas a 1234');
-    } catch (e) {
-      print('⚠️ Migración contraseñas: $e');
+      print('✅ Usuario admon creado (mantenimiento / 1234)');
     }
   }
 
