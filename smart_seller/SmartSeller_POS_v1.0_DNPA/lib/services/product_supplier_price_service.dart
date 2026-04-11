@@ -4,6 +4,7 @@ import 'sqlite_database_service.dart';
 /// Fase 1: precio de compra por producto y proveedor (sin historial).
 class ProductSupplierPriceService {
   static const String _table = 'product_supplier_prices';
+  static const String _historyTable = 'product_supplier_price_history';
 
   /// Patrón LIKE seguro (quita % y _ del texto para no usar comodines accidentales).
   static String _likeArg(String query) {
@@ -20,7 +21,15 @@ class ProductSupplierPriceService {
     final now = DateTime.now();
     final map = row.toMapForInsert();
     map['updated_at'] = now.toIso8601String();
-    return db.insert(_table, map);
+    final id = await db.insert(_table, map);
+    await _saveHistoryEntry(
+      productId: row.productId,
+      supplierId: row.supplierId,
+      purchasePrice: row.purchasePrice,
+      supplierReference: row.supplierReference,
+      changedAt: now,
+    );
+    return id;
   }
 
   /// Inserta o actualiza el precio para el par (producto, proveedor).
@@ -33,6 +42,7 @@ class ProductSupplierPriceService {
       row.supplierId,
     );
     if (existing != null && existing.id != null) {
+      final priceChanged = existing.purchasePrice != row.purchasePrice;
       await db.update(
         _table,
         {
@@ -43,6 +53,15 @@ class ProductSupplierPriceService {
         where: 'id = ?',
         whereArgs: [existing.id],
       );
+      if (priceChanged) {
+        await _saveHistoryEntry(
+          productId: row.productId,
+          supplierId: row.supplierId,
+          purchasePrice: row.purchasePrice,
+          supplierReference: row.supplierReference,
+          changedAt: now,
+        );
+      }
       return existing.id!;
     }
     return create(row.copyWith(updatedAt: now));
@@ -52,17 +71,63 @@ class ProductSupplierPriceService {
     final db = SQLiteDatabaseService.database;
     if (db == null) throw Exception('Base de datos no inicializada');
     if (row.id == null) return false;
+    final previous = await getById(row.id!);
+    final now = DateTime.now();
     final n = await db.update(
       _table,
       {
         'supplier_reference': row.supplierReference,
         'purchase_price': row.purchasePrice,
-        'updated_at': DateTime.now().toIso8601String(),
+        'updated_at': now.toIso8601String(),
       },
       where: 'id = ?',
       whereArgs: [row.id],
     );
+    if (n > 0 && previous != null && previous.purchasePrice != row.purchasePrice) {
+      await _saveHistoryEntry(
+        productId: row.productId,
+        supplierId: row.supplierId,
+        purchasePrice: row.purchasePrice,
+        supplierReference: row.supplierReference,
+        changedAt: now,
+      );
+    }
     return n > 0;
+  }
+
+  static Future<void> _saveHistoryEntry({
+    required int productId,
+    required int supplierId,
+    required double purchasePrice,
+    required String? supplierReference,
+    required DateTime changedAt,
+  }) async {
+    final db = SQLiteDatabaseService.database;
+    if (db == null) return;
+    await db.insert(_historyTable, {
+      'product_id': productId,
+      'supplier_id': supplierId,
+      'purchase_price': purchasePrice,
+      'supplier_reference': supplierReference,
+      'changed_at': changedAt.toIso8601String(),
+    });
+  }
+
+  /// Historial cronológico descendente para un par producto-proveedor.
+  static Future<List<Map<String, dynamic>>> getPriceHistory({
+    required int productId,
+    required int supplierId,
+    int limit = 200,
+  }) async {
+    final db = SQLiteDatabaseService.database;
+    if (db == null) return [];
+    return db.query(
+      _historyTable,
+      where: 'product_id = ? AND supplier_id = ?',
+      whereArgs: [productId, supplierId],
+      orderBy: 'changed_at DESC',
+      limit: limit,
+    );
   }
 
   static Future<bool> deleteById(int id) async {

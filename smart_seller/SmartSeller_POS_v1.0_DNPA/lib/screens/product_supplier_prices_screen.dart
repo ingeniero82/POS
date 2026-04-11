@@ -401,6 +401,80 @@ class _ProductSupplierPricesScreenState
     }
   }
 
+  Future<void> _openHistoryDialog(ProductSupplierPriceDetail row) async {
+    final history = await ProductSupplierPriceService.getPriceHistory(
+      productId: row.offer.productId,
+      supplierId: row.offer.supplierId,
+      limit: 200,
+    );
+
+    if (!mounted) return;
+
+    await Get.dialog<void>(
+      AlertDialog(
+        title: const Text('Historial de precios'),
+        content: SizedBox(
+          width: 520,
+          child: history.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('No hay cambios de precio registrados.'),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      row.productName,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Text('Proveedor: ${row.supplierName}'),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: history.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final h = history[i];
+                          final price = (h['purchase_price'] as num).toDouble();
+                          final changedAt = DateTime.tryParse(
+                                (h['changed_at'] as String?) ?? '',
+                              ) ??
+                              DateTime.now();
+                          final ref = (h['supplier_reference'] as String?) ?? '';
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              _money.format(price),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Fecha: ${_dateFmt.format(changedAt)}'),
+                                if (ref.isNotEmpty)
+                                  Text('Ref. proveedor: $ref'),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -520,8 +594,13 @@ class _ProductSupplierPricesScreenState
                             onSelected: (v) {
                               if (v == 'e') _openEditDialog(row);
                               if (v == 'd') _confirmDelete(row);
+                              if (v == 'h') _openHistoryDialog(row);
                             },
                             itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'h',
+                                child: Text('Ver historial'),
+                              ),
                               PopupMenuItem(
                                 value: 'e',
                                 child: Text('Editar'),

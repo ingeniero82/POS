@@ -28,7 +28,8 @@ class SalesReport {
   final double? totalDiscounts; // Total de descuentos aplicados
   final double? totalReturns; // Total de devoluciones
   final int? returnTransactions; // Número de devoluciones
-  final double netSales; // Ventas netas (bruto - descuentos - devoluciones)
+  /// Total cobrado en ventas menos devoluciones ([Sale.total] ya viene neto de descuento global POS).
+  final double netSales;
 
   SalesReport({
     required this.date,
@@ -168,6 +169,11 @@ class SalesTransaction {
   final List<TransactionItem> items;
   final String? clientName;
 
+  /// Descuento global al cobrar (monto en pesos), si aplica.
+  final double? globalDiscountAmount;
+  /// Descuento global al cobrar (% sobre subtotal+IVA), si aplica.
+  final double? globalDiscountPercent;
+
   SalesTransaction({
     required this.id,
     required this.date,
@@ -177,6 +183,8 @@ class SalesTransaction {
     required this.user,
     required this.items,
     this.clientName,
+    this.globalDiscountAmount,
+    this.globalDiscountPercent,
   });
 }
 
@@ -189,6 +197,11 @@ class TransactionItem {
   final double profit;
   final double profitMargin;
 
+  /// Precio de lista en catálogo (actual) usado para comparar; null si no hubo diferencia.
+  final double? listUnitPrice;
+  /// True si el precio unitario vendido difiere del precio de lista (catálogo actual).
+  final bool priceModifiedVsList;
+
   TransactionItem({
     required this.productName,
     required this.groupName,
@@ -197,6 +210,8 @@ class TransactionItem {
     required this.totalPrice,
     required this.profit,
     required this.profitMargin,
+    this.listUnitPrice,
+    this.priceModifiedVsList = false,
   });
 }
 

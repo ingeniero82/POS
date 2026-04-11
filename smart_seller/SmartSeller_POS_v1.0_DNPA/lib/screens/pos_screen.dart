@@ -1098,6 +1098,35 @@ class _PosScreenState extends State<PosScreen> {
                 ],
               );
             }),
+            Obx(() {
+              if (_posController.cartDiscountAmount <= 0) {
+                return const SizedBox.shrink();
+              }
+              final p = _posController.cartDiscountPercent.value;
+              final pctStr = p == p.roundToDouble()
+                  ? p.round().toString()
+                  : p.toStringAsFixed(1);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Descuento ($pctStr%):',
+                      style: TextStyle(fontSize: 15, color: Colors.red[800]),
+                    ),
+                    Text(
+                      '-\$${_posController.cartDiscountAmount.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red[800],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
             const Divider(),
             // Total
             Row(
@@ -2026,6 +2055,33 @@ class _PosScreenState extends State<PosScreen> {
                 _checkPermissionAndExecute('modifyCartPrice', () {
                   _showPriceDialog(item, index);
                 });
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.percent, color: Colors.teal.shade700),
+              title: const Text('Descuento % al total de la venta'),
+              subtitle: const Text(
+                  'Sobre subtotal + IVA; mismo ajuste que en Método de pago'),
+              onTap: () {
+                Navigator.of(context).pop();
+                if (_posController.selectedCustomer.value == null &&
+                    _posController.selectedClient.value == null) {
+                  Get.snackbar(
+                    'Cliente requerido',
+                    'Seleccione cliente de puntos o de facturación para aplicar descuento %.',
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.orange,
+                    colorText: Colors.white,
+                  );
+                  return;
+                }
+                final copFormat = NumberFormat.currency(
+                  locale: 'es_CO',
+                  symbol: '\$ ',
+                  decimalDigits: 0,
+                  customPattern: '\u00A4#,##0',
+                );
+                _posController.showCartGlobalDiscountDialog(copFormat);
               },
             ),
             ListTile(

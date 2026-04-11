@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../services/pdf_reports_service.dart';
 import '../services/company_config_service.dart';
+import '../models/user.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -30,6 +31,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   ReportPeriod selectedPeriod = ReportPeriod.today;
   String? selectedGroup;
   String? selectedPaymentMethod;
+  String? selectedCashier;
   bool isLoading = false;
 
   // Controlador para pestañas
@@ -40,6 +42,7 @@ class _ReportsScreenState extends State<ReportsScreen>
   InventoryReport? inventoryReport;
   ProfitabilityReport? profitabilityReport;
   List<Group> availableGroups = [];
+  List<User> availableUsers = [];
 
   // Filtros avanzados
   bool showAdvancedFilters = false;
@@ -52,6 +55,7 @@ class _ReportsScreenState extends State<ReportsScreen>
         vsync:
             this); // ✅ Corregido: 5 tabs (ventas, productos, inventario, rentabilidad, grupos)
     _loadGroups();
+    _loadUsers();
     _loadReportData();
   }
 
@@ -72,6 +76,19 @@ class _ReportsScreenState extends State<ReportsScreen>
     }
   }
 
+  Future<void> _loadUsers() async {
+    try {
+      final users = await SQLiteDatabaseService.getAllUsers();
+      setState(() {
+        availableUsers =
+            users.where((u) => u.isActive).toList()
+              ..sort((a, b) => a.username.compareTo(b.username));
+      });
+    } catch (e) {
+      print('Error cargando usuarios: $e');
+    }
+  }
+
   Future<void> _loadReportData() async {
     setState(() => isLoading = true);
     try {
@@ -82,6 +99,7 @@ class _ReportsScreenState extends State<ReportsScreen>
             endDate: endDate,
             groupFilter: selectedGroup,
             paymentMethodFilter: selectedPaymentMethod,
+            userFilter: selectedCashier,
           );
           break;
         case ReportType.inventory:
@@ -107,6 +125,7 @@ class _ReportsScreenState extends State<ReportsScreen>
             endDate: endDate,
             groupFilter: selectedGroup,
             paymentMethodFilter: selectedPaymentMethod,
+            userFilter: selectedCashier,
           );
           break;
         case ReportType.suppliers:
@@ -393,6 +412,29 @@ class _ReportsScreenState extends State<ReportsScreen>
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<String>(
+            initialValue: selectedCashier,
+            decoration: const InputDecoration(
+              labelText: 'Cajero',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.person),
+            ),
+            items: [
+              const DropdownMenuItem(
+                value: null,
+                child: Text('Todos los cajeros'),
+              ),
+              ...availableUsers.map((u) => DropdownMenuItem(
+                    value: u.username,
+                    child: Text('${u.username} (${u.fullName})'),
+                  )),
+            ],
+            onChanged: (value) {
+              setState(() => selectedCashier = value);
+              _loadReportData();
+            },
+          ),
         ],
       ),
     );
@@ -661,21 +703,78 @@ class _ReportsScreenState extends State<ReportsScreen>
             ),
             const SizedBox(height: 16),
             ...salesReport!.transactions.map((transaction) {
+              final nf = NumberFormat('#,###', 'es_CO');
+              final pct = transaction.globalDiscountPercent;
+              final hasGlobal = transaction.globalDiscountAmount != null &&
+                  transaction.globalDiscountAmount! > 0;
+              String? discSubtitle;
+              if (hasGlobal) {
+                final amt = transaction.globalDiscountAmount!;
+                if (pct != null && pct > 0) {
+                  final pStr = pct == pct.roundToDouble()
+                      ? pct.round().toString()
+                      : pct.toStringAsFixed(1);
+                  discSubtitle =
+                      'Descuento % al total: $pStr% (−\$${nf.format(amt)})';
+                } else {
+                  discSubtitle = 'Descuento al total: −\$${nf.format(amt)}';
+                }
+              }
               return ExpansionTile(
                 title: Text(
-                    '${transaction.time} - \$${NumberFormat('#,###').format(transaction.total)}'),
-                subtitle:
-                    Text('${transaction.paymentMethod} • ${transaction.user}'),
-                children: transaction.items.map((item) {
-                  return ListTile(
-                    leading: const Icon(Icons.shopping_cart, size: 16),
-                    title: Text(item.productName),
-                    subtitle:
-                        Text('${item.groupName} • ${item.quantity} unidades'),
-                    trailing: Text(
-                        '\$${NumberFormat('#,###').format(item.totalPrice)}'),
-                  );
-                }).toList(),
+                    '${transaction.time} - \$${nf.format(transaction.total)}'),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                        '${transaction.paymentMethod} • ${transaction.user}'),
+                    if (discSubtitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          discSubtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.teal.shade800,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                children: [
+                  ...transaction.items.map((item) {
+                    final modNote = item.priceModifiedVsList &&
+                            item.listUnitPrice != null
+                        ? 'Lista \$${nf.format(item.listUnitPrice!)} → vendido \$${nf.format(item.unitPrice)}'
+                        : null;
+                    return ListTile(
+                      leading: const Icon(Icons.shopping_cart, size: 16),
+                      title: Text(item.productName),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                              '${item.groupName} • ${item.quantity} u. @ \$${nf.format(item.unitPrice)}'),
+                          if (modNote != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                modNote,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.deepOrange.shade800,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: Text('\$${nf.format(item.totalPrice)}'),
+                    );
+                  }),
+                ],
               );
             }).toList(),
           ],
@@ -1438,8 +1537,24 @@ class _ReportsScreenState extends State<ReportsScreen>
     sb.writeln(dash);
     sb.writeln('Transacciones:');
     for (final t in r.transactions.take(50)) {
-      sb.writeln(
-          '  ${DateFormat('HH:mm').format(t.date)} \$${nf.format(t.total)} ${t.paymentMethod ?? ''}');
+      var line =
+          '  ${DateFormat('HH:mm').format(t.date)} \$${nf.format(t.total)} ${t.paymentMethod}';
+      if (t.globalDiscountAmount != null && t.globalDiscountAmount! > 0) {
+        final p = t.globalDiscountPercent;
+        if (p != null && p > 0) {
+          final ps = p == p.roundToDouble() ? '${p.round()}' : p.toStringAsFixed(1);
+          line += ' | Dcto ${ps}% (−\$${nf.format(t.globalDiscountAmount!)})';
+        } else {
+          line += ' | Dcto −\$${nf.format(t.globalDiscountAmount!)}';
+        }
+      }
+      sb.writeln(line);
+      for (final it in t.items) {
+        if (it.priceModifiedVsList && it.listUnitPrice != null) {
+          sb.writeln(
+              '      · ${it.productName}: lista \$${nf.format(it.listUnitPrice!)} → \$${nf.format(it.unitPrice)}');
+        }
+      }
     }
     if (r.transactions.length > 50)
       sb.writeln('  ... y ${r.transactions.length - 50} más');

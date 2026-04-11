@@ -979,6 +979,18 @@ class PrintService {
           commands.addAll(_newLine());
         }
       }
+      final discVal = sale.discount ?? 0;
+      if (discVal > 0) {
+        final pct = sale.discountPercentage;
+        final pctLabel = pct != null && pct > 0
+            ? (pct == pct.roundToDouble()
+                ? 'DESCUENTO (${pct.round()}%):'
+                : 'DESCUENTO (${pct.toStringAsFixed(1)}%):')
+            : 'DESCUENTO:';
+        commands.addAll(_formatText(
+            _lineLeftRight(fmt, pctLabel, '\$${currencyFormat.format(discVal)}')));
+        commands.addAll(_newLine());
+      }
       commands.addAll(_formatText(_dashLine(fmt)));
       commands.addAll(_newLine());
       commands.addAll(_boldOn);
@@ -1351,7 +1363,15 @@ class PrintService {
         print(_lineLeftRight(fmt, 'IVA:', '\$0'));
       }
     }
-    print(_lineLeftRight(fmt, 'DESCUENTO:', '\$$discountStr'));
+    if (discountVal > 0) {
+      final pct = sale.discountPercentage;
+      final discLabel = pct != null && pct > 0
+          ? (pct == pct.roundToDouble()
+              ? 'DESCUENTO (${pct.round()}%):'
+              : 'DESCUENTO (${pct.toStringAsFixed(1)}%):')
+          : 'DESCUENTO:';
+      print(_lineLeftRight(fmt, discLabel, '\$$discountStr'));
+    }
     print(_dashLine(fmt));
     print(_lineLeftRight(fmt, 'TOTAL A PAGAR:', '\$$totalStr'));
     print(_separatorLine(fmt));

@@ -643,11 +643,20 @@ class AccountingReportsService {
       final userId = row['user_id'] as int?;
 
       String userName = 'Cajero';
+      String? sessionUsername;
       if (userId != null) {
         final userRows = await db.query('users',
-            columns: ['fullName'], where: 'id = ?', whereArgs: [userId]);
-        if (userRows.isNotEmpty && userRows.first['fullName'] != null) {
-          userName = userRows.first['fullName'] as String;
+            columns: ['fullName', 'username'],
+            where: 'id = ?',
+            whereArgs: [userId]);
+        if (userRows.isNotEmpty) {
+          if (userRows.first['fullName'] != null) {
+            userName = userRows.first['fullName'] as String;
+          }
+          final u = (userRows.first['username'] as String?)?.trim();
+          if (u != null && u.isNotEmpty) {
+            sessionUsername = u;
+          }
         }
       }
 
@@ -655,9 +664,14 @@ class AccountingReportsService {
       final endDay = DateTime(closeDate.year, closeDate.month, closeDate.day)
           .add(const Duration(days: 1));
 
+      // Importante: discriminar por cajero de la sesión para no mezclar ventas
+      // de otros usuarios en el mismo día.
       final salesRows = await db.rawQuery(
-        "SELECT id, date, total, items, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount, anulada FROM sales WHERE date >= ? AND date < ? ORDER BY date",
-        [startDay.toIso8601String(), endDay.toIso8601String()],
+        "SELECT id, date, total, items, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount, anulada "
+        "FROM sales WHERE date >= ? AND date < ? ${sessionUsername != null ? 'AND user = ?' : ''} ORDER BY date",
+        sessionUsername != null
+            ? [startDay.toIso8601String(), endDay.toIso8601String(), sessionUsername]
+            : [startDay.toIso8601String(), endDay.toIso8601String()],
       );
 
       int numVentas = 0;

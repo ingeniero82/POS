@@ -18,10 +18,11 @@ class ReportsService {
     DateTime? endDate,
     String? groupFilter,
     String? paymentMethodFilter,
+    String? userFilter,
   }) async {
     // Obtener ventas del período (día o rango)
     final sales =
-        await SQLiteDatabaseService.getSales(date: date, endDate: endDate);
+        await SQLiteDatabaseService.getSales(date: date, endDate: endDate, user: userFilter);
     final products = await SQLiteDatabaseService.getAllProducts();
     final groups = await SQLiteDatabaseService.getAllGroups();
 
@@ -45,8 +46,8 @@ class ReportsService {
       }
     }
 
-    // Ventas netas = Ventas brutas - Descuentos - Devoluciones
-    final netSales = totalSales - totalDiscounts - totalReturns;
+    // [sale.total] ya es el monto cobrado (neto tras descuento global al POS). No restar otra vez totalDiscounts.
+    final netSales = totalSales - totalReturns;
     final totalTransactions =
         sales.where((s) => !s.isAnulada).length; // Excluir anuladas
     final averageTicket =
@@ -565,6 +566,46 @@ class ReportsService {
     return result.take(20).toList(); // Top 20 productos
   }
 
+  /// Producto de catálogo asociado a un ítem de venta (por [SaleItem.productId] o nombre/unidad).
+  static Product? productForSaleLine(SaleItem item, List<Product> products) {
+    if (item.productId != null) {
+      for (final p in products) {
+        if (p.id == item.productId) return p;
+      }
+    }
+    for (final p in products) {
+      if (p.name == item.name && p.unit == item.unit) return p;
+    }
+    for (final p in products) {
+      if (p.name == item.name) return p;
+    }
+    return null;
+  }
+
+  /// Precio de lista en catálogo (unidad o \$/kg si es pesado).
+  static double listUnitPriceFromCatalog(SaleItem item, Product catalog) {
+    if (catalog.isWeighted &&
+        catalog.pricePerKg != null &&
+        catalog.pricePerKg! > 0) {
+      return catalog.pricePerKg!;
+    }
+    return catalog.price;
+  }
+
+  static bool priceModifiedVsCatalog(SaleItem item, Product catalog) {
+    final list = listUnitPriceFromCatalog(item, catalog);
+    return (list - item.price).abs() > 0.009;
+  }
+
+  /// Texto corto para historial / UI si el precio vendido difiere del catálogo (precio actual).
+  static String? saleLinePriceNote(SaleItem item, List<Product> products) {
+    final c = productForSaleLine(item, products);
+    if (c == null || !priceModifiedVsCatalog(item, c)) return null;
+    final list = listUnitPriceFromCatalog(item, c);
+    final nf = NumberFormat('#,##0', 'es_CO');
+    return 'Lista \$${nf.format(list)} → vendido \$${nf.format(item.price)}';
+  }
+
   static List<SalesTransaction> _generateTransactions(
     List<Sale> sales,
     List<Product> products,
@@ -572,23 +613,22 @@ class ReportsService {
   ) {
     return sales.map((sale) {
       final items = sale.items.map((item) {
-        final product = products.firstWhere(
-          (p) => p.name == item.name,
-          orElse: () => Product(
-            code: '',
-            shortCode: '',
-            name: item.name,
-            description: '',
-            price: item.price,
-            cost: 0.0,
-            stock: 0,
-            minStock: 0,
-            category: 'Sin grupo',
-            unit: item.unit,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-        );
+        final catalog = productForSaleLine(item, products);
+        final product = catalog ??
+            Product(
+              code: '',
+              shortCode: '',
+              name: item.name,
+              description: '',
+              price: item.price,
+              cost: 0.0,
+              stock: 0,
+              minStock: 0,
+              category: 'Sin grupo',
+              unit: item.unit,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
 
         final group = groups.firstWhere(
           (g) => g.name == product.category,
@@ -607,6 +647,10 @@ class ReportsService {
             ? ((item.price - product.cost) / item.price) * 100
             : 0.0;
 
+        final listUnit =
+            catalog != null ? listUnitPriceFromCatalog(item, catalog) : null;
+        final modified = catalog != null && priceModifiedVsCatalog(item, catalog);
+
         return TransactionItem(
           productName: item.name,
           groupName: group.name,
@@ -615,8 +659,13 @@ class ReportsService {
           totalPrice: totalPrice,
           profit: profit,
           profitMargin: profitMargin,
+          listUnitPrice: modified ? listUnit : null,
+          priceModifiedVsList: modified,
         );
       }).toList();
+
+      final gd = sale.discount ?? 0.0;
+      final gp = sale.discountPercentage ?? 0.0;
 
       return SalesTransaction(
         id: sale.id ?? 0,
@@ -626,6 +675,8 @@ class ReportsService {
         paymentMethod: sale.paymentMethod ?? 'Efectivo',
         user: sale.user,
         items: items,
+        globalDiscountAmount: gd > 0 ? gd : null,
+        globalDiscountPercent: gp > 0 ? gp : null,
       );
     }).toList();
   }

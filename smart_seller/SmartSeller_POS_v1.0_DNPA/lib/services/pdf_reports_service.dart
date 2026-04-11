@@ -767,11 +767,13 @@ class PDFReportsService {
           pw.Table(
             border: pw.TableBorder.all(color: PdfColors.grey400),
             columnWidths: {
-              0: const pw.FixedColumnWidth(60),
-              1: const pw.FixedColumnWidth(60),
-              2: const pw.FixedColumnWidth(100),
-              3: const pw.FixedColumnWidth(80),
-              4: const pw.FixedColumnWidth(100),
+              0: const pw.FixedColumnWidth(44),
+              1: const pw.FixedColumnWidth(52),
+              2: const pw.FixedColumnWidth(72),
+              3: const pw.FixedColumnWidth(78),
+              4: const pw.FixedColumnWidth(56),
+              5: const pw.FixedColumnWidth(68),
+              6: const pw.FixedColumnWidth(72),
             },
             children: [
               pw.TableRow(
@@ -781,39 +783,63 @@ class PDFReportsService {
                   _buildTableHeader('Hora'),
                   _buildTableHeader('Total'),
                   _buildTableHeader('Pago'),
+                  _buildTableHeader('Dcto.'),
+                  _buildTableHeader('%'),
                   _buildTableHeader('Usuario'),
                 ],
               ),
-              ...transactions.take(20).map((transaction) => pw.TableRow(
-                    children: [
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text(transaction.id.toString(),
-                            style: const pw.TextStyle(fontSize: 9)),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text(transaction.time,
-                            style: const pw.TextStyle(fontSize: 9)),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text(
-                            _currencyFormat.format(transaction.total),
-                            style: const pw.TextStyle(fontSize: 9)),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text(transaction.paymentMethod,
-                            style: const pw.TextStyle(fontSize: 9)),
-                      ),
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.all(6),
-                        child: pw.Text(transaction.user,
-                            style: const pw.TextStyle(fontSize: 9)),
-                      ),
-                    ],
-                  )),
+              ...transactions.take(20).map((transaction) {
+                final ga = transaction.globalDiscountAmount;
+                final gp = transaction.globalDiscountPercent;
+                final dcto = (ga != null && ga > 0)
+                    ? _currencyFormat.format(ga)
+                    : '—';
+                final pct = (gp != null && gp > 0)
+                    ? (gp == gp.roundToDouble()
+                        ? '${gp.round()}%'
+                        : '${gp.toStringAsFixed(1)}%')
+                    : '—';
+                return pw.TableRow(
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: pw.Text(transaction.id.toString(),
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: pw.Text(transaction.time,
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: pw.Text(
+                          _currencyFormat.format(transaction.total),
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: pw.Text(transaction.paymentMethod,
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: pw.Text(dcto,
+                          style: const pw.TextStyle(fontSize: 7)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: pw.Text(pct,
+                          style: const pw.TextStyle(fontSize: 7)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(5),
+                      child: pw.Text(transaction.user,
+                          style: const pw.TextStyle(fontSize: 7)),
+                    ),
+                  ],
+                );
+              }),
             ],
           ),
           if (transactions.length > 20)

@@ -78,7 +78,7 @@ class SQLiteDatabaseService {
 
     // Crear grupos por defecto si no existen
     await migrateAddGroupsTable();
-    // await createDefaultGroups(); // Comentado para evitar recrear grupos automáticamente
+    await ensureDefaultGroupsIfEmpty();
 
     // ✅ NUEVO: Migración para agregar columna category
     await migrateAddCategoryColumn();
@@ -92,8 +92,10 @@ class SQLiteDatabaseService {
     // ✅ NUEVO: Migración para tablas de proveedores y contabilidad
     await migrateAddSuppliersTables();
 
-    // ✅ Fase 1: precios de compra producto–proveedor (tabla aparte, sin historial)
+    // ✅ Fase 1: precios de compra producto–proveedor (tabla aparte)
     await migrateAddProductSupplierPricesTable();
+    // ✅ Fase 2: historial de precios por producto–proveedor
+    await migrateAddProductSupplierPriceHistoryTable();
 
     // ✅ NUEVO: Migración para tablas de contabilidad
     await migrateAddAccountingTables();
@@ -1948,6 +1950,22 @@ class SQLiteDatabaseService {
     }
   }
 
+  /// Si no hay grupos activos (BD nueva o vacía), inserta el catálogo por defecto.
+  /// Así el formulario de producto muestra el mismo desplegable que en otros equipos.
+  static Future<void> ensureDefaultGroupsIfEmpty() async {
+    try {
+      final r = await _database!
+          .rawQuery('SELECT COUNT(*) as c FROM groups WHERE isActive = 1');
+      final n = (r.first['c'] as int?) ?? 0;
+      if (n == 0) {
+        print('📁 Sin grupos en BD: creando grupos por defecto...');
+        await createDefaultGroups();
+      }
+    } catch (e) {
+      print('⚠️ ensureDefaultGroupsIfEmpty: $e');
+    }
+  }
+
   // Crear grupos por defecto
   static Future<void> createDefaultGroups() async {
     final defaultGroups = [
@@ -2378,6 +2396,35 @@ class SQLiteDatabaseService {
       print('✅ Tabla product_supplier_prices creada');
     } catch (e) {
       print('❌ Error creando product_supplier_prices: $e');
+    }
+  }
+
+  /// Fase 2: historial de cambios de precio por producto y proveedor.
+  static Future<void> migrateAddProductSupplierPriceHistoryTable() async {
+    try {
+      final exists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='product_supplier_price_history'",
+      );
+      if (exists.isNotEmpty) {
+        print('✅ Tabla product_supplier_price_history ya existe');
+        return;
+      }
+
+      await _database!.execute('''
+        CREATE TABLE IF NOT EXISTS product_supplier_price_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          supplier_id INTEGER NOT NULL,
+          purchase_price REAL NOT NULL,
+          supplier_reference TEXT,
+          changed_at TEXT NOT NULL,
+          FOREIGN KEY (product_id) REFERENCES products(id),
+          FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+        )
+      ''');
+      print('✅ Tabla product_supplier_price_history creada');
+    } catch (e) {
+      print('❌ Error creando product_supplier_price_history: $e');
     }
   }
 

@@ -15,6 +15,10 @@ import '../modules/accounting/models/receivable_payment.dart';
 
 import '../services/print_service.dart';
 import '../services/company_config_service.dart';
+import '../models/permissions.dart';
+import '../services/permissions_service.dart';
+import '../services/authorization_service.dart';
+import '../widgets/authorization_modal.dart';
 import '../utils/puntos_miles_input_formatter.dart';
 import 'package:intl/intl.dart';
 
@@ -75,12 +79,16 @@ class HeldSale {
   final int? customerId;
   final int? clientId;
 
+  /// Descuento % al cobrar asociado a este carrito (sobre subtotal + IVA).
+  final double discountPercent;
+
   HeldSale({
     required this.label,
     required this.items,
     DateTime? savedAt,
     this.customerId,
     this.clientId,
+    this.discountPercent = 0.0,
   }) : savedAt = savedAt ?? DateTime.now();
 
   double get total => items.fold(0.0, (sum, i) => sum + i.total);
@@ -89,6 +97,9 @@ class HeldSale {
 
 class PosController extends GetxController {
   var cartItems = <CartItem>[].obs;
+
+  /// Descuento global al cobrar: porcentaje sobre subtotal + IVA (requiere cliente y permiso).
+  final cartDiscountPercent = 0.0.obs;
 
   /// Hasta 3 carritos en espera. Se persisten al salir del módulo POS para poder ir a Inventario y volver.
   static const int maxHeldSales = 3;
@@ -189,6 +200,7 @@ class PosController extends GetxController {
             .toList(),
         'customerId': selectedCustomer.value?.id,
         'clientId': selectedClient.value?.id,
+        'discountPercent': cartDiscountPercent.value,
       };
       await prefs.setString(_keyCurrentCart, jsonEncode(data));
     } catch (e) {
@@ -222,6 +234,12 @@ class PosController extends GetxController {
         );
       }).toList();
       cartItems.assignAll(items);
+      final dp = (map['discountPercent'] as num?)?.toDouble();
+      if (dp != null && dp >= 0 && dp <= 100) {
+        cartDiscountPercent.value = dp;
+      } else {
+        cartDiscountPercent.value = 0.0;
+      }
       final customerId = (map['customerId'] as num?)?.toInt();
       final clientId = (map['clientId'] as num?)?.toInt();
       if (customerId != null) {
@@ -236,6 +254,7 @@ class PosController extends GetxController {
       } else {
         selectedClient.value = null;
       }
+      _syncCartDiscountWithCustomers();
       notifyCustomerDisplayChanged();
       await prefs.remove(_keyCurrentCart);
     } catch (e) {
@@ -261,6 +280,7 @@ class PosController extends GetxController {
                 'savedAt': h.savedAt.toIso8601String(),
                 'customerId': h.customerId,
                 'clientId': h.clientId,
+                'discountPercent': h.discountPercent,
                 'items': h.items
                     .map((i) => {
                           'name': i.name,
@@ -306,12 +326,14 @@ class PosController extends GetxController {
         }).toList();
         if (items.isEmpty) continue;
         final savedAtStr = map['savedAt'] as String?;
+        final heldDp = (map['discountPercent'] as num?)?.toDouble() ?? 0.0;
         loaded.add(HeldSale(
           label: map['label'] as String? ?? 'Carrito en espera',
           items: items,
           savedAt: savedAtStr != null ? DateTime.tryParse(savedAtStr) : null,
           customerId: (map['customerId'] as num?)?.toInt(),
           clientId: (map['clientId'] as num?)?.toInt(),
+          discountPercent: heldDp.clamp(0.0, 100.0),
         ));
       }
       if (loaded.isNotEmpty) heldSales.value = loaded;
@@ -368,6 +390,7 @@ class PosController extends GetxController {
   // ✅ NUEVO: Método para limpiar cliente seleccionado
   void clearSelectedCustomer() {
     selectedCustomer.value = null;
+    _syncCartDiscountWithCustomers();
     notifyCustomerDisplayChanged();
     Get.snackbar(
       'Cliente removido',
@@ -433,6 +456,7 @@ class PosController extends GetxController {
   // ✅ NUEVO: Método para limpiar cliente seleccionado
   void clearSelectedClient() {
     selectedClient.value = null;
+    _syncCartDiscountWithCustomers();
     notifyCustomerDisplayChanged();
     Get.snackbar(
       'Cliente removido',
@@ -727,8 +751,15 @@ class PosController extends GetxController {
     }
   }
 
+  void _syncCartDiscountWithCustomers() {
+    if (selectedCustomer.value == null && selectedClient.value == null) {
+      cartDiscountPercent.value = 0.0;
+    }
+  }
+
   // Limpiar carrito
   void clearCart() {
+    cartDiscountPercent.value = 0.0;
     cartItems.clear();
     Get.snackbar(
       'Carrito limpiado',
@@ -775,8 +806,10 @@ class PosController extends GetxController {
       items: copy,
       customerId: cust?.id,
       clientId: cli?.id,
+      discountPercent: cartDiscountPercent.value.clamp(0.0, 100.0),
     ));
     cartItems.clear();
+    cartDiscountPercent.value = 0.0;
     // Nueva venta limpia: sin cliente del sistema ni cliente de facturación
     selectedCustomer.value = null;
     selectedClient.value = null;
@@ -835,6 +868,7 @@ class PosController extends GetxController {
     selectedCustomer.value = newCustomer;
     selectedClient.value = newClient;
     cartItems.clear();
+    cartDiscountPercent.value = held.discountPercent.clamp(0.0, 100.0);
     for (final item in held.items) {
       cartItems.add(CartItem(
         name: item.name,
@@ -850,6 +884,7 @@ class PosController extends GetxController {
     _saveHeldSalesToStorage();
 
     // Forzar que la UI se actualice ya (pestaña y sección cliente)
+    _syncCartDiscountWithCustomers();
     notifyCustomerDisplayChanged();
 
     Get.back();
@@ -896,6 +931,7 @@ class PosController extends GetxController {
 
   /// Limpia todos los carritos (actual y en espera). Se usa al hacer cierre de caja manual.
   Future<void> clearAllCartsOnCashClose() async {
+    cartDiscountPercent.value = 0.0;
     cartItems.clear();
     heldSales.clear();
     selectedCustomer.value = null;
@@ -911,6 +947,7 @@ class PosController extends GetxController {
 
     // Guardar copia del carrito actual y su cliente asociado
     final currentCopy = cartItems.map((e) => e.copy()).toList();
+    final currentDiscount = cartDiscountPercent.value.clamp(0.0, 100.0);
     final currentCustomerId = selectedCustomer.value?.id;
     final currentClientId = selectedClient.value?.id;
     final currentCustomerName = selectedCustomer.value?.name.trim();
@@ -933,6 +970,7 @@ class PosController extends GetxController {
 
     // Cambiar los ítems del carrito al seleccionado
     cartItems.assignAll(held.items.map((e) => e.copy()));
+    cartDiscountPercent.value = held.discountPercent.clamp(0.0, 100.0);
 
     // Dejar en espera el carrito que estaba activo; la etiqueta debe describir ESE carrito, no el de Oscar
     final newList = List<HeldSale>.from(heldSales);
@@ -947,9 +985,12 @@ class PosController extends GetxController {
       items: currentCopy,
       customerId: currentCustomerId,
       clientId: currentClientId,
+      discountPercent: currentDiscount,
     );
     heldSales.value = newList;
     _saveHeldSalesToStorage();
+
+    _syncCartDiscountWithCustomers();
 
     Get.snackbar(
       'Cambiado',
@@ -990,9 +1031,163 @@ class PosController extends GetxController {
   /// IVA exento (0%) - monto base sin IVA
   double get taxAt0 => 0.0;
 
-  // Calcular total
-  double get total {
-    return subtotal + taxes;
+  /// Subtotal + IVA antes del descuento global al cobrar.
+  double get grossTotal => subtotal + taxes;
+
+  /// Monto descontado (pesos, redondeado) según [cartDiscountPercent] sobre [grossTotal].
+  double get cartDiscountAmount {
+    final p = cartDiscountPercent.value;
+    if (p <= 0) return 0.0;
+    final g = grossTotal;
+    if (g <= 0) return 0.0;
+    return (g * p / 100).roundToDouble();
+  }
+
+  /// Total a cobrar (neto tras descuento global).
+  double get total => (grossTotal - cartDiscountAmount).clamp(0.0, double.infinity);
+
+  /// Campos de descuento para persistir en [Sale] (0 si no aplica).
+  ({double amount, double percent}) get _cartSaleDiscount {
+    final amt = cartDiscountAmount;
+    final pct = cartDiscountPercent.value;
+    if (amt <= 0 || pct <= 0) return (amount: 0.0, percent: 0.0);
+    return (amount: amt, percent: pct);
+  }
+
+  /// Mismo flujo que el botón en «Método de pago»; se puede llamar desde el menú de opciones del ítem.
+  void showCartGlobalDiscountDialog(NumberFormat copFormat) {
+    _requestDiscountAuthorizationThenOpenDialog(copFormat);
+  }
+
+  /// Si el cajero no tiene [Permission.modifyCartPrice], pide autorización (mismo flujo que descuentos).
+  void _requestDiscountAuthorizationThenOpenDialog(NumberFormat copFormat) {
+    final role = AuthService.to.currentUser?.role;
+    if (role != null &&
+        PermissionsService.to.hasPermission(role, Permission.modifyCartPrice)) {
+      openCartDiscountDialog(copFormat);
+      return;
+    }
+    Get.dialog(
+      AuthorizationModal(
+        action: AuthorizationService.DISCOUNT_APPLY,
+        onAuthorized: (_) =>
+            openCartDiscountDialog(copFormat, skipPermissionCheck: true),
+        onCancelled: () {},
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  void openCartDiscountDialog(NumberFormat copFormat,
+      {bool skipPermissionCheck = false}) {
+    if (!skipPermissionCheck) {
+      final role = AuthService.to.currentUser?.role;
+      if (role == null ||
+          !PermissionsService.to.hasPermission(role, Permission.modifyCartPrice)) {
+        Get.snackbar(
+          'Sin permiso',
+          'No tiene permiso para aplicar descuento en el carrito.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return;
+      }
+    }
+    if (selectedCustomer.value == null && selectedClient.value == null) {
+      Get.snackbar(
+        'Cliente requerido',
+        'Seleccione cliente de puntos o cliente de facturación para aplicar descuento %.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    final g = grossTotal;
+    if (g <= 0) return;
+
+    final initial = cartDiscountPercent.value;
+    final ctrl = TextEditingController(
+      text: initial > 0
+          ? (initial == initial.roundToDouble()
+              ? initial.round().toString()
+              : initial.toStringAsFixed(1))
+          : '',
+    );
+
+    void close() {
+      ctrl.dispose();
+      Get.back();
+    }
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Descuento % sobre el total'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Se aplica sobre subtotal + IVA (${copFormat.format(g)}).',
+              style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Porcentaje',
+                suffixText: '%',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: close, child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () {
+              cartDiscountPercent.value = 0.0;
+              close();
+            },
+            child: const Text('Quitar descuento'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final raw = ctrl.text.trim().replaceAll(',', '.');
+              final v = double.tryParse(raw);
+              if (v == null || v < 0 || v > 100) {
+                Get.snackbar(
+                  'Valor inválido',
+                  'Ingrese un porcentaje entre 0 y 100.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.red,
+                  colorText: Colors.white,
+                );
+                return;
+              }
+              final disc = (g * v / 100).roundToDouble();
+              if (g - disc < 1 && v > 0) {
+                Get.snackbar(
+                  'Total muy bajo',
+                  'El descuento dejaría el total en menos de \$1.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                );
+                return;
+              }
+              cartDiscountPercent.value = v;
+              close();
+            },
+            child: const Text('Aplicar'),
+          ),
+        ],
+      ),
+      barrierDismissible: true,
+    );
   }
 
   // ✅ NUEVO: Getter para obtener el cliente actual
@@ -1028,8 +1223,12 @@ class PosController extends GetxController {
         child: Builder(
           builder: (paymentDialogContext) => Container(
           width: 450,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(paymentDialogContext).height * 0.88,
+          ),
           padding: const EdgeInsets.all(24),
-          child: Column(
+          child: SingleChildScrollView(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1038,14 +1237,53 @@ class PosController extends GetxController {
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              Text(
-                'Total a pagar: ${copFormat.format(total)}',
-                style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF4CAF50)),
-              ),
-              const SizedBox(height: 24),
+              Obx(() => Text(
+                    'Total a pagar: ${copFormat.format(total)}',
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4CAF50)),
+                  )),
+              Obx(() {
+                if (cartDiscountAmount <= 0) return const SizedBox.shrink();
+                final p = cartDiscountPercent.value;
+                final pctStr = p == p.roundToDouble()
+                    ? p.round().toString()
+                    : p.toStringAsFixed(1);
+                return Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Incluye descuento $pctStr% (${copFormat.format(cartDiscountAmount)})',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+              Obx(() {
+                final hasClient = selectedCustomer.value != null ||
+                    selectedClient.value != null;
+                if (grossTotal <= 0 || !hasClient) {
+                  return const SizedBox.shrink();
+                }
+                return SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () =>
+                        _requestDiscountAuthorizationThenOpenDialog(copFormat),
+                    icon: const Icon(Icons.percent),
+                    label: Text(cartDiscountPercent.value > 0
+                        ? 'Descuento ${cartDiscountPercent.value == cartDiscountPercent.value.roundToDouble() ? cartDiscountPercent.value.round().toString() : cartDiscountPercent.value.toStringAsFixed(1)}% (cambiar)'
+                        : 'Descuento % al total'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      foregroundColor: Colors.teal.shade800,
+                      side: BorderSide(color: Colors.teal.shade700),
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
 
               // Opciones de pago
               Row(
@@ -1135,8 +1373,9 @@ class PosController extends GetxController {
             ],
           ),
         ),
-        ),
       ),
+    ),
+    ),
     );
   }
 
@@ -1490,6 +1729,7 @@ class PosController extends GetxController {
       return;
     }
     try {
+      final disc = _cartSaleDiscount;
       final sale = Sale(
         date: DateTime.now(),
         total: totalToPay,
@@ -1498,6 +1738,8 @@ class PosController extends GetxController {
         paymentBreakdown: parts,
         customerId: selectedCustomer.value?.id,
         clientId: selectedClient.value?.id,
+        discount: disc.amount > 0 ? disc.amount : null,
+        discountPercentage: disc.percent > 0 ? disc.percent : null,
         items: cartItems
             .map((item) => SaleItem(
                   name: item.name,
@@ -1571,6 +1813,7 @@ class PosController extends GetxController {
     }
     final abono = abonoInicial.clamp(0.0, total);
     try {
+      final disc = _cartSaleDiscount;
       final sale = Sale(
         date: DateTime.now(),
         total: total,
@@ -1578,6 +1821,8 @@ class PosController extends GetxController {
         paymentMethod: 'Crédito',
         customerId: selectedCustomer.value?.id,
         clientId: selectedClient.value?.id,
+        discount: disc.amount > 0 ? disc.amount : null,
+        discountPercentage: disc.percent > 0 ? disc.percent : null,
         items: cartItems
             .map((item) => SaleItem(
                   name: item.name,
@@ -1743,6 +1988,7 @@ class PosController extends GetxController {
 
     try {
       // Crear la venta (guardar cliente para reimpresión con nombre en ticket)
+      final disc = _cartSaleDiscount;
       final sale = Sale(
         date: DateTime.now(),
         total: total,
@@ -1750,6 +1996,8 @@ class PosController extends GetxController {
         paymentMethod: method,
         customerId: selectedCustomer.value?.id,
         clientId: selectedClient.value?.id,
+        discount: disc.amount > 0 ? disc.amount : null,
+        discountPercentage: disc.percent > 0 ? disc.percent : null,
         items: cartItems
             .map((item) => SaleItem(
                   name: item.name,
@@ -1965,7 +2213,7 @@ class PosController extends GetxController {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Total: ${copFormat.format(total)}',
+                  'Total: ${copFormat.format(sale.total)}',
                   style:
                       const TextStyle(fontSize: 18, color: Color(0xFF4CAF50)),
                 ),

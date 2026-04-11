@@ -43,6 +43,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
   final _ingresoController = TextEditingController();
   final _unitController = TextEditingController();
   final _groupController = TextEditingController();
+  /// Marca del producto (independiente del grupo; no compartir con [_groupController]).
+  final _brandController = TextEditingController();
   final _profitPerKgVisualController = TextEditingController();
 
   // ✅ NUEVO: Controlador para % de utilidad
@@ -87,7 +89,6 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       _codeController.text = widget.product!.code;
       _shortCodeController.text = widget.product!.shortCode;
       _nameController.text = widget.product!.name;
-      _descriptionController.text = widget.product!.description;
       _priceController.text = formatMontoPuntosMiles(widget.product!.price);
       _costController.text = formatMontoPuntosMiles(widget.product!.cost);
       _stockController.text = widget.product!.stock.toString();
@@ -96,6 +97,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       _unitController.text = widget.product!.unit;
       _selectedGroup = widget.product!.category;
       _groupController.text = _selectedGroup ?? '';
+      _applyBrandFromStoredDescription(widget.product!.description);
       _isActive = widget.product!.isActive;
       _isWeightedProduct = widget.product!.isWeighted;
       _weightedStockInKg = widget.product!.weightedStockInKg;
@@ -128,6 +130,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
     _profitPerKgVisualController.dispose();
     // ✅ NUEVO: Dispose de los nuevos controladores
     _profitMarginController.dispose();
+    _brandController.dispose();
     super.dispose();
   }
 
@@ -159,6 +162,42 @@ class _ProductFormDialogState extends State<ProductFormDialog>
     } catch (e) {
       print('Error cargando grupos: $e');
     }
+  }
+
+  /// Si en BD la descripción empieza por `Marca: ...`, separa marca y el resto (pestaña Facturación).
+  void _applyBrandFromStoredDescription(String raw) {
+    final s = raw.trimLeft();
+    if (s.startsWith('Marca:')) {
+      var after = s.substring(6).trimLeft();
+      final idx = after.indexOf('\n');
+      if (idx < 0) {
+        _brandController.text = after;
+        _descriptionController.text = '';
+      } else {
+        _brandController.text = after.substring(0, idx).trim();
+        _descriptionController.text = after.substring(idx + 1).trim();
+      }
+    } else {
+      _brandController.clear();
+      _descriptionController.text = raw;
+    }
+  }
+
+  /// Guarda marca en la misma columna [description] con prefijo estable (sin columna `brand` en SQLite).
+  String _composedDescriptionForSave() {
+    final brand = _brandController.text.trim();
+    final desc = _descriptionController.text.trim();
+    if (brand.isEmpty) return desc;
+    if (desc.isEmpty) return 'Marca: $brand';
+    return 'Marca: $brand\n$desc';
+  }
+
+  /// Grupo: lista desplegable usa [_selectedGroup]; sin grupos en BD, el texto va en [_groupController].
+  String _effectiveCategory() {
+    if (_availableGroups.isEmpty) {
+      return _groupController.text.trim();
+    }
+    return (_selectedGroup ?? '').trim();
   }
 
   void _showGroupManager() {
@@ -331,6 +370,21 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         newStockKg = 0.0;
       }
 
+      final categoryName = _effectiveCategory();
+      if (categoryName.isEmpty) {
+        setState(() => _isLoading = false);
+        Get.snackbar(
+          'Grupo requerido',
+          _availableGroups.isEmpty
+              ? 'Escriba el nombre del grupo o cree grupos en el menú correspondiente.'
+              : 'Seleccione un grupo en la lista.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+
       final salePrice = parseMontoPuntosMiles(_priceController.text) ?? 0;
       final costValue = parseMontoPuntosMiles(_costController.text) ?? 0;
       if (_isWeightedProduct) {
@@ -359,13 +413,13 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         code: code,
         shortCode: shortCode,
         name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
+        description: _composedDescriptionForSave(),
         price: salePrice,
         cost: costValue,
         stock: newStock,
         minStock: int.parse(_minStockController.text),
         unit: _unitController.text.trim(),
-        category: _selectedGroup ?? 'Sin grupo',
+        category: categoryName,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: _isActive,
@@ -422,6 +476,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
               setState(() {
                 _selectedGroup = null;
                 _groupController.text = '';
+                _brandController.clear();
                 _isActive = true;
                 _isWeightedProduct = false;
                 _weightedStockInKg = false;
@@ -872,8 +927,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
             children: [
               Expanded(
                 child: TextFormField(
-                  controller:
-                      _groupController, // Usamos el mismo controlador para marca
+                  controller: _brandController,
                   decoration: const InputDecoration(
                     labelText: 'Marca',
                     border: OutlineInputBorder(),
@@ -1285,6 +1339,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
               const SizedBox(width: 16),
               Expanded(
                 child: TextFormField(
+                  controller: _brandController,
                   decoration: const InputDecoration(
                     labelText: 'Marca',
                     border: OutlineInputBorder(),

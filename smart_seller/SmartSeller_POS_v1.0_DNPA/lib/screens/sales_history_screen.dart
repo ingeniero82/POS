@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../services/sqlite_database_service.dart';
+import '../services/reports_service.dart';
 import '../models/sale.dart';
 import 'package:intl/intl.dart';
 
@@ -154,40 +155,89 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                               ),
                               trailing:
                                   const Icon(Icons.arrow_forward_ios, size: 18),
-                              onTap: () {
+                              onTap: () async {
+                                final products =
+                                    await SQLiteDatabaseService.getAllProducts();
+                                if (!context.mounted) return;
+                                final cur = NumberFormat.currency(
+                                  locale: 'es_CO',
+                                  symbol: '\$ ',
+                                  decimalDigits: 0,
+                                  customPattern: '\u00A4#,##0',
+                                );
+                                final gd = sale.discount ?? 0.0;
+                                final gp = sale.discountPercentage ?? 0.0;
                                 showDialog(
                                   context: context,
                                   builder: (_) => AlertDialog(
                                     title: Text('Detalle de Venta #${sale.id}'),
                                     content: SizedBox(
-                                      width: 350,
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text('Usuario: ${sale.user}'),
-                                          Text(
-                                              'Fecha: ${sale.date.toString().substring(0, 16)}'),
-                                          Text(
-                                              'Método de pago: ${sale.paymentMethod ?? '-'}'),
-                                          const SizedBox(height: 12),
-                                          const Text('Productos:',
-                                              style: TextStyle(
-                                                  fontWeight: FontWeight.bold)),
-                                          ...sale.items.map((item) => Padding(
+                                      width: 380,
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Usuario: ${sale.user}'),
+                                            Text(
+                                                'Fecha: ${sale.date.toString().substring(0, 16)}'),
+                                            Text(
+                                                'Método de pago: ${sale.paymentMethod ?? '-'}'),
+                                            if (gd > 0) ...[
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                gp > 0
+                                                    ? 'Descuento % al total: ${gp == gp.roundToDouble() ? gp.round().toString() : gp.toStringAsFixed(1)}% (−${cur.format(gd)})'
+                                                    : 'Descuento al total: −${cur.format(gd)}',
+                                                style: TextStyle(
+                                                  color: Colors.teal.shade800,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                            const SizedBox(height: 12),
+                                            const Text('Productos:',
+                                                style: TextStyle(
+                                                    fontWeight:
+                                                        FontWeight.bold)),
+                                            ...sale.items.map((item) {
+                                              final note =
+                                                  ReportsService.saleLinePriceNote(
+                                                      item, products);
+                                              return Padding(
                                                 padding:
                                                     const EdgeInsets.symmetric(
-                                                        vertical: 2),
-                                                child: Text(
-                                                    '- ${item.name} x${item.quantity} (${item.unit})  |  ${NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0').format(item.price)}'),
-                                              )),
-                                          const Divider(),
-                                          Text(
-                                              'Total: ${NumberFormat.currency(locale: 'es_CO', symbol: '\$ ', decimalDigits: 0, customPattern: '\u00A4#,##0').format(sale.total)}',
+                                                        vertical: 6),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      '• ${item.name} ×${item.quantity} (${item.unit}) — ${cur.format(item.price)} c/u',
+                                                    ),
+                                                    if (note != null)
+                                                      Text(
+                                                        note,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors
+                                                              .deepOrange
+                                                              .shade800,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              );
+                                            }),
+                                            const Divider(),
+                                            Text(
+                                              'Total: ${cur.format(sale.total)}',
                                               style: const TextStyle(
-                                                  fontWeight: FontWeight.bold)),
-                                        ],
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                     actions: [
