@@ -47,6 +47,13 @@ class CartItem {
   /// Kg vendidos (inventario por kg). Si es null, el stock se controla por [quantity] en unidades.
   final double? weightKg;
 
+  /// Trazabilidad de cambio de precio en carrito.
+  final bool wasPriceEdited;
+  final double? originalPrice;
+  final DateTime? priceEditedAt;
+  final String? priceEditedBy;
+  final bool priceEditedFromIva;
+
   CartItem({
     required this.name,
     required this.price,
@@ -55,6 +62,11 @@ class CartItem {
     this.ivaPercentage = 19,
     this.productId,
     this.weightKg,
+    this.wasPriceEdited = false,
+    this.originalPrice,
+    this.priceEditedAt,
+    this.priceEditedBy,
+    this.priceEditedFromIva = false,
   });
 
   double get total => price * quantity;
@@ -68,7 +80,12 @@ class CartItem {
       quantity: quantity,
       ivaPercentage: ivaPercentage,
       productId: productId,
-      weightKg: weightKg);
+      weightKg: weightKg,
+      wasPriceEdited: wasPriceEdited,
+      originalPrice: originalPrice,
+      priceEditedAt: priceEditedAt,
+      priceEditedBy: priceEditedBy,
+      priceEditedFromIva: priceEditedFromIva);
 }
 
 /// Carrito guardado en espera para atender otro cliente y recuperar después.
@@ -196,6 +213,12 @@ class PosController extends GetxController {
                   'ivaPercentage': i.ivaPercentage,
                   if (i.productId != null) 'productId': i.productId,
                   if (i.weightKg != null) 'weightKg': i.weightKg,
+                  if (i.wasPriceEdited) 'wasPriceEdited': true,
+                  if (i.originalPrice != null) 'originalPrice': i.originalPrice,
+                  if (i.priceEditedAt != null)
+                    'priceEditedAt': i.priceEditedAt!.toIso8601String(),
+                  if (i.priceEditedBy != null) 'priceEditedBy': i.priceEditedBy,
+                  if (i.priceEditedFromIva) 'priceEditedFromIva': true,
                 })
             .toList(),
         'customerId': selectedCustomer.value?.id,
@@ -231,6 +254,13 @@ class PosController extends GetxController {
           ivaPercentage: (item['ivaPercentage'] as num?)?.toInt() ?? 19,
           productId: (item['productId'] as num?)?.toInt(),
           weightKg: (item['weightKg'] as num?)?.toDouble(),
+          wasPriceEdited: item['wasPriceEdited'] == true,
+          originalPrice: (item['originalPrice'] as num?)?.toDouble(),
+          priceEditedAt: item['priceEditedAt'] != null
+              ? DateTime.tryParse(item['priceEditedAt'] as String)
+              : null,
+          priceEditedBy: item['priceEditedBy'] as String?,
+          priceEditedFromIva: item['priceEditedFromIva'] == true,
         );
       }).toList();
       cartItems.assignAll(items);
@@ -290,6 +320,14 @@ class PosController extends GetxController {
                           'ivaPercentage': i.ivaPercentage,
                           if (i.productId != null) 'productId': i.productId,
                           if (i.weightKg != null) 'weightKg': i.weightKg,
+                          if (i.wasPriceEdited) 'wasPriceEdited': true,
+                          if (i.originalPrice != null)
+                            'originalPrice': i.originalPrice,
+                          if (i.priceEditedAt != null)
+                            'priceEditedAt': i.priceEditedAt!.toIso8601String(),
+                          if (i.priceEditedBy != null)
+                            'priceEditedBy': i.priceEditedBy,
+                          if (i.priceEditedFromIva) 'priceEditedFromIva': true,
                         })
                     .toList(),
               })
@@ -322,6 +360,13 @@ class PosController extends GetxController {
             ivaPercentage: (item['ivaPercentage'] as num?)?.toInt() ?? 19,
             productId: (item['productId'] as num?)?.toInt(),
             weightKg: (item['weightKg'] as num?)?.toDouble(),
+            wasPriceEdited: item['wasPriceEdited'] == true,
+            originalPrice: (item['originalPrice'] as num?)?.toDouble(),
+            priceEditedAt: item['priceEditedAt'] != null
+                ? DateTime.tryParse(item['priceEditedAt'] as String)
+                : null,
+            priceEditedBy: item['priceEditedBy'] as String?,
+            priceEditedFromIva: item['priceEditedFromIva'] == true,
           );
         }).toList();
         if (items.isEmpty) continue;
@@ -703,21 +748,8 @@ class PosController extends GetxController {
 
   // Cambiar precio temporal de un item del carrito
   void changeItemPrice(int index, double newPrice) {
+    updateItemPrice(index, newPrice);
     if (index >= 0 && index < cartItems.length) {
-      final item = cartItems[index];
-      // Crear nuevo item con precio actualizado
-      final updatedItem = CartItem(
-        name: item.name,
-        price: newPrice,
-        unit: item.unit,
-        quantity: item.quantity,
-        ivaPercentage: item.ivaPercentage,
-        productId: item.productId,
-        weightKg: item.weightKg,
-      );
-      cartItems[index] = updatedItem;
-      cartItems.refresh();
-
       Get.snackbar(
         'Precio actualizado',
         'Precio cambiado a \$${newPrice.toStringAsFixed(0)}',
@@ -744,9 +776,30 @@ class PosController extends GetxController {
   }
 
   // Cambiar precio de un producto del carrito
-  void updateItemPrice(int index, double newPrice) {
+  void updateItemPrice(
+    int index,
+    double newPrice, {
+    bool editedFromIva = false,
+  }) {
     if (index >= 0 && index < cartItems.length && newPrice > 0) {
-      cartItems[index].price = newPrice;
+      final item = cartItems[index];
+      final oldPrice = item.price;
+      final now = DateTime.now();
+      final editor = AuthService.to.currentUser?.username;
+      cartItems[index] = CartItem(
+        name: item.name,
+        price: newPrice,
+        unit: item.unit,
+        quantity: item.quantity,
+        ivaPercentage: item.ivaPercentage,
+        productId: item.productId,
+        weightKg: item.weightKg,
+        wasPriceEdited: true,
+        originalPrice: item.wasPriceEdited ? item.originalPrice : oldPrice,
+        priceEditedAt: now,
+        priceEditedBy: editor,
+        priceEditedFromIva: editedFromIva,
+      );
       cartItems.refresh();
     }
   }
@@ -878,6 +931,11 @@ class PosController extends GetxController {
         ivaPercentage: item.ivaPercentage,
         productId: item.productId,
         weightKg: item.weightKg,
+        wasPriceEdited: item.wasPriceEdited,
+        originalPrice: item.originalPrice,
+        priceEditedAt: item.priceEditedAt,
+        priceEditedBy: item.priceEditedBy,
+        priceEditedFromIva: item.priceEditedFromIva,
       ));
     }
     heldSales.removeAt(index);
@@ -1749,6 +1807,11 @@ class PosController extends GetxController {
                   ivaPercentage: item.ivaPercentage,
                   productId: item.productId,
                   weightKg: item.weightKg,
+                  priceEditedInCart: item.wasPriceEdited,
+                  originalUnitPrice: item.originalPrice,
+                  priceEditedAt: item.priceEditedAt,
+                  priceEditedBy: item.priceEditedBy,
+                  priceEditedFromIva: item.priceEditedFromIva,
                 ))
             .toList(),
       );
@@ -1832,6 +1895,11 @@ class PosController extends GetxController {
                   ivaPercentage: item.ivaPercentage,
                   productId: item.productId,
                   weightKg: item.weightKg,
+                  priceEditedInCart: item.wasPriceEdited,
+                  originalUnitPrice: item.originalPrice,
+                  priceEditedAt: item.priceEditedAt,
+                  priceEditedBy: item.priceEditedBy,
+                  priceEditedFromIva: item.priceEditedFromIva,
                 ))
             .toList(),
       );
@@ -2007,6 +2075,11 @@ class PosController extends GetxController {
                   ivaPercentage: item.ivaPercentage,
                   productId: item.productId,
                   weightKg: item.weightKg,
+                  priceEditedInCart: item.wasPriceEdited,
+                  originalUnitPrice: item.originalPrice,
+                  priceEditedAt: item.priceEditedAt,
+                  priceEditedBy: item.priceEditedBy,
+                  priceEditedFromIva: item.priceEditedFromIva,
                 ))
             .toList(),
       );

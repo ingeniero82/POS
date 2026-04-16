@@ -162,7 +162,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
       Get.snackbar(
         'Éxito',
-        '${products.length} productos importados correctamente',
+        '${products.length} productos importados correctamente. '
+            'Si el archivo incluía PRECIO_CON_IVA, se recalculó el PRECIO base automáticamente.',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),
@@ -264,63 +265,78 @@ class _ProductsScreenState extends State<ProductsScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.white,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Buscar productos...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar productos...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        onChanged: (value) => _filterProducts(),
                       ),
-                      filled: true,
-                      fillColor: Colors.grey[50],
                     ),
-                    onChanged: (value) => _filterProducts(),
-                  ),
+                    const SizedBox(width: 16),
+                    // Botón Importar Excel
+                    ElevatedButton.icon(
+                      onPressed: _importFromExcel,
+                      icon: const Icon(Icons.upload_file, color: Colors.white),
+                      label: const Text('Importar Excel', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[700],
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Botón Exportar Excel
+                    ElevatedButton.icon(
+                      onPressed: _exportToExcel,
+                      icon: const Icon(Icons.download, color: Colors.white),
+                      label: const Text('Exportar Excel', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange[700],
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Botón Nuevo Producto
+                    ElevatedButton.icon(
+                      onPressed: _showAddProductDialog,
+                      icon: const Icon(Icons.add, color: Colors.white),
+                      label: const Text('Nuevo Producto', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue[700],
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                // Botón Importar Excel
-                ElevatedButton.icon(
-                  onPressed: _importFromExcel,
-                  icon: const Icon(Icons.upload_file, color: Colors.white),
-                  label: const Text('Importar Excel', style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[700],
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Botón Exportar Excel
-                ElevatedButton.icon(
-                  onPressed: _exportToExcel,
-                  icon: const Icon(Icons.download, color: Colors.white),
-                  label: const Text('Exportar Excel', style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange[700],
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Botón Nuevo Producto
-                ElevatedButton.icon(
-                  onPressed: _showAddProductDialog,
-                  icon: const Icon(Icons.add, color: Colors.white),
-                  label: const Text('Nuevo Producto', style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue[700],
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                const SizedBox(height: 8),
+                Text(
+                  'Tip: en importación, la columna PRECIO_CON_IVA es opcional. '
+                  'Si viene con valor, el sistema calcula PRECIO base automáticamente; '
+                  'si no viene, usa PRECIO como siempre.',
+                  style: TextStyle(
+                    color: Colors.grey[700],
+                    fontSize: 12,
                   ),
                 ),
               ],

@@ -126,11 +126,21 @@ class DashboardScreen extends StatelessWidget {
                             Get.toNamed('/cuentas-cobrar-pagar');
                           },
                         ),
+                      // Reportes de ventas / POS (transacciones, precios editados en carrito, etc.)
+                      if (authService.hasPermission(Permission.viewReports))
+                        _SidebarButton(
+                          icon: Icons.bar_chart,
+                          label: 'Ventas y estadísticas',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/reportes');
+                          },
+                        ),
                       // ✅ MÓDULO COMPLETO DE REPORTES CONTABLES
                       if (authService.hasPermission(Permission.viewReports))
                         _SidebarButton(
                           icon: Icons.analytics,
-                          label: 'Reportes',
+                          label: 'Reportes contables',
                           selected: false,
                           onTap: () {
                             Get.toNamed('/reportes-contables');
@@ -598,12 +608,7 @@ class _DashboardContent extends StatelessWidget {
 
     void verReportes() {
       if (authService.hasPermission(Permission.viewReports)) {
-        Get.snackbar(
-          'Módulo en Desarrollo',
-          'Los reportes estarán disponibles próximamente',
-          backgroundColor: Colors.orange,
-          colorText: Colors.white,
-        );
+        Get.toNamed('/reportes');
       } else {
         Get.snackbar(
           'Acceso Denegado',

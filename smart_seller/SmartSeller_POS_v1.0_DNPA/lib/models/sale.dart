@@ -83,6 +83,17 @@ class SaleItem {
   /// Kg vendidos (producto pesado con inventario por kg). Si es null, el descuento de stock usa [quantity] en unidades.
   double? weightKg;
 
+  /// Trazabilidad: true si el precio fue editado manualmente en el carrito POS.
+  bool priceEditedInCart;
+  /// Precio original unitario antes de editar en carrito.
+  double? originalUnitPrice;
+  /// Fecha/hora en la que se editó el precio en carrito.
+  DateTime? priceEditedAt;
+  /// Usuario que realizó la edición en carrito.
+  String? priceEditedBy;
+  /// True cuando la edición se hizo usando "Precio con IVA" en POS.
+  bool priceEditedFromIva;
+
   // Constructor
   SaleItem({
     required this.name,
@@ -94,5 +105,10 @@ class SaleItem {
     this.ivaPercentage = 19,
     this.productId,
     this.weightKg,
+    this.priceEditedInCart = false,
+    this.originalUnitPrice,
+    this.priceEditedAt,
+    this.priceEditedBy,
+    this.priceEditedFromIva = false,
   });
 }

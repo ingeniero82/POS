@@ -9,6 +9,32 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 class ImportService {
+  static const List<String> _priceWithIvaAliases = [
+    'precio con iva',
+    'precio_con_iva',
+    'precioconiva',
+    'price with vat',
+    'price_with_vat',
+    'pricewithvat',
+    'price with tax',
+    'price_with_tax',
+    'pricewithtax',
+  ];
+
+  static const List<String> _ivaPercentageAliases = [
+    'iva',
+    'iva%',
+    'iva %',
+    'porcentaje iva',
+    'porcentaje de iva',
+    'iva porcentaje',
+    'iva percentage',
+    'tax',
+    'vat',
+    'tax rate',
+    'vat rate',
+  ];
+
   static Future<List<Product>> importProductsFromFile() async {
     try {
       // Seleccionar archivo Excel o CSV
@@ -130,6 +156,70 @@ class ImportService {
     return false;
   }
 
+  static Map<String, int> _buildNormalizedIndex(List<String> headers) {
+    final map = <String, int>{};
+    for (int i = 0; i < headers.length; i++) {
+      map[_normalizeHeader(headers[i])] = i;
+    }
+    return map;
+  }
+
+  static String? _getCsvByAliases(
+    List row,
+    Map<String, int> normalizedHeaderIndex,
+    List<String> aliases,
+  ) {
+    for (final alias in aliases) {
+      final idx = normalizedHeaderIndex[_normalizeHeader(alias)];
+      if (idx == null || idx >= row.length) continue;
+      final value = row[idx]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static String? _getExcelByAliases(
+    Sheet sheet,
+    int row,
+    Map<String, int> normalizedColumnMap,
+    List<String> aliases,
+  ) {
+    for (final alias in aliases) {
+      final colIndex = normalizedColumnMap[_normalizeHeader(alias)];
+      if (colIndex == null) continue;
+      final cell = sheet.cell(
+        CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: row),
+      );
+      final value = cell.value?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  static int _resolveIvaPercentage(String? value) {
+    if (value == null || value.trim().isEmpty) return 19;
+    final cleaned = value.trim().replaceAll('%', '').replaceAll(',', '.');
+    final parsed = double.tryParse(cleaned);
+    if (parsed == null) return 19;
+    return parsed.round();
+  }
+
+  static double _resolveBasePrice({
+    required String? basePriceRaw,
+    required String? priceWithIvaRaw,
+    required int ivaPercentage,
+  }) {
+    final priceWithIva = _parseDouble(priceWithIvaRaw);
+    if (priceWithIva != null) {
+      final denominator = 1 + (ivaPercentage / 100);
+      if (denominator > 0) {
+        return priceWithIva / denominator;
+      }
+      return priceWithIva;
+    }
+    return _parseDouble(basePriceRaw) ?? 0.0;
+  }
+
   static String? _shortCodeFromCsv(List<String> headers, List row) {
     for (int i = 0; i < headers.length; i++) {
       if (!_headerIsShortCodeColumn(headers[i].toString())) continue;
@@ -153,27 +243,37 @@ class ImportService {
   }
 
   static Product? _createProductFromCsvRow(List row, List<String> headers) {
-    String? get(String name) {
-      int idx = headers.indexWhere((h) => h == name.toLowerCase());
-      if (idx == -1 || idx >= row.length) return null;
-      return row[idx]?.toString().trim();
-    }
-    String? code = get('código') ?? get('code') ?? get('codigo');
-    String? name = get('nombre') ?? get('name') ?? get('producto');
-    String? priceStr = get('precio') ?? get('price');
-    String? stockStr = get('stock') ?? get('cantidad') ?? get('inventario');
+    final normalizedHeaderIndex = _buildNormalizedIndex(headers);
+    String? get(List<String> aliases) =>
+        _getCsvByAliases(row, normalizedHeaderIndex, aliases);
+
+    String? code = get(['código', 'code', 'codigo']);
+    String? name = get(['nombre', 'name', 'producto']);
+    String? basePriceStr = get(['precio', 'price']);
+    String? priceWithIvaStr = get(_priceWithIvaAliases);
+    String? stockStr = get(['stock', 'cantidad', 'inventario']);
+    final ivaPercentage = _resolveIvaPercentage(get(_ivaPercentageAliases));
     if (code == null || code.isEmpty || name == null || name.isEmpty) {
       return null;
     }
     
     // Campos para productos pesados
-    bool isWeighted = _parseBool(get('es_pesado') ?? get('espesado') ?? get('isweighted')) ?? false;
-    double? pricePerKg = _parseDouble(get('precio_por_kg') ?? get('precioporkg') ?? get('priceperkg'));
-    double? minWeight = _parseDouble(get('peso_min') ?? get('pesomin') ?? get('minweight'));
-    double? maxWeight = _parseDouble(get('peso_max') ?? get('pesomax') ?? get('maxweight'));
+    bool isWeighted =
+        _parseBool(get(['es_pesado', 'espesado', 'isweighted'])) ?? false;
+    double? pricePerKg = _parseDouble(
+      get(['precio_por_kg', 'precioporkg', 'priceperkg']),
+    );
+    double? minWeight = _parseDouble(
+      get(['peso_min', 'pesomin', 'minweight']),
+    );
+    double? maxWeight = _parseDouble(
+      get(['peso_max', 'pesomax', 'maxweight']),
+    );
     
     // Asegurar que la categoría siempre tenga un valor válido
-    String category = _parseGroup(get('categoría') ?? get('categoria') ?? get('category') ?? get('grupo') ?? get('group'));
+    String category = _parseGroup(
+      get(['categoría', 'categoria', 'category', 'grupo', 'group']),
+    );
     if (category.isEmpty || category.trim().isEmpty) {
       category = 'Otros';
     }
@@ -182,16 +282,22 @@ class ImportService {
       code: code,
       shortCode: _shortCodeFromImport(_shortCodeFromCsv(headers, row)),
       name: name,
-      description: get('descripción') ?? get('descripcion') ?? get('description') ?? '',
-      price: _parseDouble(priceStr) ?? 0.0,
-      cost: _parseDouble(get('costo') ?? get('cost')) ?? 0.0,
+      description: get(['descripción', 'descripcion', 'description']) ?? '',
+      price: _resolveBasePrice(
+        basePriceRaw: basePriceStr,
+        priceWithIvaRaw: priceWithIvaStr,
+        ivaPercentage: ivaPercentage,
+      ),
+      cost: _parseDouble(get(['costo', 'cost'])) ?? 0.0,
       stock: _parseInt(stockStr) ?? 0,
-      minStock: _parseInt(get('stock mínimo') ?? get('stock_minimo') ?? get('min_stock')) ?? 5,
+      minStock:
+          _parseInt(get(['stock mínimo', 'stock_minimo', 'min_stock'])) ?? 5,
       category: category,
-      unit: get('unidad') ?? get('unit') ?? 'unidad',
+      unit: get(['unidad', 'unit']) ?? 'unidad',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       isActive: true,
+      ivaPercentage: ivaPercentage,
       isWeighted: isWeighted,
       pricePerKg: pricePerKg,
       minWeight: minWeight,
@@ -201,20 +307,22 @@ class ImportService {
   }
 
   static Product? _createProductFromRow(Sheet sheet, int row, Map<String, int> columnMap) {
-    // Obtener valores de las celdas
-    String? getCellValue(String columnName) {
-      int? colIndex = columnMap[columnName];
-      if (colIndex == null) return null;
-
-      var cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: row));
-      return cell.value?.toString().trim();
+    final normalizedColumnMap = <String, int>{};
+    for (final entry in columnMap.entries) {
+      normalizedColumnMap[_normalizeHeader(entry.key)] = entry.value;
     }
+
+    String? getCellValue(List<String> aliases) =>
+        _getExcelByAliases(sheet, row, normalizedColumnMap, aliases);
     
     // Obtener valores requeridos
-    String? code = getCellValue('código') ?? getCellValue('code') ?? getCellValue('codigo');
-    String? name = getCellValue('nombre') ?? getCellValue('name') ?? getCellValue('producto');
-    String? priceStr = getCellValue('precio') ?? getCellValue('price');
-    String? stockStr = getCellValue('stock') ?? getCellValue('cantidad') ?? getCellValue('inventario');
+    String? code = getCellValue(['código', 'code', 'codigo']);
+    String? name = getCellValue(['nombre', 'name', 'producto']);
+    String? basePriceStr = getCellValue(['precio', 'price']);
+    String? priceWithIvaStr = getCellValue(_priceWithIvaAliases);
+    String? stockStr = getCellValue(['stock', 'cantidad', 'inventario']);
+    final ivaPercentage =
+        _resolveIvaPercentage(getCellValue(_ivaPercentageAliases));
     
     // Validar campos requeridos
     if (code == null || code.isEmpty || name == null || name.isEmpty) {
@@ -222,13 +330,23 @@ class ImportService {
     }
     
     // Campos para productos pesados
-    bool isWeighted = _parseBool(getCellValue('es_pesado') ?? getCellValue('espesado') ?? getCellValue('isweighted')) ?? false;
-    double? pricePerKg = _parseDouble(getCellValue('precio_por_kg') ?? getCellValue('precioporkg') ?? getCellValue('priceperkg'));
-    double? minWeight = _parseDouble(getCellValue('peso_min') ?? getCellValue('pesomin') ?? getCellValue('minweight'));
-    double? maxWeight = _parseDouble(getCellValue('peso_max') ?? getCellValue('pesomax') ?? getCellValue('maxweight'));
+    bool isWeighted =
+        _parseBool(getCellValue(['es_pesado', 'espesado', 'isweighted'])) ??
+            false;
+    double? pricePerKg = _parseDouble(
+      getCellValue(['precio_por_kg', 'precioporkg', 'priceperkg']),
+    );
+    double? minWeight = _parseDouble(
+      getCellValue(['peso_min', 'pesomin', 'minweight']),
+    );
+    double? maxWeight = _parseDouble(
+      getCellValue(['peso_max', 'pesomax', 'maxweight']),
+    );
     
     // Asegurar que la categoría siempre tenga un valor válido
-    String category = _parseGroup(getCellValue('categoría') ?? getCellValue('categoria') ?? getCellValue('category') ?? getCellValue('grupo') ?? getCellValue('group'));
+    String category = _parseGroup(
+      getCellValue(['categoría', 'categoria', 'category', 'grupo', 'group']),
+    );
     if (category.isEmpty || category.trim().isEmpty) {
       category = 'Otros';
     }
@@ -238,16 +356,25 @@ class ImportService {
       code: code,
       shortCode: _shortCodeFromImport(_shortCodeFromExcel(columnMap, sheet, row)),
       name: name,
-      description: getCellValue('descripción') ?? getCellValue('descripcion') ?? getCellValue('description') ?? '',
-      price: _parseDouble(priceStr) ?? 0.0,
-      cost: _parseDouble(getCellValue('costo') ?? getCellValue('cost')) ?? 0.0,
+      description:
+          getCellValue(['descripción', 'descripcion', 'description']) ?? '',
+      price: _resolveBasePrice(
+        basePriceRaw: basePriceStr,
+        priceWithIvaRaw: priceWithIvaStr,
+        ivaPercentage: ivaPercentage,
+      ),
+      cost: _parseDouble(getCellValue(['costo', 'cost'])) ?? 0.0,
       stock: _parseInt(stockStr) ?? 0,
-      minStock: _parseInt(getCellValue('stock mínimo') ?? getCellValue('stock_minimo') ?? getCellValue('min_stock')) ?? 5,
+      minStock: _parseInt(
+            getCellValue(['stock mínimo', 'stock_minimo', 'min_stock']),
+          ) ??
+          5,
       category: category,
-      unit: getCellValue('unidad') ?? getCellValue('unit') ?? 'unidad',
+      unit: getCellValue(['unidad', 'unit']) ?? 'unidad',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       isActive: true,
+      ivaPercentage: ivaPercentage,
       isWeighted: isWeighted,
       pricePerKg: pricePerKg,
       minWeight: minWeight,
@@ -351,17 +478,17 @@ class ImportService {
   
   static String getExcelTemplate() {
     return '''
-CÓDIGO	CÓDIGO CORTO	NOMBRE	DESCRIPCIÓN	PRECIO	COSTO	STOCK	STOCK MÍNIMO	CATEGORÍA	UNIDAD	ES_PESADO	PRECIO_POR_KG	PESO_MIN	PESO_MAX
-PROD001	MZ001	Manzana Roja	Manzana roja fresca	1.50	1.00	100	10	Frutas y Verduras	kg	true	1.50	0.1	5.0
-PROD002	LC001	Leche Entera	Leche entera 1L	2.50	2.00	50	5	Lácteos	litro	false	0.00	0.0	0.0
-PROD003	PN001	Pan Integral	Pan integral fresco	0.80	0.60	200	20	Panadería	unidad	false	0.00	0.0	0.0
-PROD004	CC001	Coca Cola	Coca Cola 500ml	1.20	0.90	150	15	Bebidas	unidad	false	0.00	0.0	0.0
-PROD005	AR001	Arroz	Arroz blanco 1kg	3.00	2.50	80	8	Abarrotes	kg	false	0.00	0.0	0.0
-PROD006	DT001	Detergente	Detergente líquido	4.50	3.50	30	3	Limpieza	unidad	false	0.00	0.0	0.0
-PROD007	JB001	Jabón	Jabón de baño	1.80	1.40	60	6	Cuidado Personal	unidad	false	0.00	0.0	0.0
-PROD008	PL001	Pollo	Pollo entero	8.00	6.50	25	3	Carnes	kg	true	8.00	0.5	3.0
-PROD009	QS001	Queso	Queso fresco	5.00	4.00	40	4	Lácteos	kg	true	5.00	0.1	2.0
-PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1.0
+CÓDIGO	CÓDIGO CORTO	NOMBRE	DESCRIPCIÓN	PRECIO	PRECIO_CON_IVA	IVA_%	COSTO	STOCK	STOCK MÍNIMO	CATEGORÍA	UNIDAD	ES_PESADO	PRECIO_POR_KG	PESO_MIN	PESO_MAX
+PROD001	MZ001	Manzana Roja	Manzana roja fresca	1.50	1.79	19	1.00	100	10	Frutas y Verduras	kg	true	1.50	0.1	5.0
+PROD002	LC001	Leche Entera	Leche entera 1L	2.50	2.98	19	2.00	50	5	Lácteos	litro	false	0.00	0.0	0.0
+PROD003	PN001	Pan Integral	Pan integral fresco	0.80	0.95	19	0.60	200	20	Panadería	unidad	false	0.00	0.0	0.0
+PROD004	CC001	Coca Cola	Coca Cola 500ml	1.20	1.43	19	0.90	150	15	Bebidas	unidad	false	0.00	0.0	0.0
+PROD005	AR001	Arroz	Arroz blanco 1kg	3.00	3.57	19	2.50	80	8	Abarrotes	kg	false	0.00	0.0	0.0
+PROD006	DT001	Detergente	Detergente líquido	4.50	5.36	19	3.50	30	3	Limpieza	unidad	false	0.00	0.0	0.0
+PROD007	JB001	Jabón	Jabón de baño	1.80	2.14	19	1.40	60	6	Cuidado Personal	unidad	false	0.00	0.0	0.0
+PROD008	PL001	Pollo	Pollo entero	8.00	9.52	19	6.50	25	3	Carnes	kg	true	8.00	0.5	3.0
+PROD009	QS001	Queso	Queso fresco	5.00	5.95	19	4.00	40	4	Lácteos	kg	true	5.00	0.1	2.0
+PROD010	TM001	Tomate	Tomate fresco	2.00	2.38	19	1.60	70	7	Frutas y Verduras	kg	true	2.00	0.1	1.0
 ''';
   }
 
@@ -370,10 +497,13 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
     
     // Encabezados mejorados para Excel
     rows.add([
-      'CÓDIGO', 'CÓDIGO CORTO', 'NOMBRE', 'DESCRIPCIÓN', 'PRECIO', 'COSTO', 'STOCK', 'STOCK MÍNIMO', 'CATEGORÍA', 'UNIDAD', 'ES_PESADO', 'PRECIO_POR_KG', 'PESO_MIN', 'PESO_MAX'
+      'CÓDIGO', 'CÓDIGO CORTO', 'NOMBRE', 'DESCRIPCIÓN', 'PRECIO', 'PRECIO_CON_IVA', 'IVA_%', 'COSTO', 'STOCK', 'STOCK MÍNIMO', 'CATEGORÍA', 'UNIDAD', 'ES_PESADO', 'PRECIO_POR_KG', 'PESO_MIN', 'PESO_MAX'
     ]);
     
     for (final p in products) {
+      final priceWithIva = p.ivaPercentage > 0
+          ? p.price * (1 + (p.ivaPercentage / 100))
+          : p.price;
       rows.add([
         p.code,
         p.shortCode ?? '',
@@ -381,6 +511,10 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
         p.description,
         // Formatear precios para Excel (sin decimales si son enteros)
         p.price == p.price.toInt() ? p.price.toInt() : p.price,
+        priceWithIva == priceWithIva.toInt()
+            ? priceWithIva.toInt()
+            : priceWithIva,
+        p.ivaPercentage,
         p.cost == p.cost.toInt() ? p.cost.toInt() : p.cost,
         p.stock,
         p.minStock,
@@ -433,20 +567,25 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'NOMBRE';
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0)).value = 'DESCRIPCIÓN';
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0)).value = 'PRECIO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'COSTO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'STOCK';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value = 'STOCK MÍNIMO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value = 'CATEGORÍA';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value = 'UNIDAD';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: 0)).value = 'ES_PESADO';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: 0)).value = 'PRECIO_POR_KG';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: 0)).value = 'PESO_MIN';
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: 0)).value = 'PESO_MAX';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'PRECIO_CON_IVA';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'IVA_%';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0)).value = 'COSTO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: 0)).value = 'STOCK';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: 0)).value = 'STOCK MÍNIMO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: 0)).value = 'CATEGORÍA';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: 0)).value = 'UNIDAD';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: 0)).value = 'ES_PESADO';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: 0)).value = 'PRECIO_POR_KG';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 14, rowIndex: 0)).value = 'PESO_MIN';
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 15, rowIndex: 0)).value = 'PESO_MAX';
       
       // Llenar datos de productos
       for (int i = 0; i < products.length; i++) {
         final p = products[i];
         final row = i + 1;
+        final priceWithIva = p.ivaPercentage > 0
+            ? p.price * (1 + (p.ivaPercentage / 100))
+            : p.price;
         
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = p.code;
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value =
@@ -454,19 +593,21 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = p.name;
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = p.description;
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = p.price;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = p.cost;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = p.stock;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = p.minStock;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = p.category;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = p.unit;
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row)).value = p.isWeighted ? 'SÍ' : 'NO';
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = p.pricePerKg ?? '';
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = p.minWeight ?? '';
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: row)).value = p.maxWeight ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = priceWithIva;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = p.ivaPercentage;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = p.cost;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row)).value = p.stock;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row)).value = p.minStock;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row)).value = p.category;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: row)).value = p.unit;
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: row)).value = p.isWeighted ? 'SÍ' : 'NO';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 13, rowIndex: row)).value = p.pricePerKg ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 14, rowIndex: row)).value = p.minWeight ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 15, rowIndex: row)).value = p.maxWeight ?? '';
       }
       
       // Ajustar ancho de columnas automáticamente
-      for (int i = 0; i < 14; i++) {
+      for (int i = 0; i < 16; i++) {
         // Nota: setColumnWidth no está disponible en esta versión
         // Las columnas se ajustarán automáticamente en Excel
       }
@@ -484,14 +625,5 @@ PROD010	TM001	Tomate	Tomate fresco	2.00	1.60	70	7	Frutas y Verduras	kg	true	2.00
       throw Exception('Error al exportar a Excel: $e');
     }
   }
-
-  // Función auxiliar para formatear precios
-  static String _formatPrice(double price) {
-    if (price == price.toInt()) {
-      return price.toInt().toString();
-    }
-    return price.toStringAsFixed(2);
-  }
-
 
 } 

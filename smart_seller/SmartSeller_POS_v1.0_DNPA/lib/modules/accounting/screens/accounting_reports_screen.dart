@@ -470,9 +470,16 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         text = _buildCierreDeCajaText(cierreData);
         successMsg = 'Cierre de caja enviado a la impresora';
       }
-      final bytes = utf8.encode(text);
-      final ok = await PrintService.instance
-          .printRawToPrinter(bytes, printerName: usePos ? null : printerName);
+      final printService = PrintService.instance;
+      await printService.initialize();
+      final bool ok;
+      if (usePos) {
+        ok = await printService.printTextTicket(text);
+      } else {
+        final bytes = utf8.encode(text);
+        ok = await printService.printRawToPrinter(bytes,
+            printerName: printerName);
+      }
       if (ok) {
         Get.snackbar('Éxito', successMsg,
             backgroundColor: Colors.green, colorText: Colors.white);

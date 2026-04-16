@@ -21,8 +21,14 @@ class ReportsService {
     String? userFilter,
   }) async {
     // Obtener ventas del período (día o rango)
-    final sales =
+    List<Sale> sales =
         await SQLiteDatabaseService.getSales(date: date, endDate: endDate, user: userFilter);
+    if (paymentMethodFilter != null && paymentMethodFilter.trim().isNotEmpty) {
+      final f = paymentMethodFilter.trim();
+      sales = sales
+          .where((s) => (s.paymentMethod ?? 'Efectivo') == f)
+          .toList();
+    }
     final products = await SQLiteDatabaseService.getAllProducts();
     final groups = await SQLiteDatabaseService.getAllGroups();
 
@@ -650,6 +656,7 @@ class ReportsService {
         final listUnit =
             catalog != null ? listUnitPriceFromCatalog(item, catalog) : null;
         final modified = catalog != null && priceModifiedVsCatalog(item, catalog);
+        final editedInSale = item.priceEditedInCart;
 
         return TransactionItem(
           productName: item.name,
@@ -661,6 +668,11 @@ class ReportsService {
           profitMargin: profitMargin,
           listUnitPrice: modified ? listUnit : null,
           priceModifiedVsList: modified,
+          priceEditedInSale: editedInSale,
+          originalUnitPrice: item.originalUnitPrice,
+          priceEditedAt: item.priceEditedAt,
+          priceEditedBy: item.priceEditedBy,
+          priceEditedFromIva: item.priceEditedFromIva,
         );
       }).toList();
 

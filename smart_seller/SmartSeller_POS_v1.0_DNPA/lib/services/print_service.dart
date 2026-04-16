@@ -359,6 +359,16 @@ class PrintService {
         _printerName = savedName;
         print('🖨️ Impresora configurada: $savedName');
       }
+      // No volver a detectar si ya hay impresora física (USB/Serie/Windows).
+      // Un segundo initialize() al cerrar caja podía fallar el USB ocupado y caer
+      // en SIMULATION: la app cree que imprime pero no sale papel (F6 seguía bien).
+      if (_isConnected &&
+          _printerPort.isNotEmpty &&
+          _printerPort != 'SIMULATION') {
+        print(
+            '✅ PrintService: conexión existente ($_printerPort), se omite re-detección');
+        return;
+      }
       // Intentar detectar/conectar la impresora (USB/Serial o por nombre en Windows)
       bool detected = await _detectPrinter();
       if (!detected) {
@@ -1144,6 +1154,66 @@ class PrintService {
       return result == true;
     } catch (e) {
       print('Error imprimiendo recibo de prueba: $e');
+      _isPrinting = false;
+      return false;
+    }
+  }
+
+  /// Ticket multilínea (cierre de caja, reportes en POS): mismo canal ESC/POS
+  /// que [printReceipt] / [printTestReceipt] (no usar UTF-8 crudo en Windows).
+  Future<bool> printTextTicket(String text) async {
+    await initialize();
+    if (!_isConnected) {
+      print('Impresora no conectada (printTextTicket)');
+      return false;
+    }
+    if (_printerPort == 'SIMULATION') {
+      print(
+          'printTextTicket: modo simulación sin impresora física; no se imprime ticket');
+      return false;
+    }
+    try {
+      _isPrinting = true;
+      final fmt = await getReceiptFormat();
+      final contentWidth =
+          (fmt.paperWidth - fmt.marginLeft).clamp(16, 120).toInt();
+      final marginLeft = fmt.marginLeft.clamp(0, 20).toInt();
+      final marginPrefix = List<int>.filled(marginLeft, 0x20);
+
+      final commands = <int>[];
+      commands.addAll(_initPrinter);
+      commands.addAll(_alignLeft);
+
+      for (final rawLine in text.split(RegExp(r'\r?\n'))) {
+        final ascii = _toReceiptAscii(rawLine);
+        if (ascii.isEmpty) {
+          commands.addAll(marginPrefix);
+          commands.addAll(_newLine());
+          continue;
+        }
+        for (var i = 0; i < ascii.length; i += contentWidth) {
+          final end = (i + contentWidth < ascii.length)
+              ? i + contentWidth
+              : ascii.length;
+          final chunk = ascii.substring(i, end);
+          commands.addAll(marginPrefix);
+          commands.addAll(_formatText(chunk));
+          commands.addAll(_newLine());
+        }
+      }
+
+      commands.addAll(_feedLines);
+      commands.addAll(_cutPaper);
+      final result =
+          await _channel.invokeMethod('printRaw', _printRawArgs(commands));
+      _isPrinting = false;
+      if (result != true) {
+        print(
+            'printTextTicket: printRaw devolvió $result · impresora=$_printerName · puerto=$_printerPort · conectada=$_isConnected');
+      }
+      return result == true;
+    } catch (e) {
+      print('Error printTextTicket: $e');
       _isPrinting = false;
       return false;
     }

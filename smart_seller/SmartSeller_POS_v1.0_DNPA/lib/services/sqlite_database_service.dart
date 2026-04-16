@@ -1139,6 +1139,11 @@ class SQLiteDatabaseService {
           'discount': item.discount,
           'discountPercentage': item.discountPercentage,
           'ivaPercentage': item.ivaPercentage,
+          'priceEditedInCart': item.priceEditedInCart,
+          'originalUnitPrice': item.originalUnitPrice,
+          'priceEditedAt': item.priceEditedAt?.toIso8601String(),
+          'priceEditedBy': item.priceEditedBy,
+          'priceEditedFromIva': item.priceEditedFromIva,
         };
         if (item.productId != null) m['productId'] = item.productId;
         if (item.weightKg != null) m['weightKg'] = item.weightKg;
@@ -1283,6 +1288,14 @@ class SQLiteDatabaseService {
                         : (item['ivaPercentage'] as num?)?.toInt() ?? 19,
                     productId: (item['productId'] as num?)?.toInt(),
                     weightKg: (item['weightKg'] as num?)?.toDouble(),
+                    priceEditedInCart: item['priceEditedInCart'] == true,
+                    originalUnitPrice:
+                        (item['originalUnitPrice'] as num?)?.toDouble(),
+                    priceEditedAt: item['priceEditedAt'] != null
+                        ? DateTime.tryParse(item['priceEditedAt'] as String)
+                        : null,
+                    priceEditedBy: item['priceEditedBy'] as String?,
+                    priceEditedFromIva: item['priceEditedFromIva'] == true,
                   ))
               .toList();
         } else {
@@ -1357,6 +1370,14 @@ class SQLiteDatabaseService {
                       : (item['ivaPercentage'] as num?)?.toInt() ?? 19,
                   productId: (item['productId'] as num?)?.toInt(),
                   weightKg: (item['weightKg'] as num?)?.toDouble(),
+                  priceEditedInCart: item['priceEditedInCart'] == true,
+                  originalUnitPrice:
+                      (item['originalUnitPrice'] as num?)?.toDouble(),
+                  priceEditedAt: item['priceEditedAt'] != null
+                      ? DateTime.tryParse(item['priceEditedAt'] as String)
+                      : null,
+                  priceEditedBy: item['priceEditedBy'] as String?,
+                  priceEditedFromIva: item['priceEditedFromIva'] == true,
                 ))
             .toList();
       }

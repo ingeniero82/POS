@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:decimal/decimal.dart';
 import '../models/product.dart';
 import '../models/group.dart';
 import '../services/sqlite_database_service.dart';
@@ -35,6 +36,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
+  final _priceWithIvaController = TextEditingController();
   final _costController = TextEditingController();
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
@@ -68,6 +70,9 @@ class _ProductFormDialogState extends State<ProductFormDialog>
 
   /// IVA configurado para facturación electrónica: 0, 5 o 19 (%). Se guarda en BD.
   int _ivaPercentage = 19;
+  int _priceWithIvaType = 19;
+  Decimal? _salePriceExact;
+  bool _isUpdatingPriceFromIva = false;
 
   /// Marca visual para producto por peso.
   bool _isWeightedProduct = false;
@@ -90,6 +95,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       _shortCodeController.text = widget.product!.shortCode ?? '';
       _nameController.text = widget.product!.name;
       _priceController.text = formatMontoPuntosMiles(widget.product!.price);
+      _salePriceExact = Decimal.parse(widget.product!.price.toString());
       _costController.text = formatMontoPuntosMiles(widget.product!.cost);
       _stockController.text = widget.product!.stock.toString();
       _minStockController.text = widget.product!.minStock.toString();
@@ -114,10 +120,14 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       // Cargar IVA de facturación electrónica (0, 5 o 19) para el dropdown "IVA *"
       final p = widget.product!.ivaPercentage;
       _ivaPercentage = (p == 0 || p == 5 || p == 19) ? p : 19;
+      if (_ivaPercentage == 5 || _ivaPercentage == 19) {
+        _priceWithIvaType = _ivaPercentage;
+      }
     }
 
     // ✅ NUEVO: Agregar listeners para cálculo automático
     _priceController.addListener(_onPriceChanged);
+    _priceWithIvaController.addListener(_onPriceWithIvaChanged);
     _costController.addListener(_onCostChanged);
     _profitMarginController.addListener(_onProfitMarginChanged);
   }
@@ -128,6 +138,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
     _ingresoController.dispose();
     _stockKgController.dispose();
     _profitPerKgVisualController.dispose();
+    _priceWithIvaController.dispose();
     // ✅ NUEVO: Dispose de los nuevos controladores
     _profitMarginController.dispose();
     _brandController.dispose();
@@ -210,7 +221,10 @@ class _ProductFormDialogState extends State<ProductFormDialog>
   // ✅ NUEVO: Funciones de cálculo automático
   void _calculateProfitMargin() {
     final cost = parseMontoPuntosMiles(_costController.text);
-    final price = parseMontoPuntosMiles(_priceController.text);
+    final exactPrice = _salePriceExact;
+    final price = exactPrice != null
+        ? double.tryParse(exactPrice.toString())
+        : parseMontoPuntosMiles(_priceController.text);
 
     if (cost != null && price != null && price > 0) {
       // ✅ CORREGIDO: Fórmula estándar de POS: (Precio de venta - Costo) / Precio de venta × 100
@@ -229,11 +243,75 @@ class _ProductFormDialogState extends State<ProductFormDialog>
     if (cost != null && margin != null && cost > 0) {
       // ✅ CORREGIDO: Fórmula inversa estándar de POS: Costo / (1 - Margen/100)
       final price = cost / (1 - margin / 100);
+      _salePriceExact = Decimal.parse(price.toString());
       _priceController.text = formatMontoPuntosMiles(price);
     }
   }
 
   void _onPriceChanged() {
+    if (_isUpdatingPriceFromIva) return;
+    final typedValue = _parseMoneyAsDecimal(_priceController.text);
+    if (typedValue != null) {
+      _salePriceExact = typedValue;
+    }
+    if (_priceMode == PriceCalculationMode.fixedPrice) {
+      _calculateProfitMargin();
+    }
+  }
+
+  Decimal? _parseMoneyAsDecimal(String text) {
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return null;
+    return Decimal.parse(digits);
+  }
+
+  Decimal _ivaFactor() {
+    return _priceWithIvaType == 5
+        ? Decimal.parse('1.05')
+        : Decimal.parse('1.19');
+  }
+
+  BigInt _roundHalfUp(Decimal value) {
+    final normalized = value.toString();
+    final negative = normalized.startsWith('-');
+    final clean = negative ? normalized.substring(1) : normalized;
+    final parts = clean.split('.');
+    var intPart = BigInt.parse(parts[0]);
+    if (parts.length > 1 && parts[1].isNotEmpty) {
+      final firstDigit = int.tryParse(parts[1][0]) ?? 0;
+      if (firstDigit >= 5) {
+        intPart += BigInt.one;
+      }
+    }
+    return negative ? -intPart : intPart;
+  }
+
+  String _formatThousands(BigInt value) {
+    final negative = value.isNegative;
+    final raw = value.abs().toString();
+    final formatted = raw.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return negative ? '-$formatted' : formatted;
+  }
+
+  void _onPriceWithIvaChanged() {
+    final gross = _parseMoneyAsDecimal(_priceWithIvaController.text);
+    if (gross == null) {
+      _salePriceExact = _parseMoneyAsDecimal(_priceController.text);
+      return;
+    }
+
+    final base =
+        (gross / _ivaFactor()).toDecimal(scaleOnInfinitePrecision: 12);
+    _salePriceExact = base;
+    final roundedForView = _roundHalfUp(base);
+
+    _isUpdatingPriceFromIva = true;
+    _priceController.text = _formatThousands(roundedForView);
+    _isUpdatingPriceFromIva = false;
+
     if (_priceMode == PriceCalculationMode.fixedPrice) {
       _calculateProfitMargin();
     }
@@ -388,7 +466,10 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         return;
       }
 
-      final salePrice = parseMontoPuntosMiles(_priceController.text) ?? 0;
+      final typedPrice = parseMontoPuntosMiles(_priceController.text) ?? 0;
+      final salePrice =
+          double.tryParse((_salePriceExact ?? Decimal.parse(typedPrice.toString())).toString()) ??
+              typedPrice;
       final costValue = parseMontoPuntosMiles(_costController.text) ?? 0;
       if (_isWeightedProduct) {
         if (salePrice <= 0) {
@@ -470,6 +551,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
               _nameController.clear();
               _descriptionController.clear();
               _priceController.clear();
+              _priceWithIvaController.clear();
               _costController.clear();
               _stockController.clear();
               _stockKgController.clear();
@@ -485,6 +567,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                 _weightedStockInKg = false;
                 _weightedPricingMode = WeightedPricingMode.manualSalePerKg;
                 _profitPerKgVisualController.clear();
+                _salePriceExact = null;
+                _priceWithIvaType = 19;
               });
             },
             barrierDismissible: false,
@@ -975,6 +1059,52 @@ class _ProductFormDialogState extends State<ProductFormDialog>
           ),
           const SizedBox(height: 16),
 
+          // Cuarta fila - Precio con IVA y tipo de IVA para autocálculo
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _priceWithIvaController,
+                  decoration: const InputDecoration(
+                    labelText: 'Precio con IVA (opcional)',
+                    border: OutlineInputBorder(),
+                    prefixText: '\$',
+                    hintText: 'Ej: 11.900',
+                    helperText:
+                        'Si lo llenas, se calcula automáticamente el precio de venta base.',
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [PuntosMilesInputFormatter()],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: _priceWithIvaType,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de IVA',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 19, child: Text('19%')),
+                    DropdownMenuItem(value: 5, child: Text('5%')),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _priceWithIvaType = value;
+                      if (!_exentoIva) {
+                        _ivaPercentage = value;
+                      }
+                    });
+                    _onPriceWithIvaChanged();
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
           // ✅ NUEVO: Selector de modo de cálculo de precios
           Container(
             padding: const EdgeInsets.all(16),
@@ -1090,7 +1220,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                 if (_exentoIva) {
                   _ivaPercentage = 0; // exento en básica = 0% en ventas y FE
                 } else {
-                  _ivaPercentage = 19; // al desmarcar, gravado 19% por defecto (puede cambiarse en pestaña FE)
+                  _ivaPercentage = _priceWithIvaType; // al desmarcar, usa el IVA activo del cálculo desde precio con IVA
                 }
               });
             },
@@ -1248,7 +1378,11 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                         else if (value == '5') _ivaPercentage = 5;
                         else _ivaPercentage = 0; // 0% o Excluido
                         _exentoIva = (_ivaPercentage == 0);
+                        if (_ivaPercentage == 5 || _ivaPercentage == 19) {
+                          _priceWithIvaType = _ivaPercentage;
+                        }
                       });
+                      _onPriceWithIvaChanged();
                     }
                   },
                 ),

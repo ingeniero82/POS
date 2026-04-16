@@ -202,6 +202,13 @@ class TransactionItem {
   /// True si el precio unitario vendido difiere del precio de lista (catálogo actual).
   final bool priceModifiedVsList;
 
+  /// Trazabilidad explícita de edición en carrito POS (persistida al momento de la venta).
+  final bool priceEditedInSale;
+  final double? originalUnitPrice;
+  final DateTime? priceEditedAt;
+  final String? priceEditedBy;
+  final bool priceEditedFromIva;
+
   TransactionItem({
     required this.productName,
     required this.groupName,
@@ -212,6 +219,11 @@ class TransactionItem {
     required this.profitMargin,
     this.listUnitPrice,
     this.priceModifiedVsList = false,
+    this.priceEditedInSale = false,
+    this.originalUnitPrice,
+    this.priceEditedAt,
+    this.priceEditedBy,
+    this.priceEditedFromIva = false,
   });
 }
 

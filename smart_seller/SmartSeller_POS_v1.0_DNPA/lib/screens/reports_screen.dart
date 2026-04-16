@@ -15,6 +15,7 @@ import 'package:path/path.dart' as path;
 import '../services/pdf_reports_service.dart';
 import '../services/company_config_service.dart';
 import '../models/user.dart';
+import 'pos_controller.dart' show kPosPaymentMethodOptions;
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -395,14 +396,19 @@ class _ReportsScreenState extends State<ReportsScreen>
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.payment),
                   ),
-                  items: const [
-                    DropdownMenuItem(
+                  items: [
+                    const DropdownMenuItem<String>(
                         value: null, child: Text('Todos los métodos')),
-                    DropdownMenuItem(
-                        value: 'Efectivo', child: Text('Efectivo')),
-                    DropdownMenuItem(value: 'Tarjeta', child: Text('Tarjeta')),
-                    DropdownMenuItem(
-                        value: 'Transferencia', child: Text('Transferencia')),
+                    ...kPosPaymentMethodOptions.map(
+                      (m) => DropdownMenuItem<String>(
+                        value: m,
+                        child: Text(m),
+                      ),
+                    ),
+                    const DropdownMenuItem<String>(
+                        value: 'Mixto', child: Text('Mixto')),
+                    const DropdownMenuItem<String>(
+                        value: 'Crédito', child: Text('Crédito')),
                   ],
                   onChanged: (value) {
                     setState(() => selectedPaymentMethod = value);
@@ -745,10 +751,25 @@ class _ReportsScreenState extends State<ReportsScreen>
                 ),
                 children: [
                   ...transaction.items.map((item) {
-                    final modNote = item.priceModifiedVsList &&
-                            item.listUnitPrice != null
-                        ? 'Lista \$${nf.format(item.listUnitPrice!)} → vendido \$${nf.format(item.unitPrice)}'
-                        : null;
+                    String? modNote;
+                    if (item.priceEditedInSale &&
+                        item.originalUnitPrice != null) {
+                      final editedAt = item.priceEditedAt != null
+                          ? DateFormat('dd/MM HH:mm').format(item.priceEditedAt!)
+                          : DateFormat('dd/MM HH:mm').format(transaction.date);
+                      final editor =
+                          (item.priceEditedBy != null && item.priceEditedBy!.trim().isNotEmpty)
+                              ? item.priceEditedBy!.trim()
+                              : transaction.user;
+                      final source =
+                          item.priceEditedFromIva ? ' (desde precio con IVA)' : '';
+                      modNote =
+                          'Precio editado en venta: \$${nf.format(item.originalUnitPrice!)} → \$${nf.format(item.unitPrice)}$source · $editedAt · $editor';
+                    } else if (item.priceModifiedVsList &&
+                        item.listUnitPrice != null) {
+                      modNote =
+                          'Lista \$${nf.format(item.listUnitPrice!)} → vendido \$${nf.format(item.unitPrice)}';
+                    }
                     return ListTile(
                       leading: const Icon(Icons.shopping_cart, size: 16),
                       title: Text(item.productName),
@@ -1550,7 +1571,14 @@ class _ReportsScreenState extends State<ReportsScreen>
       }
       sb.writeln(line);
       for (final it in t.items) {
-        if (it.priceModifiedVsList && it.listUnitPrice != null) {
+        if (it.priceEditedInSale && it.originalUnitPrice != null) {
+          final src = it.priceEditedFromIva ? ' (desde IVA)' : '';
+          final who = (it.priceEditedBy != null && it.priceEditedBy!.trim().isNotEmpty)
+              ? ' · ${it.priceEditedBy}'
+              : '';
+          sb.writeln(
+              '      · ${it.productName}: editado \$${nf.format(it.originalUnitPrice!)} → \$${nf.format(it.unitPrice)}$src$who');
+        } else if (it.priceModifiedVsList && it.listUnitPrice != null) {
           sb.writeln(
               '      · ${it.productName}: lista \$${nf.format(it.listUnitPrice!)} → \$${nf.format(it.unitPrice)}');
         }

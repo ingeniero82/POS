@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../models/accounting_entry.dart';
 import '../models/cash_session.dart';
@@ -409,14 +408,24 @@ class _AccountingModalState extends State<AccountingModal>
         return;
       }
       final text = _buildCierreTicketText(data);
-      final ok = await PrintService.instance
-          .printRawToPrinter(utf8.encode(text), printerName: null);
+      final printService = PrintService.instance;
+      // Mismo pipeline que liquidación/recibo (ESC/POS + impresora ya conectada).
+      final ok = await printService.printTextTicket(text);
+
       if (ok) {
         Get.snackbar('Éxito', 'Ticket de cierre enviado a impresión',
             backgroundColor: Colors.green, colorText: Colors.white);
       } else {
-        Get.snackbar('Error', 'No se pudo imprimir el cierre',
-            backgroundColor: Colors.red, colorText: Colors.white);
+        Get.snackbar(
+          'Error',
+          'No se envió el ticket a la térmica.\n'
+          'Impresora en la app: ${printService.printerName}\n'
+          'Conectada: ${printService.isConnected ? "sí" : "no"} · ${printService.printerPort}\n'
+          'En el PC del cliente: cable/USB, encendido, papel; y en Windows abra la cola de ESA impresora (trabajos en error o en pausa). Si la venta sí imprime, use la misma impresora guardada en Configuración de impresora y reinstale el build más reciente.',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 8),
+        );
       }
     } catch (e) {
       Get.snackbar('Error', 'Error imprimiendo cierre: $e',

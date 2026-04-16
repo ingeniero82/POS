@@ -981,7 +981,9 @@ class AccountingReportsService {
       final rows = await db.rawQuery(
         '''SELECT id, date, total, paymentMethod, discount, user
            FROM sales
-           WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)
+           WHERE date >= ? AND date < ?
+             AND (isReturn IS NULL OR isReturn = 0)
+             AND (anulada IS NULL OR anulada = 0)
            ORDER BY date''',
         [start.toIso8601String(), end.toIso8601String()],
       );
@@ -1118,7 +1120,7 @@ class AccountingReportsService {
       final rows = await db.rawQuery(
         '''SELECT id, date, total, paymentMethod, user, isReturn
            FROM sales
-           WHERE date >= ? AND date < ?
+           WHERE date >= ? AND date < ? AND (anulada IS NULL OR anulada = 0)
            ORDER BY date''',
         [start.toIso8601String(), end.toIso8601String()],
       );
@@ -1377,7 +1379,10 @@ class AccountingReportsService {
       }
 
       final rows = await db.rawQuery(
-        '''SELECT items FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        '''SELECT items FROM sales
+           WHERE date >= ? AND date < ?
+             AND (isReturn IS NULL OR isReturn = 0)
+             AND (anulada IS NULL OR anulada = 0)''',
         [start.toIso8601String(), end.toIso8601String()],
       );
 
@@ -1465,7 +1470,10 @@ class AccountingReportsService {
           .add(const Duration(days: 1));
 
       final rows = await db.rawQuery(
-        '''SELECT items FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        '''SELECT items FROM sales
+           WHERE date >= ? AND date < ?
+             AND (isReturn IS NULL OR isReturn = 0)
+             AND (anulada IS NULL OR anulada = 0)''',
         [start.toIso8601String(), end.toIso8601String()],
       );
 
@@ -1526,7 +1534,10 @@ class AccountingReportsService {
           .add(const Duration(days: 1));
 
       final rows = await db.rawQuery(
-        '''SELECT date, total FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        '''SELECT date, total FROM sales
+           WHERE date >= ? AND date < ?
+             AND (isReturn IS NULL OR isReturn = 0)
+             AND (anulada IS NULL OR anulada = 0)''',
         [start.toIso8601String(), end.toIso8601String()],
       );
 
@@ -1593,7 +1604,9 @@ class AccountingReportsService {
         final rows = await db.rawQuery(
           '''SELECT COALESCE(SUM(total), 0) as ventas, COUNT(*) as transacciones
              FROM sales
-             WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+             WHERE date >= ? AND date < ?
+               AND (isReturn IS NULL OR isReturn = 0)
+               AND (anulada IS NULL OR anulada = 0)''',
           [d.toIso8601String(), dayEnd.toIso8601String()],
         );
         final ventas = (rows.isNotEmpty && rows.first['ventas'] is num)
@@ -1714,7 +1727,10 @@ class AccountingReportsService {
           .add(const Duration(days: 1));
 
       final rows = await db.rawQuery(
-        '''SELECT items FROM sales WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+        '''SELECT items FROM sales
+           WHERE date >= ? AND date < ?
+             AND (isReturn IS NULL OR isReturn = 0)
+             AND (anulada IS NULL OR anulada = 0)''',
         [start.toIso8601String(), end.toIso8601String()],
       );
 
@@ -1784,7 +1800,9 @@ class AccountingReportsService {
 
       final rows = await db.rawQuery(
         '''SELECT total, paymentMethod, payment_breakdown FROM sales
-           WHERE date >= ? AND date < ? AND (isReturn IS NULL OR isReturn = 0)''',
+           WHERE date >= ? AND date < ?
+             AND (isReturn IS NULL OR isReturn = 0)
+             AND (anulada IS NULL OR anulada = 0)''',
         [start.toIso8601String(), end.toIso8601String()],
       );
 

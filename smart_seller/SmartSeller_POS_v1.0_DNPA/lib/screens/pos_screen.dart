@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:decimal/decimal.dart';
 import 'dart:io';
 import 'pos_controller.dart';
 import '../models/product.dart';
@@ -3363,70 +3364,215 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  Decimal? _parseMoneyDigitsAsDecimal(String text) {
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return null;
+    return Decimal.parse(digits);
+  }
+
+  String _formatThousands(BigInt value) {
+    final negative = value.isNegative;
+    final raw = value.abs().toString();
+    final formatted = raw.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+    return negative ? '-$formatted' : formatted;
+  }
+
+  BigInt _roundHalfUp(Decimal value) {
+    final normalized = value.toString();
+    final negative = normalized.startsWith('-');
+    final clean = negative ? normalized.substring(1) : normalized;
+    final parts = clean.split('.');
+    var intPart = BigInt.parse(parts[0]);
+    if (parts.length > 1 && parts[1].isNotEmpty) {
+      final firstDigit = int.tryParse(parts[1][0]) ?? 0;
+      if (firstDigit >= 5) {
+        intPart += BigInt.one;
+      }
+    }
+    return negative ? -intPart : intPart;
+  }
+
   void _showPriceDialog(item, int index) {
-    final controller = TextEditingController(text: item.price.toString());
+    final basePriceController =
+        TextEditingController(text: _formatThousands(BigInt.from(item.price.round())));
+    final priceWithIvaController = TextEditingController();
+    final oldPrice = item.price;
+    final supportsIvaPricing =
+        item.ivaPercentage == 5 || item.ivaPercentage == 19;
+    final ivaPctByDialog = (item.ivaPercentage == 5) ? 5 : 19;
+    int selectedIva = ivaPctByDialog;
+    double candidatePrice = oldPrice;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Modificar Precio'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Producto: ${item.name}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Nuevo precio',
-                prefixText: '\$ ',
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (value) {
-                final newPrice = double.tryParse(value) ?? item.price;
-                Navigator.of(context).pop();
-                _posController.updateItemPrice(index, newPrice);
-                Get.snackbar(
-                  '💰 Precio modificado',
-                  '${item.name}: \$${item.price.toStringAsFixed(0)} → \$${newPrice.toStringAsFixed(0)}',
-                  backgroundColor: Colors.orange,
-                  colorText: Colors.white,
-                  duration: const Duration(seconds: 2),
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final newPrice = double.tryParse(controller.text) ?? item.price;
-              Navigator.of(context).pop();
-              _posController.updateItemPrice(index, newPrice);
-              Get.snackbar(
-                '💰 Precio modificado',
-                '${item.name}: \$${item.price.toStringAsFixed(0)} → \$${newPrice.toStringAsFixed(0)}',
-                backgroundColor: Colors.orange,
-                colorText: Colors.white,
-                duration: const Duration(seconds: 2),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          void applyPriceFromIva() {
+            final digits =
+                priceWithIvaController.text.replaceAll(RegExp(r'[^0-9]'), '');
+            if (digits.isEmpty) return;
+            final gross = Decimal.parse(digits);
+            final formattedGross = _formatThousands(BigInt.parse(digits));
+            if (priceWithIvaController.text != formattedGross) {
+              priceWithIvaController.value = TextEditingValue(
+                text: formattedGross,
+                selection:
+                    TextSelection.collapsed(offset: formattedGross.length),
               );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
+            }
+            final divisor =
+                selectedIva == 5 ? Decimal.parse('1.05') : Decimal.parse('1.19');
+            final base =
+                (gross / divisor).toDecimal(scaleOnInfinitePrecision: 12);
+            candidatePrice = double.tryParse(base.toString()) ?? oldPrice;
+            basePriceController.text = _formatThousands(_roundHalfUp(base));
+          }
+
+          return AlertDialog(
+            title: const Text('Modificar Precio'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Producto: ${item.name}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: basePriceController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nuevo precio (base)',
+                    prefixText: '\$ ',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    final parsed = _parseMoneyDigitsAsDecimal(value);
+                    if (parsed != null) {
+                      candidatePrice = parsed.toDouble();
+                    }
+                  },
+                  onSubmitted: (value) {
+                    final parsed = _parseMoneyDigitsAsDecimal(value);
+                    final newPrice = parsed?.toDouble() ?? candidatePrice;
+                    final editedFromIva = supportsIvaPricing &&
+                        _parseMoneyDigitsAsDecimal(priceWithIvaController.text) !=
+                            null;
+                    Navigator.of(context).pop();
+                    _posController.updateItemPrice(
+                      index,
+                      newPrice,
+                      editedFromIva: editedFromIva,
+                    );
+                    Get.snackbar(
+                      '💰 Precio modificado',
+                      '${item.name}: \$${oldPrice.toStringAsFixed(0)} → \$${newPrice.toStringAsFixed(0)}',
+                      backgroundColor: Colors.orange,
+                      colorText: Colors.white,
+                      duration: const Duration(seconds: 2),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                if (supportsIvaPricing) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: priceWithIvaController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          decoration: const InputDecoration(
+                            labelText: 'Precio con IVA',
+                            prefixText: '\$ ',
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) => applyPriceFromIva(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 110,
+                        child: DropdownButtonFormField<int>(
+                          value: selectedIva,
+                          decoration: const InputDecoration(
+                            labelText: 'IVA',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 19, child: Text('19%')),
+                            DropdownMenuItem(value: 5, child: Text('5%')),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setStateDialog(() {
+                              selectedIva = value;
+                            });
+                            applyPriceFromIva();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Si usas "Precio con IVA", el carrito guarda precio base para evitar doble IVA.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ),
+                ] else ...[
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Producto exento de IVA: solo se permite editar precio base.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            child: const Text('Actualizar'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final parsed = _parseMoneyDigitsAsDecimal(basePriceController.text);
+                  final newPrice = parsed?.toDouble() ?? candidatePrice;
+                  final editedFromIva = supportsIvaPricing &&
+                      _parseMoneyDigitsAsDecimal(priceWithIvaController.text) !=
+                          null;
+                  Navigator.of(context).pop();
+                  _posController.updateItemPrice(
+                    index,
+                    newPrice,
+                    editedFromIva: editedFromIva,
+                  );
+                  Get.snackbar(
+                    '💰 Precio modificado',
+                    '${item.name}: \$${oldPrice.toStringAsFixed(0)} → \$${newPrice.toStringAsFixed(0)}',
+                    backgroundColor: Colors.orange,
+                    colorText: Colors.white,
+                    duration: const Duration(seconds: 2),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Actualizar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
