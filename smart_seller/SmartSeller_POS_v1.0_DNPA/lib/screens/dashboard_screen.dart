@@ -6,7 +6,6 @@ import 'users_screen.dart';
 import 'products_screen.dart';
 import '../services/auth_service.dart';
 import '../models/permissions.dart';
-import '../models/user.dart';
 import 'package:intl/intl.dart';
 import 'customers_screen.dart';
 import 'reports_screen.dart';
@@ -189,6 +188,15 @@ class DashboardScreen extends StatelessWidget {
                             Get.toNamed('/configuracion-impresora');
                           },
                         ),
+                      // Diagnóstico de balanza (para pruebas de comunicación con POS)
+                      _SidebarButton(
+                        icon: Icons.scale,
+                        label: 'Balanza',
+                        selected: false,
+                        onTap: () {
+                          Get.toNamed('/balanza-diagnostico');
+                        },
+                      ),
                       // Usuarios - Solo si tiene permisos
                       if (authService.hasPermission(Permission.viewUsers))
                         _SidebarButton(
@@ -642,13 +650,7 @@ class _DashboardContent extends StatelessWidget {
       }
     }
 
-    void debug() {
-      Get.toNamed('/debug');
-    }
-
-    void moduleMigration() {
-      Get.toNamed('/module-migration');
-    }
+    void diagnosticoBalanza() => Get.toNamed('/balanza-diagnostico');
 
     void gestionarUsuarios() {
       if (authService.hasPermission(Permission.viewUsers)) {
@@ -927,6 +929,15 @@ class _DashboardContent extends StatelessWidget {
                             'Administrar usuarios del sistema, permisos y roles de acceso',
                         onTap: gestionarUsuarios,
                       ),
+                    // Diagnóstico de Balanza
+                    _QuickActionCard(
+                      icon: Icons.scale,
+                      color: const Color(0xFF009688),
+                      title: 'Diagnóstico de Balanza',
+                      description:
+                          'Conectar balanza por COM, enviar comandos y validar lectura de peso',
+                      onTap: diagnosticoBalanza,
+                    ),
                   ],
                 ),
               );
