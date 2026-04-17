@@ -28,6 +28,7 @@ migrate_working_dir/
 .packages
 .pub/
 build/
+build_spos/
 .flutter-plugins
 .flutter-plugins-dependencies
 .melos_tool/
