@@ -48,8 +48,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
   void _showGroupDialog({Group? group}) {
     final isEditing = group != null;
     final nameController = TextEditingController(text: group?.name ?? '');
-    final descriptionController =
-        TextEditingController(text: group?.description ?? '');
+    final descriptionController = TextEditingController(
+      text: group?.description ?? '',
+    );
     String selectedColor = group?.color ?? '#2196F3';
     String selectedIcon = group?.icon ?? 'category';
 
@@ -100,8 +101,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
           // ✅ NUEVO: Cargar productos del grupo si estamos editando
           if (isEditing && groupProducts.isEmpty && !isLoadingProducts) {
             isLoadingProducts = true;
-            SQLiteDatabaseService.getProductsByGroup(group.name)
-                .then((products) {
+            SQLiteDatabaseService.getProductsByGroup(group.name).then((
+              products,
+            ) {
               setState(() {
                 groupProducts = products;
                 isLoadingProducts = false;
@@ -158,8 +160,11 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                     width: 40,
                                     height: 40,
                                     decoration: BoxDecoration(
-                                      color: Color(int.parse(
-                                          color.replaceAll('#', '0xFF'))),
+                                      color: Color(
+                                        int.parse(
+                                          color.replaceAll('#', '0xFF'),
+                                        ),
+                                      ),
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: selectedColor == color
@@ -185,16 +190,18 @@ class _GroupsScreenState extends State<GroupsScreen> {
                             DropdownButtonFormField<String>(
                               initialValue: selectedIcon,
                               items: icons
-                                  .map((iconData) => DropdownMenuItem<String>(
-                                        value: iconData['name'] as String,
-                                        child: Row(
-                                          children: [
-                                            Icon(iconData['icon'] as IconData),
-                                            const SizedBox(width: 8),
-                                            Text(iconData['name'] as String),
-                                          ],
-                                        ),
-                                      ))
+                                  .map(
+                                    (iconData) => DropdownMenuItem<String>(
+                                      value: iconData['name'] as String,
+                                      child: Row(
+                                        children: [
+                                          Icon(iconData['icon'] as IconData),
+                                          const SizedBox(width: 8),
+                                          Text(iconData['name'] as String),
+                                        ],
+                                      ),
+                                    ),
+                                  )
                                   .toList(),
                               onChanged: (value) {
                                 selectedIcon = value!;
@@ -225,8 +232,10 @@ class _GroupsScreenState extends State<GroupsScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.inventory,
-                                  color: Colors.blue.shade700),
+                              Icon(
+                                Icons.inventory,
+                                color: Colors.blue.shade700,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'Productos en este grupo (${groupProducts.length})',
@@ -255,8 +264,10 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                   final product = groupProducts[index];
                                   return ListTile(
                                     dense: true,
-                                    leading:
-                                        const Icon(Icons.inventory_2, size: 20),
+                                    leading: const Icon(
+                                      Icons.inventory_2,
+                                      size: 20,
+                                    ),
                                     title: Text(
                                       product.name,
                                       style: const TextStyle(fontSize: 14),
@@ -279,10 +290,12 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                     hint: const Text('Mover a otro grupo...'),
                                     items: _groups
                                         .where((g) => g.name != group.name)
-                                        .map((g) => DropdownMenuItem(
-                                              value: g.name,
-                                              child: Text(g.name),
-                                            ))
+                                        .map(
+                                          (g) => DropdownMenuItem(
+                                            value: g.name,
+                                            child: Text(g.name),
+                                          ),
+                                        )
                                         .toList(),
                                     onChanged: (value) {
                                       selectedNewGroup = value;
@@ -291,7 +304,9 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                     decoration: const InputDecoration(
                                       border: OutlineInputBorder(),
                                       contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 8),
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -300,16 +315,15 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                   onPressed: selectedNewGroup != null
                                       ? () async {
                                           // Mover productos al grupo seleccionado
-                                          await SQLiteDatabaseService
-                                              .updateProductsGroup(
+                                          await SQLiteDatabaseService.updateProductsGroup(
                                             group.name,
                                             selectedNewGroup!,
                                           );
                                           // Recargar productos
                                           final updatedProducts =
-                                              await SQLiteDatabaseService
-                                                  .getProductsByGroup(
-                                                      group.name);
+                                              await SQLiteDatabaseService.getProductsByGroup(
+                                                group.name,
+                                              );
                                           setState(() {
                                             groupProducts = updatedProducts;
                                             selectedNewGroup = null;
@@ -322,12 +336,16 @@ class _GroupsScreenState extends State<GroupsScreen> {
                                           );
                                         }
                                       : null,
-                                  icon:
-                                      const Icon(Icons.move_to_inbox, size: 16),
+                                  icon: const Icon(
+                                    Icons.move_to_inbox,
+                                    size: 16,
+                                  ),
                                   label: const Text('Mover'),
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -381,7 +399,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
                       // Verificar si ya existe un grupo con ese nombre
                       final exists =
                           await SQLiteDatabaseService.groupNameExists(
-                              newGroup.name);
+                            newGroup.name,
+                          );
                       if (exists) {
                         Get.snackbar(
                           'Error',
@@ -498,7 +517,8 @@ class _GroupsScreenState extends State<GroupsScreen> {
       AlertDialog(
         title: const Text('Eliminar Grupo'),
         content: Text(
-            '¿Estás seguro de que quieres eliminar el grupo "${group.name}"? Esta acción no se puede deshacer.'),
+          '¿Estás seguro de que quieres eliminar el grupo "${group.name}"? Esta acción no se puede deshacer.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
@@ -550,86 +570,78 @@ class _GroupsScreenState extends State<GroupsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : _groups.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.category_outlined,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No hay grupos creados',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Crea tu primer grupo para organizar tus productos',
-                        style: TextStyle(
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.category_outlined,
+                    size: 64,
+                    color: Colors.grey[400],
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _groups.length,
-                  itemBuilder: (context, index) {
-                    final group = _groups[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Color(
-                              int.parse(group.color.replaceAll('#', '0xFF'))),
-                          child: Icon(
-                            _getIconFromName(group.icon),
-                            color: Colors.white,
-                          ),
-                        ),
-                        title: Text(
-                          group.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Text(
-                          group.description.isNotEmpty
-                              ? group.description
-                              : 'Sin descripción',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: () => _showGroupDialog(group: group),
-                              icon: const Icon(Icons.edit),
-                              tooltip: 'Editar',
-                            ),
-                            IconButton(
-                              onPressed: () => _showDeleteConfirmation(group),
-                              icon: const Icon(Icons.delete),
-                              tooltip: 'Eliminar',
-                              color: Colors.red,
-                            ),
-                          ],
-                        ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No hay grupos creados',
+                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Crea tu primer grupo para organizar tus productos',
+                    style: TextStyle(color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _groups.length,
+              itemBuilder: (context, index) {
+                final group = _groups[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Color(
+                        int.parse(group.color.replaceAll('#', '0xFF')),
                       ),
-                    );
-                  },
-                ),
+                      child: Icon(
+                        _getIconFromName(group.icon),
+                        color: Colors.white,
+                      ),
+                    ),
+                    title: Text(
+                      group.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      group.description.isNotEmpty
+                          ? group.description
+                          : 'Sin descripción',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          onPressed: () => _showGroupDialog(group: group),
+                          icon: const Icon(Icons.edit),
+                          tooltip: 'Editar',
+                        ),
+                        IconButton(
+                          onPressed: () => _showDeleteConfirmation(group),
+                          icon: const Icon(Icons.delete),
+                          tooltip: 'Eliminar',
+                          color: Colors.red,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showGroupDialog(),
         tooltip: 'Crear nuevo grupo',

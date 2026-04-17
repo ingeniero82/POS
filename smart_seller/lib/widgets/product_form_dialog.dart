@@ -294,7 +294,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         stock: int.parse(_stockController.text),
         minStock: int.parse(_minStockController.text),
         unit: _unitController.text.trim(),
-        category: _selectedGroup ?? 'Sin grupo',
+        category: _selectedGroup ?? SQLiteDatabaseService.defaultGroupName,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: _isActive,

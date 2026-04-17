@@ -132,6 +132,22 @@ class PosController extends GetxController {
   double? _creditReceiptAbono;
   double? _creditReceiptPending;
   String? _creditReceiptMethod;
+
+  // Normalización centralizada para valores monetarios de caja (pesos enteros).
+  double _normalizeCashAmount(num value) => value.toDouble().roundToDouble();
+
+  bool _canCoverCashTotal(num received, num expectedTotal) =>
+      _normalizeCashAmount(received) >= _normalizeCashAmount(expectedTotal);
+
+  bool _isExactCashTotal(num paid, num expectedTotal) =>
+      _normalizeCashAmount(paid) == _normalizeCashAmount(expectedTotal);
+
+  double _calculateCashChange(num received, num expectedTotal) {
+    final change =
+        _normalizeCashAmount(received) - _normalizeCashAmount(expectedTotal);
+    return change > 0 ? change : 0.0;
+  }
+
   void setLastCashPayment(double received, double change) {
     _lastCashReceived = received;
     _lastChange = change;
@@ -460,15 +476,17 @@ class PosController extends GetxController {
       final searchLower = query.toLowerCase().trim();
       final searchNormalized = _normalizeForSearch(query);
       final filtered = allClients.where((client) {
-        final byName = client.businessName.toLowerCase().contains(searchLower) ||
+        final byName = client.businessName
+                .toLowerCase()
+                .contains(searchLower) ||
             _normalizeForSearch(client.businessName).contains(searchNormalized);
-        final byEmail =
-            (client.email?.toLowerCase().contains(searchLower) ?? false) ||
-                _normalizeForSearch(client.email ?? '')
+        final byEmail = (client.email?.toLowerCase().contains(searchLower) ??
+                false) ||
+            _normalizeForSearch(client.email ?? '').contains(searchNormalized);
+        final byDoc =
+            client.documentNumber.toLowerCase().contains(searchLower) ||
+                _normalizeForSearch(client.documentNumber)
                     .contains(searchNormalized);
-        final byDoc = client.documentNumber.toLowerCase().contains(searchLower) ||
-            _normalizeForSearch(client.documentNumber)
-                .contains(searchNormalized);
         final byPhone = (client.phone?.contains(query.trim()) ?? false) ||
             _normalizeForSearch(client.phone ?? '').contains(searchNormalized);
         return byName || byEmail || byDoc || byPhone;
@@ -626,7 +644,9 @@ class PosController extends GetxController {
       final config = await CompanyConfigService.getCompanyConfig();
       int pointsEarned = 0;
       if (config.pointsEnabled && config.pointsPesosBase > 0) {
-        pointsEarned = ((total / config.pointsPesosBase).floor() * config.pointsPerBase).toInt();
+        pointsEarned =
+            ((total / config.pointsPesosBase).floor() * config.pointsPerBase)
+                .toInt();
       }
       final newAccumulatedPoints = customer.accumulatedPoints + pointsEarned;
       final newTotalPurchases = customer.totalPurchases + total;
@@ -688,8 +708,7 @@ class PosController extends GetxController {
       if (productId == null) return 0;
       return cartItems
           .where((i) => i.productId == productId && i.weightKg != null)
-          .fold<double>(
-              0.0, (s, i) => s + i.weightKg! * i.quantity);
+          .fold<double>(0.0, (s, i) => s + i.weightKg! * i.quantity);
     }
 
     if (existingIndex >= 0) {
@@ -710,9 +729,7 @@ class PosController extends GetxController {
       cartItems.refresh(); // Notificar cambios
     } else {
       // Si no existe, verificar stock antes de agregar
-      if (availableStockKg != null &&
-          weightKg != null &&
-          weightKg > 0) {
+      if (availableStockKg != null && weightKg != null && weightKg > 0) {
         if (kgInCartForProduct() + weightKg * quantity >
             availableStockKg + 1e-9) {
           Get.snackbar(
@@ -1076,15 +1093,12 @@ class PosController extends GetxController {
   /// IVA a 19% (para mostrar en pantalla e impresión)
   double get taxAt19 => cartItems.fold(
       0.0,
-      (sum, item) => item.ivaPercentage == 19
-          ? sum + (item.total * 0.19)
-          : sum);
+      (sum, item) =>
+          item.ivaPercentage == 19 ? sum + (item.total * 0.19) : sum);
 
   /// IVA a 5% (para mostrar en pantalla e impresión)
-  double get taxAt5 => cartItems.fold(
-      0.0,
-      (sum, item) =>
-          item.ivaPercentage == 5 ? sum + (item.total * 0.05) : sum);
+  double get taxAt5 => cartItems.fold(0.0,
+      (sum, item) => item.ivaPercentage == 5 ? sum + (item.total * 0.05) : sum);
 
   /// IVA exento (0%) - monto base sin IVA
   double get taxAt0 => 0.0;
@@ -1102,7 +1116,8 @@ class PosController extends GetxController {
   }
 
   /// Total a cobrar (neto tras descuento global).
-  double get total => (grossTotal - cartDiscountAmount).clamp(0.0, double.infinity);
+  double get total =>
+      (grossTotal - cartDiscountAmount).clamp(0.0, double.infinity);
 
   /// Campos de descuento para persistir en [Sale] (0 si no aplica).
   ({double amount, double percent}) get _cartSaleDiscount {
@@ -1141,7 +1156,8 @@ class PosController extends GetxController {
     if (!skipPermissionCheck) {
       final role = AuthService.to.currentUser?.role;
       if (role == null ||
-          !PermissionsService.to.hasPermission(role, Permission.modifyCartPrice)) {
+          !PermissionsService.to
+              .hasPermission(role, Permission.modifyCartPrice)) {
         Get.snackbar(
           'Sin permiso',
           'No tiene permiso para aplicar descuento en el carrito.',
@@ -1194,7 +1210,8 @@ class PosController extends GetxController {
             TextField(
               controller: ctrl,
               autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Porcentaje',
                 suffixText: '%',
@@ -1280,160 +1297,163 @@ class PosController extends GetxController {
       Dialog(
         child: Builder(
           builder: (paymentDialogContext) => Container(
-          width: 450,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(paymentDialogContext).height * 0.88,
-          ),
-          padding: const EdgeInsets.all(24),
-          child: SingleChildScrollView(
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'Método de Pago',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              Obx(() => Text(
-                    'Total a pagar: ${copFormat.format(total)}',
-                    style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF4CAF50)),
-                  )),
-              Obx(() {
-                if (cartDiscountAmount <= 0) return const SizedBox.shrink();
-                final p = cartDiscountPercent.value;
-                final pctStr = p == p.roundToDouble()
-                    ? p.round().toString()
-                    : p.toStringAsFixed(1);
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    'Incluye descuento $pctStr% (${copFormat.format(cartDiscountAmount)})',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                    textAlign: TextAlign.center,
+            width: 450,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(paymentDialogContext).height * 0.88,
+            ),
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Método de Pago',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                );
-              }),
-              const SizedBox(height: 12),
-              Obx(() {
-                final hasClient = selectedCustomer.value != null ||
-                    selectedClient.value != null;
-                if (grossTotal <= 0 || !hasClient) {
-                  return const SizedBox.shrink();
-                }
-                return SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        _requestDiscountAuthorizationThenOpenDialog(copFormat),
-                    icon: const Icon(Icons.percent),
-                    label: Text(cartDiscountPercent.value > 0
-                        ? 'Descuento ${cartDiscountPercent.value == cartDiscountPercent.value.roundToDouble() ? cartDiscountPercent.value.round().toString() : cartDiscountPercent.value.toStringAsFixed(1)}% (cambiar)'
-                        : 'Descuento % al total'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      foregroundColor: Colors.teal.shade800,
-                      side: BorderSide(color: Colors.teal.shade700),
-                    ),
-                  ),
-                );
-              }),
-              const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+                  Obx(() => Text(
+                        'Total a pagar: ${copFormat.format(total)}',
+                        style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF4CAF50)),
+                      )),
+                  Obx(() {
+                    if (cartDiscountAmount <= 0) return const SizedBox.shrink();
+                    final p = cartDiscountPercent.value;
+                    final pctStr = p == p.roundToDouble()
+                        ? p.round().toString()
+                        : p.toStringAsFixed(1);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Incluye descuento $pctStr% (${copFormat.format(cartDiscountAmount)})',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  Obx(() {
+                    final hasClient = selectedCustomer.value != null ||
+                        selectedClient.value != null;
+                    if (grossTotal <= 0 || !hasClient) {
+                      return const SizedBox.shrink();
+                    }
+                    return SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            _requestDiscountAuthorizationThenOpenDialog(
+                                copFormat),
+                        icon: const Icon(Icons.percent),
+                        label: Text(cartDiscountPercent.value > 0
+                            ? 'Descuento ${cartDiscountPercent.value == cartDiscountPercent.value.roundToDouble() ? cartDiscountPercent.value.round().toString() : cartDiscountPercent.value.toStringAsFixed(1)}% (cambiar)'
+                            : 'Descuento % al total'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          foregroundColor: Colors.teal.shade800,
+                          side: BorderSide(color: Colors.teal.shade700),
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 12),
 
-              // Opciones de pago
-              Row(
-                children: [
-                  Expanded(
-                    child: _PaymentOption(
-                      icon: Icons.money,
-                      title: 'Efectivo',
-                      subtitle: 'Pago en efectivo',
-                      onTap: () => _showCashReceivedDialog(copFormat),
+                  // Opciones de pago
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _PaymentOption(
+                          icon: Icons.money,
+                          title: 'Efectivo',
+                          subtitle: 'Pago en efectivo',
+                          onTap: () => _showCashReceivedDialog(copFormat),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _PaymentOption(
+                          icon: Icons.credit_card,
+                          title: 'Tarjeta',
+                          subtitle: 'Débito/Crédito',
+                          onTap: () => _processPaymentWithMethod('Tarjeta'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _PaymentOption(
+                          icon: Icons.phone_android,
+                          title: 'Transferencia',
+                          subtitle: 'PSE/Bancolombia',
+                          onTap: () =>
+                              _processPaymentWithMethod('Transferencia'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _PaymentOption(
+                          icon: Icons.qr_code,
+                          title: 'QR',
+                          subtitle: 'Nequi/Daviplata',
+                          onTap: () => _showQRPaymentChoice(copFormat),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Pago mixto: parte efectivo, parte Nequi, etc.
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showMixedPaymentDialog(copFormat),
+                      icon: const Icon(Icons.account_balance_wallet),
+                      label: const Text(
+                          'Pago mixto (ej. parte efectivo, parte Nequi)'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: Colors.deepPurple,
+                        side: const BorderSide(color: Colors.deepPurple),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _PaymentOption(
-                      icon: Icons.credit_card,
-                      title: 'Tarjeta',
-                      subtitle: 'Débito/Crédito',
-                      onTap: () => _processPaymentWithMethod('Tarjeta'),
+                  const SizedBox(height: 12),
+                  // Venta a crédito: queda en cuentas por cobrar (requiere cliente seleccionado)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(paymentDialogContext, rootNavigator: true)
+                            .pop();
+                        Future.microtask(
+                            () => _openCreditReceivableDialogOnly(copFormat));
+                      },
+                      icon: const Icon(Icons.schedule),
+                      label: const Text('A crédito (cuenta por cobrar)'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: Colors.orange.shade800,
+                        side: BorderSide(color: Colors.orange.shade800),
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child:
+                        const Text('Cancelar', style: TextStyle(fontSize: 16)),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _PaymentOption(
-                      icon: Icons.phone_android,
-                      title: 'Transferencia',
-                      subtitle: 'PSE/Bancolombia',
-                      onTap: () => _processPaymentWithMethod('Transferencia'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _PaymentOption(
-                      icon: Icons.qr_code,
-                      title: 'QR',
-                      subtitle: 'Nequi/Daviplata',
-                      onTap: () => _showQRPaymentChoice(copFormat),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Pago mixto: parte efectivo, parte Nequi, etc.
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showMixedPaymentDialog(copFormat),
-                  icon: const Icon(Icons.account_balance_wallet),
-                  label: const Text(
-                      'Pago mixto (ej. parte efectivo, parte Nequi)'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    foregroundColor: Colors.deepPurple,
-                    side: const BorderSide(color: Colors.deepPurple),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Venta a crédito: queda en cuentas por cobrar (requiere cliente seleccionado)
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(paymentDialogContext, rootNavigator: true)
-                        .pop();
-                    Future.microtask(
-                        () => _openCreditReceivableDialogOnly(copFormat));
-                  },
-                  icon: const Icon(Icons.schedule),
-                  label: const Text('A crédito (cuenta por cobrar)'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    foregroundColor: Colors.orange.shade800,
-                    side: BorderSide(color: Colors.orange.shade800),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextButton(
-                onPressed: () => Get.back(),
-                child: const Text('Cancelar', style: TextStyle(fontSize: 16)),
-              ),
-            ],
+            ),
           ),
         ),
       ),
-    ),
-    ),
     );
   }
 
@@ -1459,6 +1479,7 @@ class PosController extends GetxController {
   void _showCashReceivedDialog(NumberFormat copFormat) {
     Get.back(); // Cierra el diálogo de métodos de pago
     final totalToPay = total;
+    final requiredCash = _normalizeCashAmount(totalToPay);
     final controller =
         TextEditingController(); // Vacío para que el cajero ingrese con cuánto le pagan
     final vuelto = 0.0.obs;
@@ -1466,8 +1487,8 @@ class PosController extends GetxController {
 
     void updateVuelto() {
       final value = parseMontoPuntosMiles(controller.text) ?? 0;
-      canConfirm.value = value >= totalToPay;
-      vuelto.value = value >= totalToPay ? value - totalToPay : 0;
+      canConfirm.value = _canCoverCashTotal(value, requiredCash);
+      vuelto.value = _calculateCashChange(value, requiredCash);
     }
 
     Get.dialog(
@@ -1486,7 +1507,7 @@ class PosController extends GetxController {
               ),
               const SizedBox(height: 16),
               Text(
-                'Total a pagar: ${copFormat.format(totalToPay)}',
+                'Total a pagar: ${copFormat.format(requiredCash)}',
                 style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1511,8 +1532,9 @@ class PosController extends GetxController {
                 onChanged: (_) => updateVuelto(),
                 onSubmitted: (_) {
                   final value = parseMontoPuntosMiles(controller.text) ?? 0;
-                  if (value >= totalToPay) {
-                    setLastCashPayment(value, value - totalToPay);
+                  if (_canCoverCashTotal(value, requiredCash)) {
+                    setLastCashPayment(_normalizeCashAmount(value),
+                        _calculateCashChange(value, requiredCash));
                     Get.back();
                     _onConfirmCashPayment();
                   }
@@ -1558,9 +1580,11 @@ class PosController extends GetxController {
                                   final value =
                                       parseMontoPuntosMiles(controller.text) ??
                                           0.0;
-                                  if (value >= totalToPay) {
+                                  if (_canCoverCashTotal(value, requiredCash)) {
                                     setLastCashPayment(
-                                        value, value - totalToPay);
+                                        _normalizeCashAmount(value),
+                                        _calculateCashChange(
+                                            value, requiredCash));
                                     Get.back();
                                     _onConfirmCashPayment();
                                   }
@@ -1591,6 +1615,7 @@ class PosController extends GetxController {
   void _showMixedPaymentDialog(NumberFormat copFormat) {
     Get.back(); // Cierra el diálogo de métodos de pago
     final totalToPay = total;
+    final requiredTotal = _normalizeCashAmount(totalToPay);
     final parts = <PaymentPart>[];
     final amountControllers = <TextEditingController>[];
 
@@ -1608,10 +1633,10 @@ class PosController extends GetxController {
           for (var i = 0; i < amountControllers.length; i++) {
             suma += parseMontoPuntosMiles(amountControllers[i].text) ?? 0.0;
           }
-          final restante = totalToPay - suma;
+          final normalizedSum = _normalizeCashAmount(suma);
+          final restante = requiredTotal - normalizedSum;
           final canConfirm = parts.isNotEmpty &&
-              suma >= totalToPay - 0.01 &&
-              suma <= totalToPay + 0.01;
+              _isExactCashTotal(normalizedSum, requiredTotal);
 
           return Dialog(
             child: Container(
@@ -1630,7 +1655,7 @@ class PosController extends GetxController {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Total: ${copFormat.format(totalToPay)}',
+                      'Total: ${copFormat.format(requiredTotal)}',
                       style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -1705,19 +1730,18 @@ class PosController extends GetxController {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: restante.abs() < 0.01
+                        color: restante == 0
                             ? Colors.green.shade50
                             : Colors.orange.shade50,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: restante.abs() < 0.01
-                                ? Colors.green
-                                : Colors.orange),
+                            color:
+                                restante == 0 ? Colors.green : Colors.orange),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Suma: ${copFormat.format(suma)}'),
+                          Text('Suma: ${copFormat.format(normalizedSum)}'),
                           Text(
                             'Restante: ${copFormat.format(restante)}',
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1746,7 +1770,9 @@ class PosController extends GetxController {
                                               amountControllers[i].text) ??
                                           0.0;
                                       parts[i] = PaymentPart(
-                                          method: parts[i].method, amount: a);
+                                        method: parts[i].method,
+                                        amount: _normalizeCashAmount(a),
+                                      );
                                     }
                                     for (final c in amountControllers) {
                                       c.dispose();
@@ -1780,8 +1806,9 @@ class PosController extends GetxController {
       List<PaymentPart> parts, NumberFormat copFormat) async {
     Get.back();
     final totalToPay = total;
-    final sum = parts.fold(0.0, (s, p) => s + p.amount);
-    if (sum < totalToPay - 0.01 || sum > totalToPay + 0.01) {
+    final requiredTotal = _normalizeCashAmount(totalToPay);
+    final sum = _normalizeCashAmount(parts.fold(0.0, (s, p) => s + p.amount));
+    if (!_isExactCashTotal(sum, requiredTotal)) {
       Get.snackbar('Error', 'La suma de los pagos debe ser igual al total',
           backgroundColor: Colors.red, colorText: Colors.white);
       return;
@@ -1790,7 +1817,7 @@ class PosController extends GetxController {
       final disc = _cartSaleDiscount;
       final sale = Sale(
         date: DateTime.now(),
-        total: totalToPay,
+        total: requiredTotal,
         user: AuthService.to.currentUser?.username ?? 'usuario',
         paymentMethod: 'Mixto',
         paymentBreakdown: parts,
@@ -1874,12 +1901,14 @@ class PosController extends GetxController {
       );
       return;
     }
-    final abono = abonoInicial.clamp(0.0, total);
+    final normalizedTotal = _normalizeCashAmount(total);
+    final abono =
+        _normalizeCashAmount(abonoInicial).clamp(0.0, normalizedTotal);
     try {
       final disc = _cartSaleDiscount;
       final sale = Sale(
         date: DateTime.now(),
-        total: total,
+        total: normalizedTotal,
         user: AuthService.to.currentUser?.username ?? 'usuario',
         paymentMethod: 'Crédito',
         customerId: selectedCustomer.value?.id,
@@ -1914,9 +1943,9 @@ class PosController extends GetxController {
         customerDocument: customer.documentNumber?.trim() ??
             customer.documentType ??
             'Sin documento',
-        totalAmount: total,
+        totalAmount: normalizedTotal,
         paidAmount: 0,
-        pendingAmount: total,
+        pendingAmount: normalizedTotal,
         invoiceNumber: invoiceNumber,
         invoiceDate: now,
         dueDate: dueDate,
@@ -1927,8 +1956,9 @@ class PosController extends GetxController {
         createdAt: now,
         updatedAt: now,
       );
-      final receivableId = await AccountsReceivablePayableService
-          .createAccountsReceivable(receivable);
+      final receivableId =
+          await AccountsReceivablePayableService.createAccountsReceivable(
+              receivable);
 
       if (abono > 0) {
         final uid = AuthService.to.currentUser?.id ?? 0;
@@ -1973,7 +2003,8 @@ class PosController extends GetxController {
       _lastCashReceived = null;
       _lastChange = null;
       _creditReceiptAbono = abono;
-      _creditReceiptPending = (total - abono).clamp(0.0, total);
+      _creditReceiptPending =
+          (normalizedTotal - abono).clamp(0.0, normalizedTotal);
       _creditReceiptMethod = abono > 0 ? abonoPaymentMethod : null;
 
       final customerForReceipt = selectedCustomer.value;
@@ -2526,7 +2557,8 @@ class _PosCreditReceivableDialog extends StatefulWidget {
       _PosCreditReceivableDialogState();
 }
 
-class _PosCreditReceivableDialogState extends State<_PosCreditReceivableDialog> {
+class _PosCreditReceivableDialogState
+    extends State<_PosCreditReceivableDialog> {
   final TextEditingController _abonoController = TextEditingController();
   String _abonoPaymentMethod = 'Efectivo';
 
@@ -2537,16 +2569,18 @@ class _PosCreditReceivableDialogState extends State<_PosCreditReceivableDialog> 
   }
 
   double _parseAbono(double totalVenta) {
-    final raw = parseMontoPuntosMiles(_abonoController.text) ?? 0.0;
+    final normalizedTotal = totalVenta.roundToDouble();
+    final raw =
+        (parseMontoPuntosMiles(_abonoController.text) ?? 0.0).roundToDouble();
     if (raw < 0) return 0.0;
-    if (raw > totalVenta) return totalVenta;
+    if (raw > normalizedTotal) return normalizedTotal;
     return raw;
   }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
-      final totalVenta = widget.pos.total;
+      final totalVenta = widget.pos.total.roundToDouble();
       final customer = widget.pos.selectedCustomer.value;
       final abono = _parseAbono(totalVenta);
       final saldoEstaVenta = totalVenta - abono;
@@ -2613,13 +2647,14 @@ class _PosCreditReceivableDialogState extends State<_PosCreditReceivableDialog> 
               FutureBuilder<double>(
                 key: ValueKey(customer?.id ?? -1),
                 future: customer?.id != null
-                    ? AccountsReceivablePayableService.getPendingTotalForCustomer(
-                        customer!.id!)
+                    ? AccountsReceivablePayableService
+                        .getPendingTotalForCustomer(customer!.id!)
                     : Future.value(0.0),
                 builder: (context, snap) {
                   final prev = snap.data ?? 0.0;
-                  final loading = snap.connectionState == ConnectionState.waiting &&
-                      customer?.id != null;
+                  final loading =
+                      snap.connectionState == ConnectionState.waiting &&
+                          customer?.id != null;
                   final totalClienteEst = prev + saldoEstaVenta;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

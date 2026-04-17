@@ -16,23 +16,23 @@ class Product {
   late DateTime updatedAt;
   bool isActive = true;
   String? imageUrl;
-  
+
   // Campos para productos pesados
   bool isWeighted = false; // Indica si es un producto que se vende por peso
   double? pricePerKg; // Precio por kilogramo
   double? weight; // Peso actual del producto (para productos pesados)
   double? minWeight; // Peso mínimo para venta
   double? maxWeight; // Peso máximo para venta
-  
+
   // ✅ NUEVO: Campos para gestión de IVA
   String vatType = 'GRAVADO'; // EXENTO, EXCLUIDO, GRAVADO
   double vatRate = 0.19; // Tasa de IVA: 0.0, 0.05, 0.19 (0%, 5%, 19%)
-  
+
   // ✅ NUEVO: Campos para IpoConsumo
   bool hasIpoConsumo = false; // Indica si tiene impuesto al consumo
   double? ipoConsumoRate; // Tasa de IpoConsumo (ej: 0.08 para 8%)
   String? ipoConsumoType; // Tipo: LICOR, CIGARRILLOS, BOLSAS, OTRO
-  
+
   // ✅ NUEVO: Campos para control de bolsas plásticas
   bool isPlasticBag = false; // Indica si es una bolsa plástica
   double? plasticBagTax; // Impuesto por bolsa (valor fijo por bolsa)
@@ -42,7 +42,7 @@ class Product {
   // ✅ CORREGIDO: Fórmula estándar de POS: (Precio de venta - Costo) / Precio de venta × 100
   double get profitMargin => price > 0 ? ((price - cost) / price) * 100 : 0;
   bool get isLowStock => stock <= minStock;
-  
+
   // Para productos pesados, el precio se calcula dinámicamente
   double get calculatedPrice {
     if (isWeighted && pricePerKg != null && weight != null) {
@@ -50,7 +50,7 @@ class Product {
     }
     return price;
   }
-  
+
   // Constructor
   Product({
     this.id,
@@ -81,7 +81,7 @@ class Product {
     this.isPlasticBag = false,
     this.plasticBagTax,
   });
-  
+
   // Constructor desde Map (para base de datos)
   Product.fromMap(Map<String, dynamic> map) {
     id = map['id'];
@@ -93,7 +93,7 @@ class Product {
     cost = map['cost'];
     stock = map['stock'];
     minStock = map['minStock'];
-    category = map['category'] ?? 'Sin categoría';
+    category = map['category'] ?? 'Otros';
     unit = map['unit'];
     createdAt = DateTime.parse(map['createdAt']);
     updatedAt = DateTime.parse(map['updatedAt']);
@@ -109,13 +109,17 @@ class Product {
     vatRate = (map['vatRate'] ?? 0.19).toDouble();
     // ✅ NUEVO: Campos de IpoConsumo
     hasIpoConsumo = map['hasIpoConsumo'] == 1;
-    ipoConsumoRate = map['ipoConsumoRate'] != null ? (map['ipoConsumoRate'] as num).toDouble() : null;
+    ipoConsumoRate = map['ipoConsumoRate'] != null
+        ? (map['ipoConsumoRate'] as num).toDouble()
+        : null;
     ipoConsumoType = map['ipoConsumoType'];
     // ✅ NUEVO: Campos de bolsas plásticas
     isPlasticBag = map['isPlasticBag'] == 1;
-    plasticBagTax = map['plasticBagTax'] != null ? (map['plasticBagTax'] as num).toDouble() : null;
+    plasticBagTax = map['plasticBagTax'] != null
+        ? (map['plasticBagTax'] as num).toDouble()
+        : null;
   }
-  
+
   // Convertir a Map (para base de datos)
   Map<String, dynamic> toMap() {
     return {
@@ -151,7 +155,7 @@ class Product {
       'plasticBagTax': plasticBagTax,
     };
   }
-  
+
   // Copiar con modificaciones
   Product copyWith({
     int? id,
@@ -214,4 +218,4 @@ class Product {
   }
 }
 
-// Enum eliminado - ahora usamos grupos dinámicos 
+// Enum eliminado - ahora usamos grupos dinámicos

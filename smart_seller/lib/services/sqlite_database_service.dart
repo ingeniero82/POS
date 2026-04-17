@@ -17,6 +17,7 @@ import 'security_service.dart'; // Added for password security
 
 class SQLiteDatabaseService {
   static Database? _database;
+  static const String defaultGroupName = 'Otros';
 
   // Getter público para acceder a la base de datos
   static Database? get database => _database;
@@ -33,9 +34,11 @@ class SQLiteDatabaseService {
       final localAppData = Platform.environment['LOCALAPPDATA'];
       appDirPath = localAppData != null && localAppData.isNotEmpty
           ? join(localAppData, 'SmartSellerPOS')
-          : join((await getApplicationSupportDirectory()).path, 'SmartSellerPOS');
+          : join(
+              (await getApplicationSupportDirectory()).path, 'SmartSellerPOS');
     } else {
-      appDirPath = join((await getApplicationSupportDirectory()).path, 'SmartSellerPOS');
+      appDirPath =
+          join((await getApplicationSupportDirectory()).path, 'SmartSellerPOS');
     }
     final appDir = Directory(appDirPath);
     if (!await appDir.exists()) await appDir.create(recursive: true);
@@ -77,6 +80,8 @@ class SQLiteDatabaseService {
 
     // Crear grupos por defecto si no existen
     await migrateAddGroupsTable();
+    await ensureDefaultGroupExists();
+    await normalizeProductCategories();
     // await createDefaultGroups(); // Comentado para evitar recrear grupos automáticamente
 
     // ✅ NUEVO: Migración para agregar columna category
@@ -971,7 +976,7 @@ class SQLiteDatabaseService {
   // ✅ NUEVO: Obtener productos por grupo
   static Future<List<Product>> getProductsByGroup(String groupName) async {
     final results = await _database!.query('products',
-        where: 'groupName = ? AND isActive = ?', whereArgs: [groupName, 1]);
+        where: 'category = ? AND isActive = ?', whereArgs: [groupName, 1]);
     return results.map((productData) {
       final product = Product.fromMap(productData);
       return product;
@@ -984,12 +989,24 @@ class SQLiteDatabaseService {
     await _database!.update(
       'products',
       {
-        'groupName': newGroupName,
+        'category': newGroupName,
         'updatedAt': DateTime.now().toIso8601String(),
       },
-      where: 'groupName = ? AND isActive = ?',
+      where: 'category = ? AND isActive = ?',
       whereArgs: [oldGroupName, 1],
     );
+  }
+
+  static Future<int> getProductCountByGroup(String groupName) async {
+    final result = await _database!.rawQuery(
+      '''
+      SELECT COUNT(*) as count
+      FROM products
+      WHERE isActive = 1 AND category = ?
+      ''',
+      [groupName],
+    );
+    return (result.first['count'] as int?) ?? 0;
   }
 
   // Crear producto
@@ -1674,6 +1691,7 @@ class SQLiteDatabaseService {
 
   // Obtener todos los grupos
   static Future<List<Group>> getAllGroups() async {
+    await ensureDefaultGroupExists();
     final results = await _database!.query(
       'groups',
       where: 'isActive = ?',
@@ -1700,22 +1718,80 @@ class SQLiteDatabaseService {
 
   // Actualizar grupo
   static Future<void> updateGroup(Group group) async {
-    await _database!.update(
-      'groups',
-      group.toMap(),
-      where: 'id = ?',
-      whereArgs: [group.id],
-    );
+    if (group.id == null) {
+      throw Exception('El grupo no tiene ID válido');
+    }
+
+    final existing = await getGroupById(group.id!);
+    if (existing == null) {
+      throw Exception('No se encontró el grupo a actualizar');
+    }
+
+    final oldName = existing.name.trim();
+    final newName = group.name.trim();
+
+    if (oldName.toLowerCase() == defaultGroupName.toLowerCase() &&
+        newName.toLowerCase() != defaultGroupName.toLowerCase()) {
+      throw Exception('El grupo "$defaultGroupName" no se puede renombrar');
+    }
+
+    await _database!.transaction((txn) async {
+      await txn.update(
+        'groups',
+        group.toMap(),
+        where: 'id = ?',
+        whereArgs: [group.id],
+      );
+
+      if (oldName != newName) {
+        await txn.update(
+          'products',
+          {
+            'category': newName,
+            'updatedAt': DateTime.now().toIso8601String(),
+          },
+          where: 'category = ?',
+          whereArgs: [oldName],
+        );
+      }
+    });
   }
 
-  // Eliminar grupo (marcar como inactivo)
-  static Future<void> deleteGroup(int id) async {
-    await _database!.update(
-      'groups',
-      {'isActive': 0, 'updatedAt': DateTime.now().toIso8601String()},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  // Eliminar grupo (marcar como inactivo) y mover productos a "Otros"
+  static Future<int> deleteGroup(int id) async {
+    final group = await getGroupById(id);
+    if (group == null) {
+      throw Exception('No se encontró el grupo');
+    }
+
+    if (group.name.trim().toLowerCase() == defaultGroupName.toLowerCase()) {
+      throw Exception('El grupo "$defaultGroupName" no se puede eliminar');
+    }
+
+    await ensureDefaultGroupExists();
+    final now = DateTime.now().toIso8601String();
+    final movedProducts = await getProductCountByGroup(group.name);
+
+    await _database!.transaction((txn) async {
+      await txn.update(
+        'products',
+        {
+          'category': defaultGroupName,
+          'updatedAt': now,
+        },
+        where: 'category = ?',
+        whereArgs: [group.name],
+      );
+
+      await txn.update(
+        'groups',
+        {'isActive': 0, 'updatedAt': now},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+
+    return movedProducts;
   }
 
   // Verificar si existe un grupo con el nombre dado
@@ -1756,6 +1832,52 @@ class SQLiteDatabaseService {
     } else {
       print('ℹ️ La tabla groups ya existe');
     }
+  }
+
+  static Future<void> ensureDefaultGroupExists() async {
+    final existingDefault = await _database!.query(
+      'groups',
+      where: 'LOWER(name) = ?',
+      whereArgs: [defaultGroupName.toLowerCase()],
+      limit: 1,
+    );
+
+    if (existingDefault.isEmpty) {
+      final now = DateTime.now().toIso8601String();
+      await _database!.insert('groups', {
+        'name': defaultGroupName,
+        'description': 'Grupo por defecto para productos sin grupo específico',
+        'color': '#9E9E9E',
+        'icon': 'category',
+        'createdAt': now,
+        'updatedAt': now,
+        'isActive': 1,
+      });
+      return;
+    }
+
+    final row = existingDefault.first;
+    if ((row['isActive'] as int? ?? 0) != 1) {
+      await _database!.update(
+        'groups',
+        {'isActive': 1, 'updatedAt': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+  }
+
+  static Future<void> normalizeProductCategories() async {
+    await ensureDefaultGroupExists();
+    await _database!.rawUpdate('''
+      UPDATE products
+      SET category = ?, updatedAt = ?
+      WHERE category IS NULL
+         OR TRIM(category) = ''
+         OR LOWER(TRIM(category)) = 'sin grupo'
+         OR LOWER(TRIM(category)) = 'sin categoría'
+         OR LOWER(TRIM(category)) = 'sin categoria'
+    ''', [defaultGroupName, DateTime.now().toIso8601String()]);
   }
 
   // Crear grupos por defecto
@@ -1867,14 +1989,14 @@ class SQLiteDatabaseService {
       // Agregar columna category
       await _database!.execute('''
         ALTER TABLE products 
-        ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
+        ADD COLUMN category TEXT NOT NULL DEFAULT 'Otros'
       ''');
 
-      // Migrar datos existentes de groupName a category
+      // Asignar valor por defecto a productos sin categoría
       await _database!.execute('''
-        UPDATE products 
-        SET category = groupName 
-        WHERE category IS NULL OR category = 'Sin Categoría'
+        UPDATE products
+        SET category = 'Otros'
+        WHERE category IS NULL OR TRIM(category) = ''
       ''');
 
       print('✅ Columna category agregada exitosamente');
@@ -1884,7 +2006,7 @@ class SQLiteDatabaseService {
       try {
         await _database!.execute('''
           ALTER TABLE products 
-          ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
+          ADD COLUMN category TEXT NOT NULL DEFAULT 'Otros'
         ''');
         print('✅ Columna category agregada en segundo intento');
       } catch (e2) {
@@ -1901,14 +2023,14 @@ class SQLiteDatabaseService {
       // Intentar agregar la columna sin verificar (SQLite ignorará si ya existe)
       await _database!.execute('''
         ALTER TABLE products 
-        ADD COLUMN category TEXT NOT NULL DEFAULT 'Sin Categoría'
+        ADD COLUMN category TEXT NOT NULL DEFAULT 'Otros'
       ''');
 
       // Actualizar productos existentes que no tengan category
       await _database!.execute('''
         UPDATE products 
-        SET category = 'Sin Categoría' 
-        WHERE category IS NULL
+        SET category = 'Otros' 
+        WHERE category IS NULL OR TRIM(category) = ''
       ''');
 
       print('✅ Migración forzada completada');

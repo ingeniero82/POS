@@ -77,6 +77,16 @@ class DashboardScreen extends StatelessWidget {
                           onTap: () =>
                               controller.selectMenu(DashboardMenu.inventario),
                         ),
+                      // Grupos de productos - Solo si tiene permisos de inventario
+                      if (authService.hasPermission(Permission.viewInventory))
+                        _SidebarButton(
+                          icon: Icons.category,
+                          label: 'Grupos',
+                          selected: false,
+                          onTap: () {
+                            Get.toNamed('/grupos');
+                          },
+                        ),
                       // Movimientos de inventario (entradas, salidas, consumo propio)
                       if (authService.hasPermission(Permission.viewInventory))
                         _SidebarButton(

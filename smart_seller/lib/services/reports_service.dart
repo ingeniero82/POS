@@ -8,7 +8,8 @@ import 'sqlite_database_service.dart';
 import 'supplier_service.dart';
 import 'package:intl/intl.dart';
 import '../modules/accounting/services/accounting_service.dart' as accounting;
-import '../modules/accounting/models/accounting_entry.dart' as accounting_models;
+import '../modules/accounting/models/accounting_entry.dart'
+    as accounting_models;
 
 class ReportsService {
   // Generar reporte de ventas completo (ahora incluye datos profesionales)
@@ -19,10 +20,8 @@ class ReportsService {
     String? paymentMethodFilter,
   }) async {
     // Obtener ventas del período (día o rango)
-    final sales = await SQLiteDatabaseService.getSales(
-      date: date, 
-      endDate: endDate
-    );
+    final sales =
+        await SQLiteDatabaseService.getSales(date: date, endDate: endDate);
     final products = await SQLiteDatabaseService.getAllProducts();
     final groups = await SQLiteDatabaseService.getAllGroups();
 
@@ -31,7 +30,7 @@ class ReportsService {
     double totalDiscounts = 0.0;
     double totalReturns = 0.0;
     int returnTransactions = 0;
-    
+
     // ✅ NUEVO: Acumular desglose de ventas
     double totalExempt = 0.0;
     double totalExcluded = 0.0;
@@ -44,7 +43,7 @@ class ReportsService {
     double totalPlasticBagTax = 0.0;
     int totalPlasticBagCount = 0;
     double totalSubtotal = 0.0;
-    
+
     for (final sale in sales) {
       if (sale.isReturn) {
         // Es una devolución
@@ -55,7 +54,7 @@ class ReportsService {
         totalSales += sale.total;
         // Sumar descuentos
         totalDiscounts += sale.discount ?? 0.0;
-        
+
         // ✅ NUEVO: Acumular desglose de ventas
         totalExempt += sale.exemptAmount;
         totalExcluded += sale.excludedAmount;
@@ -70,11 +69,12 @@ class ReportsService {
         totalSubtotal += sale.subtotal;
       }
     }
-    
+
     // Ventas netas = Ventas brutas - Descuentos - Devoluciones
     final netSales = totalSales - totalDiscounts - totalReturns;
     final totalTransactions = sales.length;
-    final averageTicket = totalTransactions > 0 ? totalSales / totalTransactions : 0.0;
+    final averageTicket =
+        totalTransactions > 0 ? totalSales / totalTransactions : 0.0;
 
     // ✅ NUEVO: Filtrar devoluciones para métricas (solo ventas reales)
     final salesWithoutReturns = sales.where((sale) => !sale.isReturn).toList();
@@ -83,31 +83,40 @@ class ReportsService {
     final salesByHour = _generateSalesByHour(salesWithoutReturns);
 
     // Generar datos por método de pago
-    final salesByPaymentMethod = _generateSalesByPaymentMethod(salesWithoutReturns);
+    final salesByPaymentMethod =
+        _generateSalesByPaymentMethod(salesWithoutReturns);
 
     // Generar datos por grupo
-    final salesByGroup = await _generateSalesByGroup(salesWithoutReturns, products, groups, groupFilter);
+    final salesByGroup = await _generateSalesByGroup(
+        salesWithoutReturns, products, groups, groupFilter);
 
     // Generar top productos
-    final topProducts = await _generateTopProducts(salesWithoutReturns, products, groups);
+    final topProducts =
+        await _generateTopProducts(salesWithoutReturns, products, groups);
 
     // Generar transacciones detalladas
-    final transactions = _generateTransactions(salesWithoutReturns, products, groups);
+    final transactions =
+        _generateTransactions(salesWithoutReturns, products, groups);
 
     // ✅ NUEVO: Obtener datos contables profesionales (retrocompatible - opcionales)
     try {
-      final accountingSummary = await accounting.AccountingService.getIncomeExpenseSummary(date);
-      final accountingEntries = await accounting.AccountingService.getAccountingEntriesByDate(date);
-      
+      final accountingSummary =
+          await accounting.AccountingService.getIncomeExpenseSummary(date);
+      final accountingEntries =
+          await accounting.AccountingService.getAccountingEntriesByDate(date);
+
       // Separar ventas de otros ingresos
       final otherIncome = accountingSummary['income']! - totalSales;
       final expenses = accountingSummary['expense']!;
       final netProfit = totalSales + otherIncome - expenses;
-      final profitMargin = totalSales > 0 
-          ? ((totalSales - _calculateTotalCost(transactions)) / totalSales * 100)
+      final profitMargin = totalSales > 0
+          ? ((totalSales - _calculateTotalCost(transactions)) /
+              totalSales *
+              100)
           : 0.0;
 
-      final additionalIncomes = _extractAdditionalIncomes(accountingEntries, totalSales);
+      final additionalIncomes =
+          _extractAdditionalIncomes(accountingEntries, totalSales);
       final expenseDetails = _extractExpenseDetails(accountingEntries);
 
       // Calcular arqueo de caja
@@ -209,26 +218,39 @@ class ReportsService {
     // Filtrar por grupo si se especifica
     List<Product> filteredProducts = products;
     if (groupFilter != null && groupFilter.isNotEmpty) {
-      filteredProducts = products.where((p) => p.category == groupFilter).toList();
+      filteredProducts =
+          products.where((p) => p.category == groupFilter).toList();
     }
 
     // Filtrar solo stock bajo si se especifica
     if (onlyLowStock) {
-      filteredProducts = filteredProducts.where((p) => p.stock <= p.minStock).toList();
+      filteredProducts =
+          filteredProducts.where((p) => p.stock <= p.minStock).toList();
     }
 
     // Calcular totales
     final totalProducts = filteredProducts.length;
-    final lowStockProducts = filteredProducts.where((p) => p.stock <= p.minStock && p.stock > 0).length;
-    final outOfStockProducts = filteredProducts.where((p) => p.stock == 0).length;
-    final totalInventoryValue = filteredProducts.fold(0.0, (sum, p) => sum + (p.stock * p.price));
-    final totalCostValue = filteredProducts.fold(0.0, (sum, p) => sum + (p.stock * p.cost));
+    final lowStockProducts = filteredProducts
+        .where((p) => p.stock <= p.minStock && p.stock > 0)
+        .length;
+    final outOfStockProducts =
+        filteredProducts.where((p) => p.stock == 0).length;
+    final totalInventoryValue =
+        filteredProducts.fold(0.0, (sum, p) => sum + (p.stock * p.price));
+    final totalCostValue =
+        filteredProducts.fold(0.0, (sum, p) => sum + (p.stock * p.cost));
 
     // Generar items de inventario
     final items = filteredProducts.map((product) {
       final group = groups.firstWhere(
         (g) => g.name == product.category,
-        orElse: () => Group(name: 'Sin grupo', description: '', color: '#9E9E9E', icon: 'category', createdAt: DateTime.now(), updatedAt: DateTime.now()),
+        orElse: () => Group(
+            name: 'Otros',
+            description: '',
+            color: '#9E9E9E',
+            icon: 'category',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now()),
       );
 
       String status = 'OK';
@@ -269,7 +291,8 @@ class ReportsService {
     DateTime? endDate,
     String? groupFilter,
   }) async {
-    final sales = await SQLiteDatabaseService.getSales(date: date, endDate: endDate);
+    final sales =
+        await SQLiteDatabaseService.getSales(date: date, endDate: endDate);
     final products = await SQLiteDatabaseService.getAllProducts();
     final groups = await SQLiteDatabaseService.getAllGroups();
 
@@ -292,7 +315,7 @@ class ReportsService {
             cost: 0.0,
             stock: 0,
             minStock: 0,
-            category: 'Sin grupo',
+            category: 'Otros',
             unit: item.unit,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -301,7 +324,13 @@ class ReportsService {
 
         final group = groups.firstWhere(
           (g) => g.name == product.category,
-          orElse: () => Group(name: 'Sin grupo', description: '', color: '#9E9E9E', icon: 'category', createdAt: DateTime.now(), updatedAt: DateTime.now()),
+          orElse: () => Group(
+              name: 'Otros',
+              description: '',
+              color: '#9E9E9E',
+              icon: 'category',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now()),
         );
 
         final revenue = item.price * item.quantity;
@@ -323,8 +352,13 @@ class ReportsService {
             revenue: existing.revenue + revenue,
             cost: existing.cost + cost,
             profit: existing.profit + profit,
-            profitMargin: existing.revenue + revenue > 0 ? ((existing.profit + profit) / (existing.revenue + revenue)) * 100 : 0.0,
-            roi: existing.cost + cost > 0 ? ((existing.profit + profit) / (existing.cost + cost)) * 100 : 0.0,
+            profitMargin: existing.revenue + revenue > 0
+                ? ((existing.profit + profit) / (existing.revenue + revenue)) *
+                    100
+                : 0.0,
+            roi: existing.cost + cost > 0
+                ? ((existing.profit + profit) / (existing.cost + cost)) * 100
+                : 0.0,
           );
         } else {
           productProfits[item.name] = ProductProfitability(
@@ -342,16 +376,20 @@ class ReportsService {
     }
 
     // Filtrar por grupo si se especifica
-    List<ProductProfitability> filteredProducts = productProfits.values.toList();
+    List<ProductProfitability> filteredProducts =
+        productProfits.values.toList();
     if (groupFilter != null && groupFilter.isNotEmpty) {
-      filteredProducts = productProfits.values.where((p) => p.groupName == groupFilter).toList();
+      filteredProducts = productProfits.values
+          .where((p) => p.groupName == groupFilter)
+          .toList();
     }
 
     // Ordenar por rentabilidad
     filteredProducts.sort((a, b) => b.profit.compareTo(a.profit));
 
     final totalProfit = totalRevenue - totalCost;
-    final profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0.0;
+    final profitMargin =
+        totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0.0;
 
     return ProfitabilityReport(
       date: date,
@@ -383,7 +421,8 @@ class ReportsService {
     });
   }
 
-  static List<SalesByPaymentMethod> _generateSalesByPaymentMethod(List<Sale> sales) {
+  static List<SalesByPaymentMethod> _generateSalesByPaymentMethod(
+      List<Sale> sales) {
     final Map<String, double> methodAmounts = {};
     final Map<String, int> methodTransactions = {};
     final totalAmount = sales.fold(0.0, (sum, sale) => sum + sale.total);
@@ -433,7 +472,7 @@ class ReportsService {
             cost: 0.0,
             stock: 0,
             minStock: 0,
-            category: 'Sin grupo',
+            category: 'Otros',
             unit: item.unit,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -444,7 +483,8 @@ class ReportsService {
         final itemTotal = item.price * item.quantity;
 
         groupAmounts[groupName] = (groupAmounts[groupName] ?? 0.0) + itemTotal;
-        groupQuantities[groupName] = (groupQuantities[groupName] ?? 0) + item.quantity;
+        groupQuantities[groupName] =
+            (groupQuantities[groupName] ?? 0) + item.quantity;
         groupTransactions[groupName] = (groupTransactions[groupName] ?? 0) + 1;
       }
     }
@@ -496,7 +536,7 @@ class ReportsService {
             cost: 0.0,
             stock: 0,
             minStock: 0,
-            category: 'Sin grupo',
+            category: 'Otros',
             unit: item.unit,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -505,12 +545,20 @@ class ReportsService {
 
         final group = groups.firstWhere(
           (g) => g.name == product.category,
-          orElse: () => Group(name: 'Sin grupo', description: '', color: '#9E9E9E', icon: 'category', createdAt: DateTime.now(), updatedAt: DateTime.now()),
+          orElse: () => Group(
+              name: 'Otros',
+              description: '',
+              color: '#9E9E9E',
+              icon: 'category',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now()),
         );
 
         final itemTotal = item.price * item.quantity;
         final profit = (item.price - product.cost) * item.quantity;
-        final profitMargin = item.price > 0 ? ((item.price - product.cost) / item.price) * 100 : 0.0;
+        final profitMargin = item.price > 0
+            ? ((item.price - product.cost) / item.price) * 100
+            : 0.0;
 
         if (productSales.containsKey(item.name)) {
           final existing = productSales[item.name]!;
@@ -577,7 +625,7 @@ class ReportsService {
             cost: 0.0,
             stock: 0,
             minStock: 0,
-            category: 'Sin grupo',
+            category: 'Otros',
             unit: item.unit,
             createdAt: DateTime.now(),
             updatedAt: DateTime.now(),
@@ -586,12 +634,20 @@ class ReportsService {
 
         final group = groups.firstWhere(
           (g) => g.name == product.category,
-          orElse: () => Group(name: 'Sin grupo', description: '', color: '#9E9E9E', icon: 'category', createdAt: DateTime.now(), updatedAt: DateTime.now()),
+          orElse: () => Group(
+              name: 'Otros',
+              description: '',
+              color: '#9E9E9E',
+              icon: 'category',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now()),
         );
 
         final totalPrice = item.price * item.quantity;
         final profit = (item.price - product.cost) * item.quantity;
-        final profitMargin = item.price > 0 ? ((item.price - product.cost) / item.price) * 100 : 0.0;
+        final profitMargin = item.price > 0
+            ? ((item.price - product.cost) / item.price) * 100
+            : 0.0;
 
         return TransactionItem(
           productName: item.name,
@@ -626,32 +682,35 @@ class ReportsService {
     try {
       final suppliers = await SupplierService.getAllSuppliers();
       final payments = await SupplierService.getAllSupplierPayments();
-      
+
       // Filtrar pagos por fecha
       final filteredPayments = payments.where((payment) {
         final paymentDate = payment.paymentDate;
         if (endDate != null) {
           return paymentDate.isAfter(date.subtract(const Duration(days: 1))) &&
-                 paymentDate.isBefore(endDate.add(const Duration(days: 1)));
+              paymentDate.isBefore(endDate.add(const Duration(days: 1)));
         } else {
           return paymentDate.year == date.year &&
-                 paymentDate.month == date.month &&
-                 paymentDate.day == date.day;
+              paymentDate.month == date.month &&
+              paymentDate.day == date.day;
         }
       }).toList();
 
       // Calcular totales
-      final totalPayments = filteredPayments.fold(0.0, (sum, payment) => sum + payment.amount);
+      final totalPayments =
+          filteredPayments.fold(0.0, (sum, payment) => sum + payment.amount);
       final totalPaymentTransactions = filteredPayments.length;
 
       // Generar resúmenes por proveedor
-      final supplierPayments = _generateSupplierPaymentSummaries(suppliers, filteredPayments);
-      
+      final supplierPayments =
+          _generateSupplierPaymentSummaries(suppliers, filteredPayments);
+
       // Generar pagos por método
       final paymentsByMethod = _generatePaymentsByMethod(filteredPayments);
-      
+
       // Generar actividad de proveedores
-      final supplierActivity = _generateSupplierActivity(suppliers, filteredPayments);
+      final supplierActivity =
+          _generateSupplierActivity(suppliers, filteredPayments);
 
       return SuppliersReport(
         date: date,
@@ -680,39 +739,42 @@ class ReportsService {
         date: date,
         endDate: endDate,
       );
-      
+
       // Obtener pagos a proveedores para egresos
       final supplierPayments = await SupplierService.getAllSupplierPayments();
-      
+
       // Filtrar pagos por fecha
       final filteredPayments = supplierPayments.where((payment) {
         final paymentDate = payment.paymentDate;
         if (endDate != null) {
           return paymentDate.isAfter(date.subtract(const Duration(days: 1))) &&
-                 paymentDate.isBefore(endDate.add(const Duration(days: 1)));
+              paymentDate.isBefore(endDate.add(const Duration(days: 1)));
         } else {
           return paymentDate.year == date.year &&
-                 paymentDate.month == date.month &&
-                 paymentDate.day == date.day;
+              paymentDate.month == date.month &&
+              paymentDate.day == date.day;
         }
       }).toList();
 
       // Calcular totales
       final totalIncome = sales.fold(0.0, (sum, sale) => sum + sale.total);
-      final totalExpenses = filteredPayments.fold(0.0, (sum, payment) => sum + payment.amount);
+      final totalExpenses =
+          filteredPayments.fold(0.0, (sum, payment) => sum + payment.amount);
       final netProfit = totalIncome - totalExpenses;
 
       // Generar entradas de ingresos
       final incomeEntries = _generateIncomeEntries(sales);
-      
+
       // Generar entradas de egresos
       final expenseEntries = _generateExpenseEntries(filteredPayments);
-      
+
       // Generar contabilidad por categoría
-      final accountingByCategory = _generateAccountingByCategory(incomeEntries, expenseEntries);
-      
+      final accountingByCategory =
+          _generateAccountingByCategory(incomeEntries, expenseEntries);
+
       // Generar flujo de caja diario
-      final dailyCashFlow = _generateDailyCashFlow(date, endDate, sales, filteredPayments);
+      final dailyCashFlow =
+          _generateDailyCashFlow(date, endDate, sales, filteredPayments);
 
       return AccountingReport(
         date: date,
@@ -737,43 +799,55 @@ class ReportsService {
     List<SupplierPayment> payments,
   ) {
     final Map<int, List<SupplierPayment>> paymentsBySupplier = {};
-    
+
     for (final payment in payments) {
       paymentsBySupplier.putIfAbsent(payment.supplierId, () => []).add(payment);
     }
 
-    return suppliers.map((supplier) {
-      final supplierPayments = paymentsBySupplier[supplier.id] ?? [];
-      final totalAmount = supplierPayments.fold(0.0, (sum, payment) => sum + payment.amount);
-      final paymentCount = supplierPayments.length;
-      final averagePayment = paymentCount > 0 ? totalAmount / paymentCount : 0.0;
-      final lastPayment = supplierPayments.isNotEmpty 
-          ? supplierPayments.map((p) => p.paymentDate).reduce((a, b) => a.isAfter(b) ? a : b)
-          : DateTime.now();
+    return suppliers
+        .map((supplier) {
+          final supplierPayments = paymentsBySupplier[supplier.id] ?? [];
+          final totalAmount = supplierPayments.fold(
+              0.0, (sum, payment) => sum + payment.amount);
+          final paymentCount = supplierPayments.length;
+          final averagePayment =
+              paymentCount > 0 ? totalAmount / paymentCount : 0.0;
+          final lastPayment = supplierPayments.isNotEmpty
+              ? supplierPayments
+                  .map((p) => p.paymentDate)
+                  .reduce((a, b) => a.isAfter(b) ? a : b)
+              : DateTime.now();
 
-      return SupplierPaymentSummary(
-        supplierName: supplier.name,
-        paymentCount: paymentCount,
-        totalAmount: totalAmount,
-        lastPayment: lastPayment,
-        averagePayment: averagePayment,
-      );
-    }).where((summary) => summary.paymentCount > 0).toList()
+          return SupplierPaymentSummary(
+            supplierName: supplier.name,
+            paymentCount: paymentCount,
+            totalAmount: totalAmount,
+            lastPayment: lastPayment,
+            averagePayment: averagePayment,
+          );
+        })
+        .where((summary) => summary.paymentCount > 0)
+        .toList()
       ..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
   }
 
-  static List<PaymentByMethod> _generatePaymentsByMethod(List<SupplierPayment> payments) {
+  static List<PaymentByMethod> _generatePaymentsByMethod(
+      List<SupplierPayment> payments) {
     final Map<String, List<SupplierPayment>> paymentsByMethod = {};
-    
+
     for (final payment in payments) {
-      paymentsByMethod.putIfAbsent(payment.paymentMethod, () => []).add(payment);
+      paymentsByMethod
+          .putIfAbsent(payment.paymentMethod, () => [])
+          .add(payment);
     }
 
-    final totalAmount = payments.fold(0.0, (sum, payment) => sum + payment.amount);
+    final totalAmount =
+        payments.fold(0.0, (sum, payment) => sum + payment.amount);
 
     return paymentsByMethod.entries.map((entry) {
       final methodPayments = entry.value;
-      final amount = methodPayments.fold(0.0, (sum, payment) => sum + payment.amount);
+      final amount =
+          methodPayments.fold(0.0, (sum, payment) => sum + payment.amount);
       final transactions = methodPayments.length;
       final percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0.0;
 
@@ -862,7 +936,8 @@ class ReportsService {
     }).toList();
   }
 
-  static List<AccountingEntry> _generateExpenseEntries(List<SupplierPayment> payments) {
+  static List<AccountingEntry> _generateExpenseEntries(
+      List<SupplierPayment> payments) {
     return payments.map((payment) {
       return AccountingEntry(
         date: payment.paymentDate,
@@ -885,13 +960,15 @@ class ReportsService {
     for (final entry in incomeEntries) {
       final category = entry.category ?? 'sin_categoria';
       final translatedCategory = _translateCategory(category);
-      incomeByCategory[translatedCategory] = (incomeByCategory[translatedCategory] ?? 0.0) + entry.amount;
+      incomeByCategory[translatedCategory] =
+          (incomeByCategory[translatedCategory] ?? 0.0) + entry.amount;
     }
 
     for (final entry in expenseEntries) {
       final category = entry.category ?? 'sin_categoria';
       final translatedCategory = _translateCategory(category);
-      expenseByCategory[translatedCategory] = (expenseByCategory[translatedCategory] ?? 0.0) + entry.amount;
+      expenseByCategory[translatedCategory] =
+          (expenseByCategory[translatedCategory] ?? 0.0) + entry.amount;
     }
 
     final allCategories = {...incomeByCategory.keys, ...expenseByCategory.keys};
@@ -930,47 +1007,50 @@ class ReportsService {
 
   // Extraer ingresos adicionales (no asociados a venta)
   static List<AdditionalIncome> _extractAdditionalIncomes(
-    List<accounting_models.AccountingEntry> entries, 
-    double totalSales
-  ) {
+      List<accounting_models.AccountingEntry> entries, double totalSales) {
     final List<AdditionalIncome> additionalIncomes = [];
-    
+
     for (final entry in entries) {
-      if (entry.type == 'income' && !entry.description.toLowerCase().contains('venta')) {
+      if (entry.type == 'income' &&
+          !entry.description.toLowerCase().contains('venta')) {
         additionalIncomes.add(AdditionalIncome(
           description: entry.description,
           amount: entry.amount,
-          category: _translateCategory(entry.category ?? 'Otros'), // ✅ Traducido
+          category:
+              _translateCategory(entry.category ?? 'Otros'), // ✅ Traducido
           date: entry.date,
           paymentMethod: entry.paymentMethod,
         ));
       }
     }
-    
+
     return additionalIncomes;
   }
 
   // Extraer detalles de egresos
-  static List<ExpenseDetail> _extractExpenseDetails(List<accounting_models.AccountingEntry> entries) {
+  static List<ExpenseDetail> _extractExpenseDetails(
+      List<accounting_models.AccountingEntry> entries) {
     final List<ExpenseDetail> expenses = [];
-    
+
     for (final entry in entries) {
       if (entry.type == 'expense') {
         expenses.add(ExpenseDetail(
           description: entry.description,
           amount: entry.amount,
-          category: _translateCategory(entry.category ?? 'Gastos'), // ✅ Traducido
+          category:
+              _translateCategory(entry.category ?? 'Gastos'), // ✅ Traducido
           date: entry.date,
           paymentMethod: entry.paymentMethod,
         ));
       }
     }
-    
+
     return expenses;
   }
 
   // Calcular balances de caja
-  static Future<Map<String, double>> _calculateCashBalances(DateTime date) async {
+  static Future<Map<String, double>> _calculateCashBalances(
+      DateTime date) async {
     try {
       // Obtener última sesión de caja antes de la fecha
       final db = SQLiteDatabaseService.database;
@@ -986,7 +1066,7 @@ class ReportsService {
 
       if (session.isNotEmpty) {
         final initialAmount = session.first['initial_amount'] as double? ?? 0.0;
-        
+
         // Buscar movimientos de la sesión
         final movements = await db.query(
           'cash_movements',
@@ -1048,7 +1128,7 @@ class ReportsService {
     final days = <DateTime>[];
     final current = DateTime(startDate.year, startDate.month, startDate.day);
     final end = endDate ?? startDate;
-    
+
     while (current.isBefore(end.add(const Duration(days: 1)))) {
       days.add(current);
       current.add(const Duration(days: 1));
@@ -1072,5 +1152,3 @@ class ReportsService {
     }).toList();
   }
 }
-
-

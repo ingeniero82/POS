@@ -371,12 +371,21 @@ class _GroupsScreenState extends State<GroupsScreen> {
 
                     if (isEditing) {
                       await SQLiteDatabaseService.updateGroup(newGroup);
-                      Get.snackbar(
-                        'Éxito',
-                        'Grupo actualizado correctamente',
-                        backgroundColor: Colors.green,
-                        colorText: Colors.white,
-                      );
+                      // Cerrar primero el modal para evitar que Get.back()
+                      // cierre un overlay (snackbar) en lugar del diálogo.
+                      if (Get.isDialogOpen ?? false) {
+                        Get.back();
+                      }
+                      await _loadGroups();
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        Get.snackbar(
+                          'Éxito',
+                          'Grupo actualizado correctamente',
+                          backgroundColor: Colors.green,
+                          colorText: Colors.white,
+                        );
+                      });
+                      return;
                     } else {
                       // Verificar si ya existe un grupo con ese nombre
                       final exists =
