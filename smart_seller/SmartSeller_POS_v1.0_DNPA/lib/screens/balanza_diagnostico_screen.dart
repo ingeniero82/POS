@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
+import 'package:get/get.dart';
 
 import '../services/balanza_service.dart';
 
@@ -15,7 +15,7 @@ class BalanzaDiagnosticoScreen extends StatefulWidget {
 }
 
 class _BalanzaDiagnosticoScreenState extends State<BalanzaDiagnosticoScreen> {
-  final BalanzaService _balanza = BalanzaService();
+  final BalanzaService _balanza = Get.find<BalanzaService>();
   final List<int> _baudRates = const [2400, 4800, 9600, 19200, 38400];
   final List<int> _bitsOpciones = const [7, 8];
   final List<int> _stopBitsOpciones = const [1, 2];
@@ -126,7 +126,6 @@ class _BalanzaDiagnosticoScreenState extends State<BalanzaDiagnosticoScreen> {
   void dispose() {
     unawaited(_tramasSub?.cancel());
     _balanza.removeListener(_onServiceChanged);
-    _balanza.dispose();
     _comandoController.dispose();
     super.dispose();
   }

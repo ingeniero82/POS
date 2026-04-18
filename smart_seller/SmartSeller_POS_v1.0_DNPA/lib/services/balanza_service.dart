@@ -55,6 +55,19 @@ class BalanzaService extends ChangeNotifier {
     _iniciarPollingSiAplica();
   }
 
+  /// Pide una lectura a la balanza (comando configurado o `W` si no hay comando).
+  Future<bool> solicitarLecturaPeso() async {
+    if (_estado != EstadoConexionBalanza.conectado) {
+      _errorMsg = 'No hay conexión activa para enviar comandos.';
+      notifyListeners();
+      return false;
+    }
+    if (_comandoLectura.isNotEmpty) {
+      return enviarComando(_comandoLectura, terminador: _terminadorLectura);
+    }
+    return enviarComando('W', terminador: _terminadorLectura);
+  }
+
   Future<bool> conectar({
     required String puerto,
     int baudRate = 9600,

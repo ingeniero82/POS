@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:decimal/decimal.dart';
+import 'dart:async';
 import 'dart:io';
 import 'pos_controller.dart';
 import '../models/product.dart';
@@ -15,6 +16,7 @@ import '../modules/accounting/widgets/accounting_modal.dart';
 import '../modules/accounting/services/accounting_service.dart';
 import '../services/auth_service.dart';
 import '../services/print_service.dart';
+import '../services/balanza_service.dart';
 
 import '../services/client_validation_service.dart';
 import '../models/client.dart';
@@ -46,6 +48,7 @@ class _PosScreenState extends State<PosScreen> {
   final FocusNode _keyboardListenerFocus = FocusNode();
 
   List<Product> _products = [];
+
   /// Según ventas reales (cantidades en historial); se actualiza al vender.
   List<Product> _frequentProducts = [];
   bool _isLoading = true;
@@ -55,6 +58,9 @@ class _PosScreenState extends State<PosScreen> {
 
   // Controlador del POS
   late PosController _posController;
+  late BalanzaService _balanzaService;
+  StreamSubscription<double?>? _pesoSub;
+  double? _pesoEnVivoKg;
 
   // Variables para autorización
   bool _isAuthorized = false;
@@ -65,6 +71,14 @@ class _PosScreenState extends State<PosScreen> {
   void initState() {
     super.initState();
     _posController = Get.put(PosController());
+    _balanzaService = Get.find<BalanzaService>();
+    _pesoEnVivoKg = _balanzaService.ultimoPeso;
+    _pesoSub = _balanzaService.pesosStream.listen((peso) {
+      if (!mounted) return;
+      setState(() {
+        _pesoEnVivoKg = peso;
+      });
+    });
 
     // ✅ NUEVO: Configurar callback para limpiar campo de búsqueda
     _posController.onClearSearchField = () {
@@ -106,6 +120,7 @@ class _PosScreenState extends State<PosScreen> {
 
   @override
   void dispose() {
+    unawaited(_pesoSub?.cancel());
     _posController.onSaleCompleted = null;
     _barcodeController.dispose();
     _quantityController.dispose();
@@ -158,6 +173,15 @@ class _PosScreenState extends State<PosScreen> {
           await SQLiteDatabaseService.getFrequentProductsForPos(limit: 12);
       if (mounted) setState(() => _frequentProducts = next);
     } catch (_) {}
+  }
+
+  String _labelEstadoBalanza(EstadoConexionBalanza estado) {
+    return switch (estado) {
+      EstadoConexionBalanza.conectado => 'Conectada',
+      EstadoConexionBalanza.conectando => 'Conectando',
+      EstadoConexionBalanza.error => 'Error',
+      EstadoConexionBalanza.desconectado => 'Desconectada',
+    };
   }
 
   String quitarTildes(String texto) {
@@ -741,6 +765,40 @@ class _PosScreenState extends State<PosScreen> {
                   ? 'Stock: ${_selectedProduct!.stockKg.toStringAsFixed(3)} kg'
                   : 'Stock: ${_selectedProduct!.stock} ${_selectedProduct!.unit}',
             ),
+            if (_selectedProduct!.isWeighted) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.teal.shade100),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.scale,
+                      color: _balanzaService.estado ==
+                              EstadoConexionBalanza.conectado
+                          ? Colors.green
+                          : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Balanza ${_labelEstadoBalanza(_balanzaService.estado)}'
+                        '${_pesoEnVivoKg != null ? ' · ${_pesoEnVivoKg!.toStringAsFixed(3)} kg' : ''}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Get.toNamed('/balanza-diagnostico'),
+                      child: const Text('Diagnóstico'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
 
             // Campo de cantidad
@@ -865,10 +923,8 @@ class _PosScreenState extends State<PosScreen> {
         // así siempre se ven al menos 2-3 productos además del subtotal e IVA.
         const double minCartHeight = 220.0;
         final availableHeight = constraints.maxHeight;
-        const fixedHeights = 16.0 * 3 +
-            80 +
-            120 +
-            80; // aprox. clientes + totales + botones
+        const fixedHeights =
+            16.0 * 3 + 80 + 120 + 80; // aprox. clientes + totales + botones
         final cartHeight = (availableHeight - fixedHeights)
             .clamp(minCartHeight, double.infinity);
 
@@ -1752,11 +1808,10 @@ class _PosScreenState extends State<PosScreen> {
 
   void _searchProduct(String code) {
     // Primero buscar por código exacto
-    final exactMatch =
-        _products
-            .where((p) =>
-                p.code == code || (p.shortCode != null && p.shortCode == code))
-            .toList();
+    final exactMatch = _products
+        .where((p) =>
+            p.code == code || (p.shortCode != null && p.shortCode == code))
+        .toList();
 
     if (exactMatch.isNotEmpty) {
       _selectProduct(exactMatch.first);
@@ -1856,106 +1911,15 @@ class _PosScreenState extends State<PosScreen> {
       return;
     }
 
-    final weightController = TextEditingController();
-    double calculated = 0.0;
-
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (_, setStateDialog) {
-            void recalc() {
-              final kg = double.tryParse(
-                  weightController.text.trim().replaceAll(',', '.'));
-              calculated = (kg != null && kg > 0) ? (kg * pricePerKg) : 0.0;
-            }
-
-            void submitWeightedAdd() {
-              final kg = double.tryParse(
-                  weightController.text.trim().replaceAll(',', '.'));
-              if (kg == null || kg <= 0) {
-                Get.snackbar(
-                  'Peso inválido',
-                  'Ingresa un peso válido mayor que 0.',
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-                return;
-              }
-              final total = kg * pricePerKg;
-              final useKgStock = product.weightedStockInKg;
-              _posController.addToCart(
-                product.name,
-                total,
-                product.unit,
-                quantity: 1,
-                availableStock: useKgStock ? null : product.stock,
-                availableStockKg: useKgStock ? product.stockKg : null,
-                weightKg: useKgStock ? kg : null,
-                ivaPercentage: product.ivaPercentage,
-                productId: product.id,
-                mergeExisting: false,
-              );
-
-              Navigator.of(dialogContext).pop();
-              Get.snackbar(
-                '✅ Agregado por peso',
-                '${product.name} · ${kg.toStringAsFixed(3)} kg · \$${NumberFormat('#,###').format(total)}',
-                backgroundColor: Colors.green,
-                colorText: Colors.white,
-                duration: const Duration(seconds: 2),
-              );
-              _cancelSelection();
-            }
-
-            return AlertDialog(
-              title: Text('Producto pesado: ${product.name}'),
-              content: SizedBox(
-                width: 420,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Precio por kg: \$${NumberFormat('#,###').format(pricePerKg)}'),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: weightController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      autofocus: true,
-                      onChanged: (_) {
-                        setStateDialog(recalc);
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Peso (kg) *',
-                        hintText: 'Ej: 0.750',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Total: \$${NumberFormat('#,###').format(calculated)}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: submitWeightedAdd,
-                  child: const Text('Agregar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (dialogContext) => _WeightedAddDialog(
+        product: product,
+        posController: _posController,
+        balanza: _balanzaService,
+        onSuccess: _cancelSelection,
+      ),
     );
   }
 
@@ -2665,7 +2629,8 @@ class _PosScreenState extends State<PosScreen> {
             SizedBox(height: 16),
             Text('F1: Mostrar ayuda'),
             Text('F2: Reimpresión de facturas'),
-            Text('F3: Facturación electrónica (selecciona/crea cliente si falta)'),
+            Text(
+                'F3: Facturación electrónica (selecciona/crea cliente si falta)'),
             Text('F4: Contabilidad / Caja'),
             Text('F5: Abrir cajón monedero'),
             Text('F6: Finalizar venta (métodos de pago)'),
@@ -2707,7 +2672,8 @@ class _PosScreenState extends State<PosScreen> {
                   const Expanded(
                     child: Text(
                       'Seleccionar Cliente para Facturación Electrónica',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       maxLines: 2,
                       overflow: TextOverflow.fade,
                     ),
@@ -2772,8 +2738,7 @@ class _PosScreenState extends State<PosScreen> {
                           OutlinedButton.icon(
                             onPressed: () =>
                                 _showQuickCreateElectronicClientDialog(
-                                    continueToElectronic:
-                                        continueToElectronic),
+                                    continueToElectronic: continueToElectronic),
                             icon: const Icon(Icons.person_add),
                             label: const Text('Crear cliente ahora'),
                           ),
@@ -2893,7 +2858,8 @@ class _PosScreenState extends State<PosScreen> {
                       DropdownMenuItem(value: 'CC', child: Text('CC')),
                       DropdownMenuItem(value: 'CE', child: Text('CE')),
                       DropdownMenuItem(value: 'TI', child: Text('TI')),
-                      DropdownMenuItem(value: 'PASAPORTE', child: Text('PASAPORTE')),
+                      DropdownMenuItem(
+                          value: 'PASAPORTE', child: Text('PASAPORTE')),
                     ],
                     onChanged: (v) => docType.value = v ?? 'NIT',
                     decoration: const InputDecoration(
@@ -3396,8 +3362,8 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _showPriceDialog(item, int index) {
-    final basePriceController =
-        TextEditingController(text: _formatThousands(BigInt.from(item.price.round())));
+    final basePriceController = TextEditingController(
+        text: _formatThousands(BigInt.from(item.price.round())));
     final priceWithIvaController = TextEditingController();
     final oldPrice = item.price;
     final supportsIvaPricing =
@@ -3423,8 +3389,9 @@ class _PosScreenState extends State<PosScreen> {
                     TextSelection.collapsed(offset: formattedGross.length),
               );
             }
-            final divisor =
-                selectedIva == 5 ? Decimal.parse('1.05') : Decimal.parse('1.19');
+            final divisor = selectedIva == 5
+                ? Decimal.parse('1.05')
+                : Decimal.parse('1.19');
             final base =
                 (gross / divisor).toDecimal(scaleOnInfinitePrecision: 12);
             candidatePrice = double.tryParse(base.toString()) ?? oldPrice;
@@ -3461,7 +3428,8 @@ class _PosScreenState extends State<PosScreen> {
                     final parsed = _parseMoneyDigitsAsDecimal(value);
                     final newPrice = parsed?.toDouble() ?? candidatePrice;
                     final editedFromIva = supportsIvaPricing &&
-                        _parseMoneyDigitsAsDecimal(priceWithIvaController.text) !=
+                        _parseMoneyDigitsAsDecimal(
+                                priceWithIvaController.text) !=
                             null;
                     Navigator.of(context).pop();
                     _posController.updateItemPrice(
@@ -3486,7 +3454,9 @@ class _PosScreenState extends State<PosScreen> {
                         child: TextField(
                           controller: priceWithIvaController,
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
                           decoration: const InputDecoration(
                             labelText: 'Precio con IVA',
                             prefixText: '\$ ',
@@ -3545,7 +3515,8 @@ class _PosScreenState extends State<PosScreen> {
               ),
               ElevatedButton(
                 onPressed: () {
-                  final parsed = _parseMoneyDigitsAsDecimal(basePriceController.text);
+                  final parsed =
+                      _parseMoneyDigitsAsDecimal(basePriceController.text);
                   final newPrice = parsed?.toDouble() ?? candidatePrice;
                   final editedFromIva = supportsIvaPricing &&
                       _parseMoneyDigitsAsDecimal(priceWithIvaController.text) !=
@@ -3574,6 +3545,255 @@ class _PosScreenState extends State<PosScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+String _weightedDialogEstadoBalanza(EstadoConexionBalanza estado) {
+  return switch (estado) {
+    EstadoConexionBalanza.conectado => 'Conectada',
+    EstadoConexionBalanza.conectando => 'Conectando',
+    EstadoConexionBalanza.error => 'Error',
+    EstadoConexionBalanza.desconectado => 'Desconectada',
+  };
+}
+
+/// Diálogo producto por kg con peso en vivo desde [BalanzaService].
+class _WeightedAddDialog extends StatefulWidget {
+  const _WeightedAddDialog({
+    required this.product,
+    required this.posController,
+    required this.balanza,
+    required this.onSuccess,
+  });
+
+  final Product product;
+  final PosController posController;
+  final BalanzaService balanza;
+  final VoidCallback onSuccess;
+
+  @override
+  State<_WeightedAddDialog> createState() => _WeightedAddDialogState();
+}
+
+class _WeightedAddDialogState extends State<_WeightedAddDialog> {
+  late final TextEditingController _weightController;
+  double _calculated = 0;
+  bool _vincularPeso = true;
+  StreamSubscription<double?>? _pesoSub;
+  Timer? _pollTimer;
+
+  double? get _livePeso =>
+      widget.balanza.ultimoPeso; // último valor parseado del servicio
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.balanza.ultimoPeso;
+    _weightController = TextEditingController(
+      text: initial != null && initial > 0 ? initial.toStringAsFixed(3) : '',
+    );
+    _recalc();
+    widget.balanza.addListener(_onBalanzaChanged);
+    _pesoSub = widget.balanza.pesosStream.listen((p) {
+      if (!mounted || !_vincularPeso) return;
+      if (widget.balanza.estado != EstadoConexionBalanza.conectado) return;
+      if (p == null || p <= 0) return;
+      final next = p.toStringAsFixed(3);
+      if (_weightController.text == next) return;
+      _weightController.text = next;
+      _recalc();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.balanza.estado == EstadoConexionBalanza.conectado) {
+        unawaited(widget.balanza.solicitarLecturaPeso());
+      }
+    });
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
+      if (!mounted || !_vincularPeso) return;
+      if (widget.balanza.estado != EstadoConexionBalanza.conectado) return;
+      unawaited(widget.balanza.solicitarLecturaPeso());
+    });
+  }
+
+  void _onBalanzaChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _recalc() {
+    final kg = double.tryParse(
+        _weightController.text.trim().replaceAll(',', '.'));
+    final pricePerKg = widget.product.pricePerKg ?? 0;
+    setState(() {
+      _calculated = (kg != null && kg > 0) ? kg * pricePerKg : 0.0;
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    unawaited(_pesoSub?.cancel());
+    widget.balanza.removeListener(_onBalanzaChanged);
+    _weightController.dispose();
+    super.dispose();
+  }
+
+  void _tomarPesoManual() {
+    Future<void>(() async {
+      await widget.balanza.solicitarLecturaPeso();
+      double? live;
+      for (var i = 0; i < 35; i++) {
+        await Future.delayed(const Duration(milliseconds: 80));
+        live = widget.balanza.ultimoPeso;
+        if (live != null && live > 0) break;
+      }
+      if (!mounted) return;
+      if (live == null || live <= 0) {
+        Get.snackbar(
+          'Sin peso disponible',
+          'No llegó una lectura válida. Si hay peso en la balanza, revisa en '
+              '«Configurar balanza»: tramas entrantes, terminador del comando '
+              '(CR vs CRLF) y velocidad (baud). Si hay peso en la balanza, '
+              'vuelve a intentar.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5),
+        );
+        return;
+      }
+      _weightController.text = live.toStringAsFixed(3);
+      _recalc();
+    });
+  }
+
+  void _submit() {
+    final kg = double.tryParse(
+        _weightController.text.trim().replaceAll(',', '.'));
+    if (kg == null || kg <= 0) {
+      Get.snackbar(
+        'Peso inválido',
+        'Ingresa un peso válido mayor que 0.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+    final pricePerKg = widget.product.pricePerKg!;
+    final total = kg * pricePerKg;
+    final useKgStock = widget.product.weightedStockInKg;
+    widget.posController.addToCart(
+      widget.product.name,
+      total,
+      widget.product.unit,
+      quantity: 1,
+      availableStock: useKgStock ? null : widget.product.stock,
+      availableStockKg: useKgStock ? widget.product.stockKg : null,
+      weightKg: useKgStock ? kg : null,
+      ivaPercentage: widget.product.ivaPercentage,
+      productId: widget.product.id,
+      mergeExisting: false,
+    );
+    Navigator.of(context).pop();
+    Get.snackbar(
+      '✅ Agregado por peso',
+      '${widget.product.name} · ${kg.toStringAsFixed(3)} kg · \$${NumberFormat('#,###').format(total)}',
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+    );
+    widget.onSuccess();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pricePerKg = widget.product.pricePerKg!;
+    final live = _livePeso;
+    return AlertDialog(
+      title: Text('Producto pesado: ${widget.product.name}'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Precio por kg: \$${NumberFormat('#,###').format(pricePerKg)}'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.scale,
+                  size: 18,
+                  color: widget.balanza.estado == EstadoConexionBalanza.conectado
+                      ? Colors.green
+                      : Colors.grey,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Balanza ${_weightedDialogEstadoBalanza(widget.balanza.estado)}'
+                    '${live != null && live > 0 ? ' · ${live.toStringAsFixed(3)} kg' : ''}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Vincular peso en vivo'),
+              subtitle: const Text(
+                'Actualiza el campo con la balanza. Desactívalo para teclear el peso.',
+              ),
+              value: _vincularPeso,
+              onChanged: (v) => setState(() => _vincularPeso = v),
+            ),
+            TextField(
+              controller: _weightController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              onChanged: (_) => _recalc(),
+              decoration: const InputDecoration(
+                labelText: 'Peso (kg) *',
+                hintText: 'Ej: 0.750',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: widget.balanza.estado == EstadoConexionBalanza.conectado
+                      ? _tomarPesoManual
+                      : null,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Tomar peso ahora'),
+                ),
+                const SizedBox(width: 10),
+                TextButton(
+                  onPressed: () => Get.toNamed('/balanza-diagnostico'),
+                  child: const Text('Configurar balanza'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Total: \$${NumberFormat('#,###').format(_calculated)}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: _submit,
+          child: const Text('Agregar'),
+        ),
+      ],
     );
   }
 }

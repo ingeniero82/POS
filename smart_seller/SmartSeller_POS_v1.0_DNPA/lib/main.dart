@@ -32,6 +32,7 @@ import 'services/auth_service.dart';
 import 'services/permissions_service.dart';
 import 'services/print_service.dart';
 import 'services/company_config_service.dart';
+import 'services/balanza_service.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -54,6 +55,7 @@ Future<void> _runApp() async {
   await SQLiteDatabaseService.initialize();
   Get.put(AuthService());
   Get.put(PermissionsService());
+  Get.put(BalanzaService(), permanent: true);
   runApp(const MyApp());
   // Permisos, impresora y config en segundo plano para que no bloquee la ventana.
   Future.delayed(const Duration(milliseconds: 500), () async {
