@@ -77,7 +77,8 @@ class _AccountsReceivablePayableScreenState
       ]);
 
       setState(() {
-        _receivableByCustomer = receivableData[0] as List<ReceivableCustomerSummary>;
+        _receivableByCustomer =
+            receivableData[0] as List<ReceivableCustomerSummary>;
         _receivableSummary = receivableData[1] as Map<String, dynamic>;
         _payableBySupplier = payableData[0] as List<PayableSupplierSummary>;
         _payableSummary = payableData[1] as Map<String, dynamic>;
@@ -421,7 +422,9 @@ class _AccountsReceivablePayableScreenState
               title: const Text('Error'),
               content: Text('${snap.error}'),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cerrar')),
               ],
             );
           }
@@ -471,9 +474,12 @@ class _AccountsReceivablePayableScreenState
                       spacing: 12,
                       runSpacing: 8,
                       children: [
-                        _chipInfo('Total facturado', _money.format(summary.totalInvoiced)),
-                        _chipInfo('Total cobrado', _money.format(summary.totalPaid)),
-                        _chipInfo('Saldo pendiente', _money.format(summary.totalPending)),
+                        _chipInfo('Total facturado',
+                            _money.format(summary.totalInvoiced)),
+                        _chipInfo(
+                            'Total cobrado', _money.format(summary.totalPaid)),
+                        _chipInfo('Saldo pendiente',
+                            _money.format(summary.totalPending)),
                         Chip(
                           label: Text('${summary.documentCount} documento(s)'),
                         ),
@@ -494,35 +500,47 @@ class _AccountsReceivablePayableScreenState
                           final payments = id != null
                               ? (paymentsByReceivableId[id] ?? [])
                               : <ReceivablePayment>[];
-                          final saleId = _parsePosSaleIdFromInvoice(acc.invoiceNumber);
+                          final saleId =
+                              _parsePosSaleIdFromInvoice(acc.invoiceNumber);
                           return Card(
                             margin: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 6),
                             child: ExpansionTile(
                               leading: Icon(
-                                acc.isOverdue ? Icons.error_outline : Icons.receipt_long,
+                                acc.isOverdue
+                                    ? Icons.error_outline
+                                    : Icons.receipt_long,
                                 color: acc.isOverdue ? Colors.red : Colors.blue,
                               ),
                               title: Text(
                                 acc.invoiceNumber,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
                                 '${_df.format(acc.invoiceDate)} · ${_statusLabel(acc.status)}',
                               ),
                               children: [
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 0, 16, 8),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      _rowKV('Total factura', _money.format(acc.totalAmount)),
-                                      _rowKV('Pagado', _money.format(acc.paidAmount)),
-                                      _rowKV('Pendiente', _money.format(acc.pendingAmount)),
-                                      _rowKV('Vence', _formatDateOnly(acc.dueDate)),
-                                      if (acc.notes != null && acc.notes!.trim().isNotEmpty)
+                                      _rowKV('Total factura',
+                                          _money.format(acc.totalAmount)),
+                                      _rowKV('Pagado',
+                                          _money.format(acc.paidAmount)),
+                                      _rowKV('Pendiente',
+                                          _money.format(acc.pendingAmount)),
+                                      _rowKV('Vence',
+                                          _formatDateOnly(acc.dueDate)),
+                                      if (acc.notes != null &&
+                                          acc.notes!.trim().isNotEmpty)
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 8),
+                                          padding:
+                                              const EdgeInsets.only(top: 8),
                                           child: Text(
                                             'Notas: ${acc.notes}',
                                             style: TextStyle(
@@ -530,9 +548,11 @@ class _AccountsReceivablePayableScreenState
                                                 color: Colors.grey.shade800),
                                           ),
                                         ),
-                                      if ((acc.id != null) && (acc.pendingAmount > 0))
+                                      if ((acc.id != null) &&
+                                          (acc.pendingAmount > 0))
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 10, bottom: 4),
+                                          padding: const EdgeInsets.only(
+                                              top: 10, bottom: 4),
                                           child: Wrap(
                                             spacing: 10,
                                             runSpacing: 8,
@@ -544,10 +564,13 @@ class _AccountsReceivablePayableScreenState
                                                   summary,
                                                   acc,
                                                 ),
-                                                icon: const Icon(Icons.payments_outlined),
-                                                label: const Text('Registrar abono'),
+                                                icon: const Icon(
+                                                    Icons.payments_outlined),
+                                                label: const Text(
+                                                    'Registrar abono'),
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.green.shade600,
+                                                  backgroundColor:
+                                                      Colors.green.shade600,
                                                   foregroundColor: Colors.white,
                                                 ),
                                               ),
@@ -558,10 +581,12 @@ class _AccountsReceivablePayableScreenState
                                                   summary,
                                                   acc,
                                                 ),
-                                                icon: const Icon(Icons.check_circle_outline),
+                                                icon: const Icon(
+                                                    Icons.check_circle_outline),
                                                 label: const Text('Pago total'),
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.green.shade800,
+                                                  backgroundColor:
+                                                      Colors.green.shade800,
                                                   foregroundColor: Colors.white,
                                                 ),
                                               ),
@@ -582,14 +607,16 @@ class _AccountsReceivablePayableScreenState
                                           child: Text(
                                             'Sin abonos registrados (saldo inicial = factura completa a crédito).',
                                             style: TextStyle(
-                                                fontSize: 13, fontStyle: FontStyle.italic),
+                                                fontSize: 13,
+                                                fontStyle: FontStyle.italic),
                                           ),
                                         )
                                       else
                                         ...payments.map((p) => ListTile(
                                               dense: true,
                                               contentPadding: EdgeInsets.zero,
-                                              title: Text(_money.format(p.amount)),
+                                              title:
+                                                  Text(_money.format(p.amount)),
                                               subtitle: Text(
                                                 '${_df.format(p.paymentDate)} · ${p.paymentMethod}'
                                                 '${p.reference != null && p.reference!.isNotEmpty ? ' · Ref: ${p.reference}' : ''}',
@@ -605,7 +632,8 @@ class _AccountsReceivablePayableScreenState
                                           ),
                                         ),
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 4),
+                                          padding:
+                                              const EdgeInsets.only(top: 4),
                                           child: Text(
                                             'Carga de ítems desactivada temporalmente para evitar bloqueos al desplazarse.',
                                             style: TextStyle(
@@ -691,7 +719,7 @@ class _AccountsReceivablePayableScreenState
                     ),
                     const SizedBox(height: 10),
                     DropdownButtonFormField<String>(
-                      value: paymentMethod,
+                      initialValue: paymentMethod,
                       decoration: const InputDecoration(
                         labelText: 'Método de pago',
                         border: OutlineInputBorder(),
@@ -758,7 +786,8 @@ class _AccountsReceivablePayableScreenState
       return;
     }
     if (amount > account.pendingAmount) {
-      Get.snackbar('Validación', 'El abono no puede superar el saldo pendiente.');
+      Get.snackbar(
+          'Validación', 'El abono no puede superar el saldo pendiente.');
       return;
     }
 
@@ -768,7 +797,8 @@ class _AccountsReceivablePayableScreenState
       amount: amount,
       paymentDate: now,
       paymentMethod: paymentMethod,
-      reference: referenceCtrl.text.trim().isEmpty ? null : referenceCtrl.text.trim(),
+      reference:
+          referenceCtrl.text.trim().isEmpty ? null : referenceCtrl.text.trim(),
       notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
       userId: 1,
       createdAt: now,
@@ -849,7 +879,7 @@ class _AccountsReceivablePayableScreenState
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: paymentMethod,
+                  initialValue: paymentMethod,
                   decoration: const InputDecoration(
                     labelText: 'Método de pago',
                     border: OutlineInputBorder(),
@@ -995,7 +1025,8 @@ class _AccountsReceivablePayableScreenState
         payment: payment,
         isFullPayment: isFullPayment,
       );
-      final ok = await PrintService.instance.printRawToPrinter(utf8.encode(text));
+      final ok =
+          await PrintService.instance.printRawToPrinter(utf8.encode(text));
       if (!mounted) return;
       if (ok) {
         Get.snackbar(
@@ -1041,8 +1072,10 @@ class _AccountsReceivablePayableScreenState
     }
 
     String money(double value) => '\$${nf.format(value)}';
-    final previousPending = (account.pendingAmount + payment.amount).clamp(0, 999999999).toDouble();
-    final previousPaid = (account.paidAmount - payment.amount).clamp(0, 999999999).toDouble();
+    final previousPending =
+        (account.pendingAmount + payment.amount).clamp(0, 999999999).toDouble();
+    final previousPaid =
+        (account.paidAmount - payment.amount).clamp(0, 999999999).toDouble();
     final operationLabel = isFullPayment ? 'PAGO TOTAL' : 'ABONO';
 
     sb.writeln(sep);
@@ -1141,7 +1174,9 @@ class _AccountsReceivablePayableScreenState
               title: const Text('Error'),
               content: Text('${snap.error}'),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cerrar')),
               ],
             );
           }
@@ -1190,9 +1225,12 @@ class _AccountsReceivablePayableScreenState
                     child: Wrap(
                       spacing: 12,
                       children: [
-                        _chipInfo('Total facturado', _money.format(summary.totalInvoiced)),
-                        _chipInfo('Total pagado', _money.format(summary.totalPaid)),
-                        _chipInfo('Pendiente', _money.format(summary.totalPending)),
+                        _chipInfo('Total facturado',
+                            _money.format(summary.totalInvoiced)),
+                        _chipInfo(
+                            'Total pagado', _money.format(summary.totalPaid)),
+                        _chipInfo(
+                            'Pendiente', _money.format(summary.totalPending)),
                       ],
                     ),
                   ),
@@ -1215,17 +1253,22 @@ class _AccountsReceivablePayableScreenState
                                 horizontal: 16, vertical: 6),
                             child: ExpansionTile(
                               title: Text(acc.invoiceNumber,
-                                  style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
                               subtitle: Text(_df.format(acc.invoiceDate)),
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      _rowKV('Total', _money.format(acc.totalAmount)),
-                                      _rowKV('Pagado', _money.format(acc.paidAmount)),
-                                      _rowKV('Pendiente', _money.format(acc.pendingAmount)),
+                                      _rowKV('Total',
+                                          _money.format(acc.totalAmount)),
+                                      _rowKV('Pagado',
+                                          _money.format(acc.paidAmount)),
+                                      _rowKV('Pendiente',
+                                          _money.format(acc.pendingAmount)),
                                       const SizedBox(height: 8),
                                       Text(
                                         'Pagos',
@@ -1237,13 +1280,15 @@ class _AccountsReceivablePayableScreenState
                                       if (payments.isEmpty)
                                         const Text(
                                           'Sin pagos registrados.',
-                                          style: TextStyle(fontStyle: FontStyle.italic),
+                                          style: TextStyle(
+                                              fontStyle: FontStyle.italic),
                                         )
                                       else
                                         ...payments.map((p) => ListTile(
                                               dense: true,
                                               contentPadding: EdgeInsets.zero,
-                                              title: Text(_money.format(p.amount)),
+                                              title:
+                                                  Text(_money.format(p.amount)),
                                               subtitle: Text(
                                                 '${_df.format(p.paymentDate)} · ${p.paymentMethod}',
                                               ),

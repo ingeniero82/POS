@@ -87,10 +87,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
   int? _getCierreDeCajaSessionId() {
     final sessions = _cashSessionReport?.sessions ?? [];
     if (sessions.isEmpty) return null;
-    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final today =
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     // Preferir la sesión que incluye hoy (apertura <= hoy y (sin cierre o cierre >= hoy))
     for (final s in sessions) {
-      final openDay = DateTime(s.openDate.year, s.openDate.month, s.openDate.day);
+      final openDay =
+          DateTime(s.openDate.year, s.openDate.month, s.openDate.day);
       final closeDay = s.closeDate != null
           ? DateTime(s.closeDate!.year, s.closeDate!.month, s.closeDate!.day)
           : today;
@@ -108,7 +110,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       await _loadCashSessionReport();
       final sessionId = _getCierreDeCajaSessionId();
       if (sessionId != null) {
-        final data = await AccountingReportsService.getCierreDeCajaData(sessionId);
+        final data =
+            await AccountingReportsService.getCierreDeCajaData(sessionId);
         if (mounted) setState(() => _cierreDeCajaData = data);
       } else if (mounted) setState(() => _cierreDeCajaData = null);
     } else if (index == 2) {
@@ -222,8 +225,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         _devolucionesData = null;
         _resumenSemanalData = null;
       });
-      if (_selectedDailyReport != null)
+      if (_selectedDailyReport != null) {
         _selectDailyReport(_selectedDailyReport!);
+      }
     }
   }
 
@@ -235,12 +239,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     }
     final sessionId = _getCierreDeCajaSessionId();
     if (_cierreDeCajaData == null && sessionId != null) {
-      final data = await AccountingReportsService.getCierreDeCajaData(sessionId);
+      final data =
+          await AccountingReportsService.getCierreDeCajaData(sessionId);
       if (mounted) setState(() => _cierreDeCajaData = data);
     }
     Map<String, dynamic>? cierreData = _cierreDeCajaData;
     if (cierreData == null && sessionId != null) {
-      cierreData = await AccountingReportsService.getCierreDeCajaData(sessionId);
+      cierreData =
+          await AccountingReportsService.getCierreDeCajaData(sessionId);
     }
     if (_ventasPorProductoData == null) {
       final data = await AccountingReportsService.getVentasPorProductoData(
@@ -582,7 +588,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       final ventaTarifa = ventasPorTarifaIva[rate] ?? 0.0;
       final ivaTarifa = ivaPorTarifa[rate] ?? 0.0;
       lineVal(
-        '  IVA ${rate}%:',
+        '  IVA $rate%:',
         'Ventas \$${fmtNum(ventaTarifa)} | Imp \$${fmtNum(ivaTarifa)}',
       );
     }
@@ -1481,12 +1487,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                         await _loadCashSessionReport();
                         final sessionId = _getCierreDeCajaSessionId();
                         if (sessionId != null) {
-                          final data =
-                              await AccountingReportsService.getCierreDeCajaData(sessionId);
-                          if (mounted) setState(() {
-                            _cierreDeCajaData = data;
-                            _isLoading = false;
-                          });
+                          final data = await AccountingReportsService
+                              .getCierreDeCajaData(sessionId);
+                          if (mounted) {
+                            setState(() {
+                              _cierreDeCajaData = data;
+                              _isLoading = false;
+                            });
+                          }
                         } else if (mounted) setState(() => _isLoading = false);
                       },
                 icon: const Icon(Icons.refresh, size: 20),
@@ -1563,15 +1571,16 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                       _dataRow('IVA incluido',
                           '\$${_currencyFormat.format((d['ivaIncluido'] as num?)?.toDouble() ?? 0)}'),
                       ...(() {
-                        final ventasPorTarifaIva =
-                            (d['ventasPorTarifaIva'] as Map<String, dynamic>? ??
-                                    {})
-                                .map((k, v) =>
-                                    MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
-                        final ivaPorTarifa =
-                            (d['ivaPorTarifa'] as Map<String, dynamic>? ?? {})
-                                .map((k, v) =>
-                                    MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+                        final ventasPorTarifaIva = (d['ventasPorTarifaIva']
+                                    as Map<String, dynamic>? ??
+                                {})
+                            .map((k, v) =>
+                                MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+                        final ivaPorTarifa = (d['ivaPorTarifa']
+                                    as Map<String, dynamic>? ??
+                                {})
+                            .map((k, v) =>
+                                MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
                         final orderedRates = ventasPorTarifaIva.keys.toList()
                           ..sort((a, b) => (int.tryParse(a) ?? 0)
                               .compareTo(int.tryParse(b) ?? 0));
@@ -4122,8 +4131,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       );
       if (outputFile == null || outputFile.trim().isEmpty) return null;
       String finalPath = outputFile.trim();
-      if (!finalPath.toLowerCase().endsWith('.pdf'))
+      if (!finalPath.toLowerCase().endsWith('.pdf')) {
         finalPath = '$finalPath.pdf';
+      }
       final file = File(finalPath);
       await file.writeAsBytes(pdfBytes);
       return finalPath;
