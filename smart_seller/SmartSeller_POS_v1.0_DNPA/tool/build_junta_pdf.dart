@@ -21,8 +21,10 @@ bool _isTableSep(String line) {
 
 Future<void> main() async {
   final root = Directory.current.path;
-  final mdPath = p.join(root, 'docs', 'DOCUMENTACION_TECNICA_JUNTA_SMART_SELLER.md');
-  final outPath = p.join(root, 'docs', 'DOCUMENTACION_TECNICA_JUNTA_SMART_SELLER.pdf');
+  final mdPath =
+      p.join(root, 'docs', 'DOCUMENTACION_TECNICA_JUNTA_SMART_SELLER.md');
+  final outPath =
+      p.join(root, 'docs', 'DOCUMENTACION_TECNICA_JUNTA_SMART_SELLER.pdf');
 
   final mdFile = File(mdPath);
   if (!await mdFile.exists()) {
@@ -44,9 +46,10 @@ Future<void> main() async {
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('• ', style: pw.TextStyle(fontSize: 10)),
+          pw.Text('• ', style: const pw.TextStyle(fontSize: 10)),
           pw.Expanded(
-            child: pw.Text(_clean(text), style: const pw.TextStyle(fontSize: 10)),
+            child:
+                pw.Text(_clean(text), style: const pw.TextStyle(fontSize: 10)),
           ),
         ],
       ),
@@ -156,10 +159,12 @@ Future<void> main() async {
                   fontWeight: pw.FontWeight.bold,
                 ),
                 cellStyle: const pw.TextStyle(fontSize: 8),
-                headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                headerDecoration:
+                    const pw.BoxDecoration(color: PdfColors.grey300),
                 cellAlignment: pw.Alignment.centerLeft,
                 cellPadding: const pw.EdgeInsets.all(4),
-                border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.5),
+                border:
+                    pw.TableBorder.all(color: PdfColors.grey500, width: 0.5),
               ),
             ),
           );
@@ -182,7 +187,8 @@ Future<void> main() async {
           margin: const pw.EdgeInsets.only(bottom: 6),
           padding: const pw.EdgeInsets.only(left: 10),
           decoration: const pw.BoxDecoration(
-            border: pw.Border(left: pw.BorderSide(color: PdfColors.grey700, width: 3)),
+            border: pw.Border(
+                left: pw.BorderSide(color: PdfColors.grey700, width: 3)),
           ),
           child: pw.Text(
             _clean(line.substring(2)),
@@ -237,7 +243,7 @@ Future<void> main() async {
           level: 0,
           child: pw.Text(
             'Smart Seller POS — Documentación técnica (DNPA)',
-            style: pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
+            style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
           ),
         ),
         pw.SizedBox(height: 12),
