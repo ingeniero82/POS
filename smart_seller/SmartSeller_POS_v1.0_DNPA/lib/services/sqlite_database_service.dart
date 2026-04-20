@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:sqflite/sqflite.dart';
+import 'dart:math' as math;
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/user.dart';
@@ -1200,6 +1200,88 @@ class SQLiteDatabaseService {
         );
       }
     }
+  }
+
+  /// Entradas en [inventory_movements] por devolución POS (el stock ya se
+  /// actualizó en [saveSale]; aquí solo queda trazabilidad en Movimientos).
+  static Future<void> logPosReturnInventoryMovements(
+    Sale returnSale,
+    int userId,
+  ) async {
+    if (!returnSale.isReturn || _database == null) return;
+    final dateStr = returnSale.date.toIso8601String();
+    final retId = returnSale.id;
+    final origId = returnSale.originalSaleId;
+
+    for (final item in returnSale.items) {
+      final row = await _productRowForSaleItem(item);
+      if (row == null) continue;
+      final product = Product.fromMap(row);
+      final pid = row['id'] as int;
+
+      final desc = StringBuffer('Devolución POS');
+      if (retId != null) desc.write(' · Mov. #$retId');
+      if (origId != null) desc.write(' · Fact. orig. #$origId');
+
+      late final int qty;
+      if (product.isWeighted &&
+          product.weightedStockInKg &&
+          item.weightKg != null &&
+          item.weightKg! > 0) {
+        final g = (item.weightKg! * 1000).round();
+        qty = math.max(1, g);
+        desc.write(
+            ' · +${item.weightKg!.toStringAsFixed(3)} kg (cantidad en gramos)');
+      } else {
+        qty = item.quantity;
+        desc.write(' · +$qty ${item.unit}');
+      }
+
+      await _database!.insert('inventory_movements', {
+        'productId': pid,
+        'type': 'entrada',
+        'quantity': qty,
+        'reason': 'devolucion',
+        'description': desc.toString(),
+        'date': dateStr,
+        'userId': userId,
+      });
+    }
+  }
+
+  /// Revierte puntos y total de compras del cliente de fidelización (misma
+  /// regla que el POS al acumular) cuando la venta original llevaba cliente.
+  static Future<void> applyCustomerBalanceAfterReturn(
+    int? customerId,
+    double returnedTotal,
+  ) async {
+    if (customerId == null || returnedTotal <= 0 || _database == null) return;
+
+    final customer = await getCustomerById(customerId);
+    if (customer == null) return;
+
+    final configs = await getCompanyConfig();
+    if (configs.isEmpty) return;
+    final cfg = configs.first;
+
+    var pointsToSubtract = 0;
+    if (cfg.pointsEnabled && cfg.pointsPesosBase > 0) {
+      pointsToSubtract =
+          ((returnedTotal / cfg.pointsPesosBase).floor() * cfg.pointsPerBase)
+              .toInt();
+    }
+
+    final newPoints =
+        math.max(0, customer.accumulatedPoints - pointsToSubtract);
+    final newTotal = math.max(0.0, customer.totalPurchases - returnedTotal);
+
+    await updateCustomer(
+      customer.copyWith(
+        accumulatedPoints: newPoints,
+        totalPurchases: newTotal,
+        updatedAt: DateTime.now(),
+      ),
+    );
   }
 
   // Obtener historial de ventas
