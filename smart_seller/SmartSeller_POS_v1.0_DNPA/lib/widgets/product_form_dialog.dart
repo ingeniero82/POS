@@ -45,6 +45,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
   final _ingresoController = TextEditingController();
   final _unitController = TextEditingController();
   final _groupController = TextEditingController();
+
   /// Marca del producto (independiente del grupo; no compartir con [_groupController]).
   final _brandController = TextEditingController();
   final _profitPerKgVisualController = TextEditingController();
@@ -76,7 +77,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
 
   /// Marca visual para producto por peso.
   bool _isWeightedProduct = false;
-  WeightedPricingMode _weightedPricingMode = WeightedPricingMode.manualSalePerKg;
+  WeightedPricingMode _weightedPricingMode =
+      WeightedPricingMode.manualSalePerKg;
 
   /// Producto pesado: inventario en kg ([true]) o en unidades ([false]).
   bool _weightedStockInKg = false;
@@ -303,8 +305,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       return;
     }
 
-    final base =
-        (gross / _ivaFactor()).toDecimal(scaleOnInfinitePrecision: 12);
+    final base = (gross / _ivaFactor()).toDecimal(scaleOnInfinitePrecision: 12);
     _salePriceExact = base;
     final roundedForView = _roundHalfUp(base);
 
@@ -363,8 +364,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
 
       final code = _codeController.text.trim();
       final rawShortCode = _shortCodeController.text.trim();
-      final String? shortCode =
-          rawShortCode.isEmpty ? null : rawShortCode;
+      final String? shortCode = rawShortCode.isEmpty ? null : rawShortCode;
       final excludeId = widget.product?.id;
 
       // Validar código de barras único
@@ -405,7 +405,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
         }
       }
 
-      double? _parseKgInput(String input) {
+      double? parseKgInput(String input) {
         final v = input.trim().replaceAll(',', '.');
         if (v.isEmpty) return 0.0;
         return double.tryParse(v);
@@ -426,10 +426,10 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       } else if (invKg) {
         newStock = 0;
         if (widget.product != null) {
-          final delta = _parseKgInput(_ingresoController.text) ?? 0.0;
+          final delta = parseKgInput(_ingresoController.text) ?? 0.0;
           newStockKg = (widget.product!.stockKg + delta).clamp(0.0, 1e15);
         } else {
-          final kg = _parseKgInput(_stockKgController.text);
+          final kg = parseKgInput(_stockKgController.text);
           if (kg == null || kg < 0) {
             setState(() => _isLoading = false);
             Get.snackbar(
@@ -467,9 +467,10 @@ class _ProductFormDialogState extends State<ProductFormDialog>
       }
 
       final typedPrice = parseMontoPuntosMiles(_priceController.text) ?? 0;
-      final salePrice =
-          double.tryParse((_salePriceExact ?? Decimal.parse(typedPrice.toString())).toString()) ??
-              typedPrice;
+      final salePrice = double.tryParse(
+              (_salePriceExact ?? Decimal.parse(typedPrice.toString()))
+                  .toString()) ??
+          typedPrice;
       final costValue = parseMontoPuntosMiles(_costController.text) ?? 0;
       if (_isWeightedProduct) {
         if (salePrice <= 0) {
@@ -1027,12 +1028,12 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                 child: TextFormField(
                   controller: _priceController,
                   decoration: InputDecoration(
-                    labelText:
-                        _isWeightedProduct ? 'Venta por kg *' : 'Precio de Venta *',
-                    border: OutlineInputBorder(),
+                    labelText: _isWeightedProduct
+                        ? 'Venta por kg *'
+                        : 'Precio de Venta *',
+                    border: const OutlineInputBorder(),
                     prefixText: '\$',
-                    hintText:
-                        _isWeightedProduct ? 'Ej: 3.000' : 'Ej: 15.000',
+                    hintText: _isWeightedProduct ? 'Ej: 3.000' : 'Ej: 15.000',
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [PuntosMilesInputFormatter()],
@@ -1080,7 +1081,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: _priceWithIvaType,
+                  initialValue: _priceWithIvaType,
                   decoration: const InputDecoration(
                     labelText: 'Tipo de IVA',
                     border: OutlineInputBorder(),
@@ -1220,7 +1221,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                 if (_exentoIva) {
                   _ivaPercentage = 0; // exento en básica = 0% en ventas y FE
                 } else {
-                  _ivaPercentage = _priceWithIvaType; // al desmarcar, usa el IVA activo del cálculo desde precio con IVA
+                  _ivaPercentage =
+                      _priceWithIvaType; // al desmarcar, usa el IVA activo del cálculo desde precio con IVA
                 }
               });
             },
@@ -1239,12 +1241,12 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                 child: TextFormField(
                   controller: _costController,
                   decoration: InputDecoration(
-                    labelText:
-                        _isWeightedProduct ? 'Costo por kg *' : 'Precio de Costo',
-                    border: OutlineInputBorder(),
+                    labelText: _isWeightedProduct
+                        ? 'Costo por kg *'
+                        : 'Precio de Costo',
+                    border: const OutlineInputBorder(),
                     prefixText: '\$',
-                    hintText:
-                        _isWeightedProduct ? 'Ej: 2.000' : 'Ej: 10.000',
+                    hintText: _isWeightedProduct ? 'Ej: 2.000' : 'Ej: 10.000',
                   ),
                   keyboardType: TextInputType.number,
                   inputFormatters: [PuntosMilesInputFormatter()],
@@ -1268,7 +1270,8 @@ class _ProductFormDialogState extends State<ProductFormDialog>
             ],
           ),
           if (_isWeightedProduct &&
-              _weightedPricingMode == WeightedPricingMode.byProfitPercentage) ...[
+              _weightedPricingMode ==
+                  WeightedPricingMode.byProfitPercentage) ...[
             const SizedBox(height: 12),
             Row(
               children: [
@@ -1364,19 +1367,25 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                     border: OutlineInputBorder(),
                     helperText: 'Se guarda al dar Actualizar',
                   ),
-                  value: _ivaPercentage == 0 ? '0' : (_ivaPercentage == 5 ? '5' : '19'),
+                  initialValue: _ivaPercentage == 0
+                      ? '0'
+                      : (_ivaPercentage == 5 ? '5' : '19'),
                   items: const [
                     DropdownMenuItem(value: '19', child: Text('19%')),
                     DropdownMenuItem(value: '5', child: Text('5%')),
                     DropdownMenuItem(value: '0', child: Text('0% (Exento)')),
-                    DropdownMenuItem(value: 'EXCLUIDO', child: Text('Excluido')),
+                    DropdownMenuItem(
+                        value: 'EXCLUIDO', child: Text('Excluido')),
                   ],
                   onChanged: (value) {
                     if (value != null) {
                       setState(() {
-                        if (value == '19') _ivaPercentage = 19;
-                        else if (value == '5') _ivaPercentage = 5;
-                        else _ivaPercentage = 0; // 0% o Excluido
+                        if (value == '19') {
+                          _ivaPercentage = 19;
+                        } else if (value == '5')
+                          _ivaPercentage = 5;
+                        else
+                          _ivaPercentage = 0; // 0% o Excluido
                         _exentoIva = (_ivaPercentage == 0);
                         if (_ivaPercentage == 5 || _ivaPercentage == 19) {
                           _priceWithIvaType = _ivaPercentage;
@@ -1911,8 +1920,7 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                                   ),
                                   keyboardType: TextInputType.number,
                                   validator: (value) {
-                                    if (value == null ||
-                                        value.trim().isEmpty) {
+                                    if (value == null || value.trim().isEmpty) {
                                       return 'El stock es obligatorio';
                                     }
                                     if (int.tryParse(value) == null) {
@@ -1934,13 +1942,11 @@ class _ProductFormDialogState extends State<ProductFormDialog>
                                       const TextInputType.numberWithOptions(
                                           decimal: true),
                                   validator: (value) {
-                                    if (value == null ||
-                                        value.trim().isEmpty) {
+                                    if (value == null || value.trim().isEmpty) {
                                       return 'Ingresa el stock en kg (0 si no aplica)';
                                     }
-                                    final x = double.tryParse(value
-                                        .trim()
-                                        .replaceAll(',', '.'));
+                                    final x = double.tryParse(
+                                        value.trim().replaceAll(',', '.'));
                                     if (x == null || x < 0) {
                                       return 'Valor inválido';
                                     }

@@ -61,6 +61,44 @@ const List<StandardPaperWidth> kStandardPaperWidths = [
   StandardPaperWidth('80 mm extra ancho', 72),
 ];
 
+/// Fila de ticket: en venta por peso, [CartItem.price] es el subtotal de la línea (no \$/kg).
+({String cant, String pUnit, String total}) _ticketItemColumns(
+  CartItem item,
+  NumberFormat currencyFormat,
+  ReceiptFormat fmt,
+) {
+  final w = item.weightKg;
+  if (w != null && w > 0 && item.quantity > 0) {
+    final kgLine = w * item.quantity;
+    final lineTotal = item.total;
+    final perKg = kgLine > 0 ? lineTotal / kgLine : 0.0;
+    var cant = kgLine >= 100
+        ? kgLine.toStringAsFixed(0)
+        : (kgLine >= 10
+            ? kgLine.toStringAsFixed(1)
+            : kgLine.toStringAsFixed(2));
+    if (cant.length > fmt.colCant) {
+      cant = cant.substring(0, fmt.colCant);
+    }
+    return (
+      cant: cant,
+      pUnit: currencyFormat.format(perKg),
+      total: currencyFormat.format(lineTotal),
+    );
+  }
+  final cantRaw = item.quantity == item.quantity.truncateToDouble()
+      ? '${item.quantity.toInt()}'
+      : item.quantity.toString();
+  final cant = cantRaw.length > fmt.colCant
+      ? cantRaw.substring(0, fmt.colCant)
+      : cantRaw;
+  return (
+    cant: cant,
+    pUnit: currencyFormat.format(item.price),
+    total: currencyFormat.format(item.total),
+  );
+}
+
 class PrintService {
   static const MethodChannel _channel = MethodChannel('print_channel');
   static PrintService? _instance;
@@ -950,16 +988,12 @@ class PrintService {
       commands.addAll(_newLine());
 
       for (CartItem item in items) {
-        final cant = item.quantity == item.quantity.truncateToDouble()
-            ? '${item.quantity.toInt()}'
-            : item.quantity.toString();
+        final cols = _ticketItemColumns(item, currencyFormat, fmt);
         final desc = item.name.length > fmt.colDesc
             ? item.name.substring(0, fmt.colDesc)
             : item.name;
-        final pUnit = currencyFormat.format(item.price);
-        final t = currencyFormat.format(item.total);
-        commands.addAll(
-            _formatText(_buildTicketItemRow(fmt, cant, desc, pUnit, t)));
+        commands.addAll(_formatText(
+            _buildTicketItemRow(fmt, cols.cant, desc, cols.pUnit, cols.total)));
         commands.addAll(_newLine());
       }
 
@@ -997,8 +1031,8 @@ class PrintService {
                 ? 'DESCUENTO (${pct.round()}%):'
                 : 'DESCUENTO (${pct.toStringAsFixed(1)}%):')
             : 'DESCUENTO:';
-        commands.addAll(_formatText(
-            _lineLeftRight(fmt, pctLabel, '\$${currencyFormat.format(discVal)}')));
+        commands.addAll(_formatText(_lineLeftRight(
+            fmt, pctLabel, '\$${currencyFormat.format(discVal)}')));
         commands.addAll(_newLine());
       }
       commands.addAll(_formatText(_dashLine(fmt)));
@@ -1022,8 +1056,8 @@ class PrintService {
               ? (creditPaymentMethod ?? 'ABONO').toUpperCase()
               : 'CREDITO SIN ABONO')
           : (sale.paymentMethod ?? 'EFECTIVO').toUpperCase();
-      commands
-          .addAll(_formatText(_lineLeftRight(fmt, 'FORMA DE PAGO:', paymentLabel)));
+      commands.addAll(
+          _formatText(_lineLeftRight(fmt, 'FORMA DE PAGO:', paymentLabel)));
       commands.addAll(_newLine());
       if (isCreditSale) {
         commands.addAll(_boldOn);
@@ -1031,14 +1065,14 @@ class PrintService {
             .addAll(_formatText('*** VENTA A CRÉDITO - FIRMA DEL CLIENTE ***'));
         commands.addAll(_newLine());
         commands.addAll(_boldOff);
-        commands.addAll(_formatText(
-            _lineLeftRight(fmt, 'TOTAL A CREDITO:', currencyFormat.format(total))));
+        commands.addAll(_formatText(_lineLeftRight(
+            fmt, 'TOTAL A CREDITO:', currencyFormat.format(total))));
         commands.addAll(_newLine());
         commands.addAll(_formatText(_lineLeftRight(
             fmt, 'ABONO INICIAL:', currencyFormat.format(creditAbono))));
         commands.addAll(_newLine());
-        commands.addAll(_formatText(_lineLeftRight(fmt, 'MEDIO PAGO ABONO:',
-            creditMethodLabel.toUpperCase())));
+        commands.addAll(_formatText(_lineLeftRight(
+            fmt, 'MEDIO PAGO ABONO:', creditMethodLabel.toUpperCase())));
         commands.addAll(_newLine());
         commands.addAll(_boldOn);
         commands.addAll(_formatText(_lineLeftRight(
@@ -1401,17 +1435,12 @@ class PrintService {
     print(_buildTicketItemRow(fmt, 'Cant.', 'Descripción', 'P.Unit', 'Total'));
     print(_dashLine(fmt));
     for (CartItem item in items) {
-      final cant =
-          '${item.quantity.toStringAsFixed(item.quantity == item.quantity.truncateToDouble() ? 0 : 2)}x';
+      final cols = _ticketItemColumns(item, currencyFormat, fmt);
       final desc = item.name.length > fmt.colDesc
           ? item.name.substring(0, fmt.colDesc)
           : item.name;
       print(_buildTicketItemRow(
-          fmt,
-          cant,
-          desc,
-          '\$${currencyFormat.format(item.price)}',
-          '\$${currencyFormat.format(item.total)}'));
+          fmt, cols.cant, desc, '\$${cols.pUnit}', '\$${cols.total}'));
     }
     print(_dashLine(fmt));
     print('');
@@ -1420,12 +1449,14 @@ class PrintService {
     print(_lineLeftRight(fmt, 'SUBTOTAL:', '\$$subtotalStr'));
     final hasVat19 = (vatAt19 ?? 0) > 0;
     final hasVat5 = (vatAt5 ?? 0) > 0;
-    if (hasVat19)
+    if (hasVat19) {
       print(_lineLeftRight(
           fmt, 'IVA (19%):', '\$${currencyFormat.format(vatAt19!)}'));
-    if (hasVat5)
+    }
+    if (hasVat5) {
       print(_lineLeftRight(
           fmt, 'IVA (5%):', '\$${currencyFormat.format(vatAt5!)}'));
+    }
     if (!hasVat19 && !hasVat5) {
       if (taxes > 0) {
         print(_lineLeftRight(fmt, 'IVA:', '\$$taxesStr'));
