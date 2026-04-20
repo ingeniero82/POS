@@ -90,13 +90,14 @@ class _BalanzaDiagnosticoScreenState extends State<BalanzaDiagnosticoScreen> {
       );
       return;
     }
-    await _balanza.conectar(
+    final ok = await _balanza.conectar(
       puerto: _puertoSeleccionado!,
       baudRate: _baudRate,
       bits: _bits,
       stopBits: _stopBits,
       parity: _paridad,
     );
+    if (!ok || !mounted) return;
     _aplicarConfiguracionLectura();
   }
 
@@ -107,6 +108,24 @@ class _BalanzaDiagnosticoScreenState extends State<BalanzaDiagnosticoScreen> {
       terminador: _terminador,
       intervaloMs: _intervaloMs,
     );
+    _persistenciaSiConectado();
+  }
+
+  void _persistenciaSiConectado() {
+    if (_balanza.estado != EstadoConexionBalanza.conectado) return;
+    final puerto = _puertoSeleccionado;
+    if (puerto == null || puerto.isEmpty) return;
+    unawaited(_balanza.persistirUltimaConfigExitosa(
+      puerto: puerto,
+      baudRate: _baudRate,
+      bits: _bits,
+      stopBits: _stopBits,
+      parity: _paridad,
+      comando: _comandoController.text,
+      terminador: _terminador,
+      lecturaActiva: _lecturaActiva,
+      intervaloMs: _intervaloMs,
+    ));
   }
 
   Future<void> _enviarComandoManual() async {

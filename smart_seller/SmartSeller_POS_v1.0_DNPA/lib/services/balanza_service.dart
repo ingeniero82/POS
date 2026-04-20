@@ -1,18 +1,24 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_libserialport/flutter_libserialport.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum EstadoConexionBalanza { desconectado, conectando, conectado, error }
+
+/// Quita STX/ETX y bytes de control; evita que el regex tome dígitos de basura antes del peso real.
+String _sanearTramaBalanza(String s) =>
+    s.replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]'), '');
 
 class BalanzaService extends ChangeNotifier {
   SerialPort? _port;
   SerialPortReader? _reader;
+  StreamSubscription<Uint8List>? _serialSub;
   Timer? _watchdog;
   Timer? _pollingTimer;
   Timer? _flushTimer;
   bool _manualDisconnect = false;
+  DateTime? _ultimoSolicitarPeso;
 
   final _pesoController = StreamController<double?>.broadcast();
   Stream<double?> get pesosStream => _pesoController.stream;
@@ -38,9 +44,100 @@ class BalanzaService extends ChangeNotifier {
   int _intervaloLecturaMs = 1000;
   bool _pollingHabilitado = false;
 
+  /// Intervalo (ms) del último `configurarLecturaActiva` / prefs; sirve al POS para alinear sondeo con diagnóstico.
+  int get intervaloLecturaMsConfigurado => _intervaloLecturaMs;
+
+  /// Si el servicio ya está haciendo polling (lectura activa + comando), no hace falta duplicar pedidos desde el POS.
+  bool get lecturaContinuaDelServicioActiva =>
+      _pollingHabilitado &&
+      _comandoLectura.isNotEmpty &&
+      _estado == EstadoConexionBalanza.conectado;
+
   final List<int> _byteBuffer = <int>[];
 
   static List<String> puertosDisponibles() => SerialPort.availablePorts;
+
+  static const _kPrefPort = 'balanza_pref_puerto';
+  static const _kPrefBaud = 'balanza_pref_baud';
+  static const _kPrefBits = 'balanza_pref_bits';
+  static const _kPrefStop = 'balanza_pref_stop';
+  static const _kPrefParity = 'balanza_pref_parity';
+  static const _kPrefComando = 'balanza_pref_comando';
+  static const _kPrefTermIdx = 'balanza_pref_term_idx';
+  static const _kPrefPoll = 'balanza_pref_poll';
+  static const _kPrefInterval = 'balanza_pref_interval_ms';
+
+  static String _terminadorDesdeIndice(int idx) {
+    return switch (idx) {
+      1 => '\r',
+      2 => '\n',
+      3 => '\r\n',
+      _ => '',
+    };
+  }
+
+  static int _indiceTerminador(String t) {
+    if (t == '\r') return 1;
+    if (t == '\n') return 2;
+    if (t == '\r\n') return 3;
+    return 0;
+  }
+
+  /// Guarda la última conexión exitosa (diagnóstico) para reconectar en POS al abrir ventas.
+  Future<void> persistirUltimaConfigExitosa({
+    required String puerto,
+    required int baudRate,
+    required int bits,
+    required int stopBits,
+    required int parity,
+    required String comando,
+    required String terminador,
+    required bool lecturaActiva,
+    required int intervaloMs,
+  }) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kPrefPort, puerto);
+    await p.setInt(_kPrefBaud, baudRate);
+    await p.setInt(_kPrefBits, bits);
+    await p.setInt(_kPrefStop, stopBits);
+    await p.setInt(_kPrefParity, parity);
+    await p.setString(_kPrefComando, comando.trim());
+    await p.setInt(_kPrefTermIdx, _indiceTerminador(terminador));
+    await p.setBool(_kPrefPoll, lecturaActiva);
+    await p.setInt(_kPrefInterval, intervaloMs < 200 ? 200 : intervaloMs);
+  }
+
+  /// Si hay prefs guardadas y no hay COM abierto, reconecta (útil al entrar al POS).
+  Future<void> intentarReconexionDesdePrefs() async {
+    if (_estado == EstadoConexionBalanza.conectado) return;
+    final p = await SharedPreferences.getInstance();
+    final puerto = p.getString(_kPrefPort);
+    if (puerto == null || puerto.isEmpty) return;
+    final baud = p.getInt(_kPrefBaud) ?? 9600;
+    final bits = p.getInt(_kPrefBits) ?? 8;
+    final stop = p.getInt(_kPrefStop) ?? 1;
+    final parity = p.getInt(_kPrefParity) ?? SerialPortParity.none;
+    final cmd = p.getString(_kPrefComando) ?? 'W';
+    final term = _terminadorDesdeIndice(p.getInt(_kPrefTermIdx) ?? 3);
+    // Por defecto lectura continua (como en fruver); si el usuario la desactivó en prefs, se respeta false guardado.
+    final poll = p.getBool(_kPrefPoll) ?? true;
+    final interval = p.getInt(_kPrefInterval) ?? 1000;
+    final ok = await conectar(
+      puerto: puerto,
+      baudRate: baud,
+      bits: bits,
+      stopBits: stop,
+      parity: parity,
+    );
+    if (ok) {
+      configurarLecturaActiva(
+        habilitado: poll,
+        comando: cmd,
+        terminador: term,
+        intervaloMs: interval,
+      );
+    }
+  }
 
   void configurarLecturaActiva({
     required bool habilitado,
@@ -62,6 +159,13 @@ class BalanzaService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final ahora = DateTime.now();
+    // Muy agresivo en ventas: muchas balanzas toleran ~30–60 ms entre W; 200 ms retrasaba demasiado el peso en POS.
+    if (_ultimoSolicitarPeso != null &&
+        ahora.difference(_ultimoSolicitarPeso!).inMilliseconds < 45) {
+      return true;
+    }
+    _ultimoSolicitarPeso = ahora;
     if (_comandoLectura.isNotEmpty) {
       return enviarComando(_comandoLectura, terminador: _terminadorLectura);
     }
@@ -117,11 +221,15 @@ class BalanzaService extends ChangeNotifier {
 
   void _leerDatos() {
     _byteBuffer.clear();
-    _reader?.stream.listen(
+    final r = _reader;
+    if (r == null) return;
+    unawaited(_serialSub?.cancel());
+    _serialSub = r.stream.listen(
       (Uint8List data) {
         _byteBuffer.addAll(data);
         _emitirChunkCrudo(data);
         _procesarBuffer();
+        _intentarPesoDesdeBufferSinSaltoLinea();
         _programarFlushBuffer();
       },
       onError: (Object e) {
@@ -178,7 +286,7 @@ class BalanzaService extends ChangeNotifier {
 
   void _programarFlushBuffer() {
     _flushTimer?.cancel();
-    _flushTimer = Timer(const Duration(milliseconds: 180), () {
+    _flushTimer = Timer(const Duration(milliseconds: 70), () {
       if (_byteBuffer.isEmpty) return;
       final trama = String.fromCharCodes(_byteBuffer).trim();
       _byteBuffer.clear();
@@ -190,23 +298,70 @@ class BalanzaService extends ChangeNotifier {
 
   void _parsearTrama(String trama) {
     _tramasController.add(trama);
-    // Formatos comunes:
-    //   +001.234kg
-    //   ST,GS,+1.234kg
-    //   -000.050 kg
-    final normalized = trama.replaceAll(' ', '');
-    final regex = RegExp(r'([+-]?\d+[.,]?\d*)');
-    final matches = regex.allMatches(normalized);
+    // Formatos comunes: +001.234kg, ST,GS,+1.234kg, 1.234 (sin kg).
+    // No usar el *primer* `kg` en la trama: a veces hay un peso residual/tara y luego el real (p. ej. 0.01 + 00.150).
+    final limpia = _sanearTramaBalanza(trama.trim());
+    final conPuntos = limpia.replaceAll(',', '.');
+    double? valor;
 
-    for (final m in matches) {
-      final raw = (m.group(1) ?? '').replaceAll(',', '.');
-      final valor = double.tryParse(raw);
-      if (valor != null && valor >= -9999 && valor <= 99999) {
-        _ultimoPeso = valor;
-        _pesoController.add(valor);
-        return;
+    final kgRe = RegExp(
+      r'([+-]?\d+\.?\d*)\s*kge?\b',
+      caseSensitive: false,
+    );
+    final kgMatches = kgRe.allMatches(conPuntos).toList();
+    if (kgMatches.isNotEmpty) {
+      valor = double.tryParse(kgMatches.last.group(1)!);
+    }
+
+    if (valor == null) {
+      final compacto = conPuntos.replaceAll(' ', '');
+      final re = RegExp(r'[+-]?\d+\.\d+|[+-]?\d+');
+      final ms = re.allMatches(compacto).toList();
+      for (var i = ms.length - 1; i >= 0; i--) {
+        final raw = ms[i].group(0);
+        if (raw == null) continue;
+        final v = double.tryParse(raw);
+        if (v != null && v >= -9999 && v <= 99999) {
+          valor = v;
+          break;
+        }
       }
     }
+
+    if (valor != null && valor >= -9999 && valor <= 99999) {
+      if (_ultimoPeso != null && (valor - _ultimoPeso!).abs() < 1e-6) {
+        return;
+      }
+      _ultimoPeso = valor;
+      _pesoController.add(valor);
+      notifyListeners();
+    }
+  }
+
+  /// Si la trama llega partida y aún no hay CR/LF, intenta extraer `…00.270kg` del buffer acumulado.
+  void _intentarPesoDesdeBufferSinSaltoLinea() {
+    if (_byteBuffer.length < 6) return;
+    final s = _sanearTramaBalanza(String.fromCharCodes(_byteBuffer));
+    final lower = s.toLowerCase();
+    if (!lower.contains('kg')) return;
+    final ki = lower.lastIndexOf('kg');
+    if (ki < 1) return;
+    final start = ki >= 40 ? ki - 40 : 0;
+    final window = s.substring(start, ki + 2).replaceAll(',', '.');
+    final matches = RegExp(
+      r'([+-]?\d+\.?\d*)\s*kge?\b',
+      caseSensitive: false,
+    ).allMatches(window);
+    if (matches.isEmpty) return;
+    final raw = matches.last.group(1) ?? '';
+    final v = double.tryParse(raw);
+    if (v == null || v < -9999 || v > 99999) return;
+    if (_ultimoPeso != null && (v - _ultimoPeso!).abs() < 1e-6) {
+      return;
+    }
+    _ultimoPeso = v;
+    _pesoController.add(v);
+    notifyListeners();
   }
 
   void _iniciarWatchdog() {
@@ -292,6 +447,11 @@ class BalanzaService extends ChangeNotifier {
     _pollingTimer = null;
     _flushTimer?.cancel();
     _flushTimer = null;
+
+    try {
+      await _serialSub?.cancel();
+    } catch (_) {}
+    _serialSub = null;
 
     try {
       _reader?.close();
