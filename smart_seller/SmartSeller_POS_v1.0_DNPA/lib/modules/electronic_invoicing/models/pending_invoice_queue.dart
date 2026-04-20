@@ -182,8 +182,9 @@ class PendingInvoiceItem {
   bool get canRetryNow {
     if (!status.canRetry) return false;
     if (attemptCount >= maxRetries) return false;
-    if (nextRetryAt != null && DateTime.now().isBefore(nextRetryAt!))
+    if (nextRetryAt != null && DateTime.now().isBefore(nextRetryAt!)) {
       return false;
+    }
     return true;
   }
 

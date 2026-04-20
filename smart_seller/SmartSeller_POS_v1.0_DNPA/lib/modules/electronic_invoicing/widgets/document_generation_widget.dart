@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/document_generation_controller.dart';
-import '../services/document_generation_service.dart';
 
 class DocumentGenerationWidget extends StatelessWidget {
   final DocumentGenerationController controller;

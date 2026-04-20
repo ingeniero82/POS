@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/pending_invoice_queue_controller.dart';
-import '../models/pending_invoice_queue.dart';
 import '../widgets/pending_invoice_queue_widget.dart';
 import '../widgets/retry_config_widget.dart';
 

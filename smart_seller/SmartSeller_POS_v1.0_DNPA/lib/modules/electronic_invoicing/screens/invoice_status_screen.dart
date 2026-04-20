@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/invoice_status_controller.dart';
-import '../models/invoice_status.dart';
 import '../models/electronic_document.dart';
 import '../widgets/invoice_status_widget.dart';
 import '../widgets/invoice_filters_widget.dart';

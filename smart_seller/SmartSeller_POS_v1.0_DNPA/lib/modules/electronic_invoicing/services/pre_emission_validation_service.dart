@@ -1,5 +1,4 @@
 import '../models/electronic_document.dart';
-import '../models/system_configuration.dart';
 import '../services/system_configuration_service.dart';
 import '../../../models/client.dart';
 import '../../../models/product.dart';
