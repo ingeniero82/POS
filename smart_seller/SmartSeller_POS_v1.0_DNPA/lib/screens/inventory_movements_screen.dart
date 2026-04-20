@@ -225,10 +225,10 @@ class _MovementFormDialogState extends State<_MovementFormDialog> {
               InkWell(
                 onTap: _openProductSearch,
                 child: InputDecorator(
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Producto',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: const Icon(Icons.search, color: Colors.blue),
+                    border: OutlineInputBorder(),
+                    suffixIcon: Icon(Icons.search, color: Colors.blue),
                     errorText: null,
                   ),
                   child: Text(
@@ -280,8 +280,9 @@ class _MovementFormDialogState extends State<_MovementFormDialog> {
                     labelText: 'Cantidad', border: OutlineInputBorder()),
                 keyboardType: TextInputType.number,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty)
+                  if (v == null || v.trim().isEmpty) {
                     return 'Ingresa la cantidad';
+                  }
                   if (int.tryParse(v) == null) return 'Cantidad inválida';
                   return null;
                 },
@@ -419,11 +420,11 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                   child: TextField(
                     controller: _searchController,
                     focusNode: _searchFocus,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Buscar por nombre o código...',
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(),
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     onChanged: (value) => setState(() => _query = value),
                   ),
@@ -467,7 +468,8 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                           ),
                           subtitle: Text(
                             'Código: ${p.code} · Stock: ${p.stock} ${p.unit}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600),
                           ),
                           onTap: () => Navigator.of(context).pop(p),
                         );

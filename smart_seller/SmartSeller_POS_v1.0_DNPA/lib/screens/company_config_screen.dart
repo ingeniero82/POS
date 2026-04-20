@@ -76,7 +76,10 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
 
         // ✅ CARGAR NUEVOS CAMPOS DE FACTURACIÓN ELECTRÓNICA (normalizar NIT -> 31 para el dropdown)
         final docType = config.documentType?.trim().toUpperCase();
-        _documentTypeController.text = (docType == null || docType.isEmpty || docType == 'NIT') ? '31' : config.documentType!;
+        _documentTypeController.text =
+            (docType == null || docType.isEmpty || docType == 'NIT')
+                ? '31'
+                : config.documentType!;
         _nitNumberController.text = config.nitNumber ?? '';
         _verificationDigitController.text = config.verificationDigit ?? '';
         _cityController.text = config.city ?? '';
@@ -87,7 +90,8 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
         _fiscalResponsibilitiesController.text =
             config.fiscalResponsibilities ?? '';
         _pointsEnabled = config.pointsEnabled;
-        _pointsPesosBaseController.text = config.pointsPesosBase.toStringAsFixed(0);
+        _pointsPesosBaseController.text =
+            config.pointsPesosBase.toStringAsFixed(0);
         _pointsPerBaseController.text = config.pointsPerBase.toStringAsFixed(0);
         _isLoading = false;
       });
@@ -361,7 +365,8 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
 
                     // Tipo de documento (empresa emisora: solo NIT para facturación electrónica)
                     DropdownButtonFormField<String>(
-                      value: '31', // Único ítem; si en BD estaba "NIT", ya se normalizó al cargar
+                      initialValue:
+                          '31', // Único ítem; si en BD estaba "NIT", ya se normalizó al cargar
                       decoration: const InputDecoration(
                         labelText: 'Tipo de Documento *',
                         prefixIcon: Icon(Icons.description),
@@ -546,7 +551,8 @@ class _CompanyConfigScreenState extends State<CompanyConfigScreen> {
                       TextFormField(
                         controller: _pointsPesosBaseController,
                         decoration: const InputDecoration(
-                          labelText: 'Por cada cuántos pesos de compra (ej: 2000, 5000, 10000)',
+                          labelText:
+                              'Por cada cuántos pesos de compra (ej: 2000, 5000, 10000)',
                           prefixIcon:
                               Icon(Icons.monetization_on, color: Colors.amber),
                           border: OutlineInputBorder(),

@@ -81,9 +81,8 @@ class _ReportsScreenState extends State<ReportsScreen>
     try {
       final users = await SQLiteDatabaseService.getAllUsers();
       setState(() {
-        availableUsers =
-            users.where((u) => u.isActive).toList()
-              ..sort((a, b) => a.username.compareTo(b.username));
+        availableUsers = users.where((u) => u.isActive).toList()
+          ..sort((a, b) => a.username.compareTo(b.username));
       });
     } catch (e) {
       print('Error cargando usuarios: $e');
@@ -733,8 +732,7 @@ class _ReportsScreenState extends State<ReportsScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                        '${transaction.paymentMethod} • ${transaction.user}'),
+                    Text('${transaction.paymentMethod} • ${transaction.user}'),
                     if (discSubtitle != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
@@ -755,14 +753,16 @@ class _ReportsScreenState extends State<ReportsScreen>
                     if (item.priceEditedInSale &&
                         item.originalUnitPrice != null) {
                       final editedAt = item.priceEditedAt != null
-                          ? DateFormat('dd/MM HH:mm').format(item.priceEditedAt!)
+                          ? DateFormat('dd/MM HH:mm')
+                              .format(item.priceEditedAt!)
                           : DateFormat('dd/MM HH:mm').format(transaction.date);
-                      final editor =
-                          (item.priceEditedBy != null && item.priceEditedBy!.trim().isNotEmpty)
-                              ? item.priceEditedBy!.trim()
-                              : transaction.user;
-                      final source =
-                          item.priceEditedFromIva ? ' (desde precio con IVA)' : '';
+                      final editor = (item.priceEditedBy != null &&
+                              item.priceEditedBy!.trim().isNotEmpty)
+                          ? item.priceEditedBy!.trim()
+                          : transaction.user;
+                      final source = item.priceEditedFromIva
+                          ? ' (desde precio con IVA)'
+                          : '';
                       modNote =
                           'Precio editado en venta: \$${nf.format(item.originalUnitPrice!)} → \$${nf.format(item.unitPrice)}$source · $editedAt · $editor';
                     } else if (item.priceModifiedVsList &&
@@ -1546,10 +1546,12 @@ class _ReportsScreenState extends State<ReportsScreen>
     sb.writeln('Ventas netas:      \$${nf.format(r.netSales)}');
     sb.writeln('Transacciones:     ${r.totalTransactions}');
     sb.writeln('Ticket promedio:   \$${nf.format(r.averageTicket)}');
-    if (r.totalDiscounts != null && r.totalDiscounts! > 0)
+    if (r.totalDiscounts != null && r.totalDiscounts! > 0) {
       sb.writeln('Descuentos:        \$${nf.format(r.totalDiscounts)}');
-    if (r.totalReturns != null && r.totalReturns! > 0)
+    }
+    if (r.totalReturns != null && r.totalReturns! > 0) {
       sb.writeln('Devoluciones:      \$${nf.format(r.totalReturns)}');
+    }
     sb.writeln(dash);
     sb.writeln('Por método de pago:');
     for (final m in r.salesByPaymentMethod) {
@@ -1563,8 +1565,9 @@ class _ReportsScreenState extends State<ReportsScreen>
       if (t.globalDiscountAmount != null && t.globalDiscountAmount! > 0) {
         final p = t.globalDiscountPercent;
         if (p != null && p > 0) {
-          final ps = p == p.roundToDouble() ? '${p.round()}' : p.toStringAsFixed(1);
-          line += ' | Dcto ${ps}% (−\$${nf.format(t.globalDiscountAmount!)})';
+          final ps =
+              p == p.roundToDouble() ? '${p.round()}' : p.toStringAsFixed(1);
+          line += ' | Dcto $ps% (−\$${nf.format(t.globalDiscountAmount!)})';
         } else {
           line += ' | Dcto −\$${nf.format(t.globalDiscountAmount!)}';
         }
@@ -1573,9 +1576,10 @@ class _ReportsScreenState extends State<ReportsScreen>
       for (final it in t.items) {
         if (it.priceEditedInSale && it.originalUnitPrice != null) {
           final src = it.priceEditedFromIva ? ' (desde IVA)' : '';
-          final who = (it.priceEditedBy != null && it.priceEditedBy!.trim().isNotEmpty)
-              ? ' · ${it.priceEditedBy}'
-              : '';
+          final who =
+              (it.priceEditedBy != null && it.priceEditedBy!.trim().isNotEmpty)
+                  ? ' · ${it.priceEditedBy}'
+                  : '';
           sb.writeln(
               '      · ${it.productName}: editado \$${nf.format(it.originalUnitPrice!)} → \$${nf.format(it.unitPrice)}$src$who');
         } else if (it.priceModifiedVsList && it.listUnitPrice != null) {
@@ -1584,8 +1588,9 @@ class _ReportsScreenState extends State<ReportsScreen>
         }
       }
     }
-    if (r.transactions.length > 50)
+    if (r.transactions.length > 50) {
       sb.writeln('  ... y ${r.transactions.length - 50} más');
+    }
     sb.writeln(sep);
     sb.writeln('Smart Seller POS');
     sb.writeln('');

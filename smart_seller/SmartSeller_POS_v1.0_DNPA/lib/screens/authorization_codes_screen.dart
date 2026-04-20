@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
-import '../models/permissions.dart';
 import '../services/authorization_codes_service.dart';
 
 class AuthorizationCodesScreen extends StatefulWidget {
