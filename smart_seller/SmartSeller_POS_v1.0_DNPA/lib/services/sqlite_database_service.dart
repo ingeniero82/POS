@@ -54,7 +54,7 @@ class SQLiteDatabaseService {
 
     _database = await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -323,7 +323,8 @@ class SQLiteDatabaseService {
         pointsRate REAL NOT NULL DEFAULT 1.0,
         accumulatedPoints INTEGER NOT NULL DEFAULT 0,
         lastPurchase TEXT,
-        totalPurchases REAL NOT NULL DEFAULT 0.0
+        totalPurchases REAL NOT NULL DEFAULT 0.0,
+        storeCredit REAL NOT NULL DEFAULT 0.0
       )
     ''');
 
@@ -459,6 +460,18 @@ class SQLiteDatabaseService {
         print('✅ Columna anulada_por agregada a sales');
       } catch (e) {
         print('ℹ️ Columna anulada_por ya existe en sales');
+      }
+    }
+
+    // Migración versión 7: saldo a favor (crédito tienda) en clientes del sistema
+    if (oldVersion < 7) {
+      print('🔧 Agregando columna storeCredit a customers...');
+      try {
+        await db.execute(
+            'ALTER TABLE customers ADD COLUMN storeCredit REAL NOT NULL DEFAULT 0');
+        print('✅ Columna storeCredit agregada a customers');
+      } catch (e) {
+        print('ℹ️ Columna storeCredit ya existe en customers');
       }
     }
   }
@@ -1153,6 +1166,9 @@ class SQLiteDatabaseService {
         };
         if (item.productId != null) m['productId'] = item.productId;
         if (item.weightKg != null) m['weightKg'] = item.weightKg;
+        if (item.originalItemIndex != null) {
+          m['originalItemIndex'] = item.originalItemIndex;
+        }
         return m;
       }).toList()), // Guardar como JSON string
       // ✅ Cliente asociado (para reimpresión con nombre en ticket)
@@ -1222,6 +1238,12 @@ class SQLiteDatabaseService {
       final desc = StringBuffer('Devolución POS');
       if (retId != null) desc.write(' · Mov. #$retId');
       if (origId != null) desc.write(' · Fact. orig. #$origId');
+      final oli = item.originalItemIndex;
+      if (oli != null) desc.write(' · Línea orig. #${oli + 1}');
+      final pm = returnSale.paymentMethod ?? '';
+      if (pm.toLowerCase().contains('saldo a favor')) {
+        desc.write(' · Liquidación: saldo a favor cliente');
+      }
 
       late final int qty;
       if (product.isWeighted &&
@@ -1383,6 +1405,8 @@ class SQLiteDatabaseService {
                         : null,
                     priceEditedBy: item['priceEditedBy'] as String?,
                     priceEditedFromIva: item['priceEditedFromIva'] == true,
+                    originalItemIndex:
+                        (item['originalItemIndex'] as num?)?.toInt(),
                   ))
               .toList();
         } else {
@@ -1465,6 +1489,8 @@ class SQLiteDatabaseService {
                       : null,
                   priceEditedBy: item['priceEditedBy'] as String?,
                   priceEditedFromIva: item['priceEditedFromIva'] == true,
+                  originalItemIndex:
+                      (item['originalItemIndex'] as num?)?.toInt(),
                 ))
             .toList();
       }
@@ -1484,6 +1510,205 @@ class SQLiteDatabaseService {
       whereArgs: [originalSaleId],
     );
     return rows.isNotEmpty;
+  }
+
+  /// Devoluciones ya registradas para una factura (orden cronológico).
+  static Future<List<Sale>> getReturnSalesForOriginal(int originalSaleId) async {
+    if (_database == null) return [];
+    final rows = await _database!.query(
+      'sales',
+      columns: ['id'],
+      where:
+          'isReturn = 1 AND originalSaleId = ? AND (anulada IS NULL OR anulada = 0)',
+      whereArgs: [originalSaleId],
+      orderBy: 'date ASC, id ASC',
+    );
+    final out = <Sale>[];
+    for (final r in rows) {
+      final id = r['id'] as int;
+      final s = await getSaleById(id);
+      if (s != null) out.add(s);
+    }
+    return out;
+  }
+
+  /// Suma de [Sale.total] de todas las devoluciones asociadas a la factura original.
+  static Future<double> getTotalReturnedCashForOriginal(int originalSaleId) async {
+    final list = await getReturnSalesForOriginal(originalSaleId);
+    return list.fold<double>(0.0, (a, r) => a + r.total.abs());
+  }
+
+  static bool _returnLineUsesKgStock(SaleItem origLine, SaleItem retItem) {
+    return origLine.weightKg != null &&
+        origLine.weightKg! > 1e-9 &&
+        (retItem.weightKg != null && retItem.weightKg! > 1e-9);
+  }
+
+  static void _accumulateReturnSaleIntoLineAgg(
+    Sale ret,
+    Sale orig,
+    List<int> qty,
+    List<double> kg,
+  ) {
+    final items = ret.items;
+    for (var ri = 0; ri < items.length; ri++) {
+      final item = items[ri];
+      int? lineIdx = item.originalItemIndex;
+      if (lineIdx != null && lineIdx >= 0 && lineIdx < orig.items.length) {
+        _addReturnItemToLineAgg(orig.items[lineIdx], lineIdx, item, qty, kg);
+        continue;
+      }
+      if (items.length == orig.items.length) {
+        lineIdx = ri;
+        _addReturnItemToLineAgg(orig.items[lineIdx], lineIdx, item, qty, kg);
+      }
+    }
+  }
+
+  static void _addReturnItemToLineAgg(
+    SaleItem origLine,
+    int lineIdx,
+    SaleItem retItem,
+    List<int> qty,
+    List<double> kg,
+  ) {
+    if (_returnLineUsesKgStock(origLine, retItem)) {
+      kg[lineIdx] += retItem.weightKg ?? 0.0;
+    } else {
+      qty[lineIdx] += retItem.quantity;
+    }
+  }
+
+  /// Cantidad / kg ya devueltos por índice de línea en la factura original.
+  static Future<Map<int, ({int qty, double kg})>> getReturnedByLineIndexAggregated(
+    int originalSaleId,
+    Sale original,
+  ) async {
+    final returns = await getReturnSalesForOriginal(originalSaleId);
+    final qty = List<int>.filled(original.items.length, 0);
+    final kg = List<double>.filled(original.items.length, 0.0);
+    for (final ret in returns) {
+      _accumulateReturnSaleIntoLineAgg(ret, original, qty, kg);
+    }
+    final map = <int, ({int qty, double kg})>{};
+    for (var i = 0; i < original.items.length; i++) {
+      map[i] = (qty: qty[i], kg: kg[i]);
+    }
+    return map;
+  }
+
+  /// True si el inventario de la línea se maneja por kg (misma regla que [saveSale]).
+  static Future<bool> saleLineUsesKgInventoryStock(SaleItem item) async {
+    final row = await _productRowForSaleItem(item);
+    if (row == null) {
+      return item.weightKg != null && item.weightKg! > 1e-9;
+    }
+    final p = Product.fromMap(row);
+    return p.isWeighted &&
+        p.weightedStockInKg &&
+        item.weightKg != null &&
+        item.weightKg! > 1e-9;
+  }
+
+  static double _saleItemSubtotal(SaleItem it) {
+    final disc = it.discount ?? 0.0;
+    final w = it.weightKg;
+    if (w != null && w > 1e-9) {
+      return (it.price - disc).clamp(0.0, 1e18);
+    }
+    final base = it.price * it.quantity;
+    return (base - disc).clamp(0.0, 1e18);
+  }
+
+  static double _saleItemGrossWithTax(SaleItem it) {
+    final s = _saleItemSubtotal(it);
+    return s * (1.0 + it.ivaPercentage / 100.0);
+  }
+
+  static double _originalGrossWithTaxSum(Sale original) {
+    return original.items.fold<double>(
+        0.0, (a, it) => a + _saleItemGrossWithTax(it));
+  }
+
+  static double _originalSubtotalSum(Sale original) {
+    return original.items.fold<double>(0.0, (a, it) => a + _saleItemSubtotal(it));
+  }
+
+  /// Monto a devolver al cliente por este lote (proporcional al cobrado en origen, incluye IVA y descuento global).
+  static double computePartialReturnCustomerAmount(
+    Sale original,
+    Map<int, int> returnQtyByLineIndex,
+    Map<int, double> returnKgByLineIndex,
+  ) {
+    final G = _originalGrossWithTaxSum(original);
+    if (G <= 1e-12 || original.total <= 0) return 0.0;
+    double acc = 0.0;
+    for (var i = 0; i < original.items.length; i++) {
+      final rQ = returnQtyByLineIndex[i] ?? 0;
+      final rK = returnKgByLineIndex[i] ?? 0.0;
+      if (rQ <= 0 && rK <= 1e-12) continue;
+      final it = original.items[i];
+      final gLine = _saleItemGrossWithTax(it);
+      double frac;
+      if (it.weightKg != null && it.weightKg! > 1e-9) {
+        frac = (rK / it.weightKg!).clamp(0.0, 1.0);
+      } else {
+        if (it.quantity <= 0) continue;
+        frac = (rQ / it.quantity).clamp(0.0, 1.0);
+      }
+      acc += original.total * (gLine / G) * frac;
+    }
+    return acc.clamp(0.0, original.total);
+  }
+
+  /// Parte proporcional del descuento global (pesos) que corresponde a este lote devuelto.
+  static double computePartialReturnGlobalDiscountAmount(
+    Sale original,
+    Map<int, int> returnQtyByLineIndex,
+    Map<int, double> returnKgByLineIndex,
+  ) {
+    final disc = original.discount ?? 0.0;
+    if (disc <= 0) return 0.0;
+    final subSum = _originalSubtotalSum(original);
+    if (subSum <= 1e-12) return 0.0;
+    double acc = 0.0;
+    for (var i = 0; i < original.items.length; i++) {
+      final rQ = returnQtyByLineIndex[i] ?? 0;
+      final rK = returnKgByLineIndex[i] ?? 0.0;
+      if (rQ <= 0 && rK <= 1e-12) continue;
+      final it = original.items[i];
+      final lineSub = _saleItemSubtotal(it);
+      double frac;
+      if (it.weightKg != null && it.weightKg! > 1e-9) {
+        frac = (rK / it.weightKg!).clamp(0.0, 1.0);
+      } else {
+        if (it.quantity <= 0) continue;
+        frac = (rQ / it.quantity).clamp(0.0, 1.0);
+      }
+      acc += disc * (lineSub / subSum) * frac;
+    }
+    return acc.clamp(0.0, disc);
+  }
+
+  /// Ya no queda mercancía por devolver en la factura original.
+  static Future<bool> isOriginalSaleFullyReturned(Sale original) async {
+    if (original.id == null || original.isReturn || original.isAnulada) {
+      return true;
+    }
+    final agg = await getReturnedByLineIndexAggregated(original.id!, original);
+    for (var i = 0; i < original.items.length; i++) {
+      final o = original.items[i];
+      final a = agg[i] ?? (qty: 0, kg: 0.0);
+      final useKg = await saleLineUsesKgInventoryStock(o);
+      if (useKg) {
+        final maxKg = o.weightKg ?? 0.0;
+        if (maxKg <= 1e-9) continue;
+        if (maxKg - a.kg > 1e-6) return false;
+      } else {
+        if (o.quantity - a.qty > 0) return false;
+      }
+    }
+    return true;
   }
 
   /// Anula una venta: marca como anulada y devuelve el stock al inventario.
@@ -1535,6 +1760,211 @@ class SQLiteDatabaseService {
         );
       }
     }
+
+    // Si la venta anulada era a crédito, revertir CxC y abonos para evitar cartera/caja inconsistente.
+    try {
+      await _reverseReceivableForVoidedCreditSale(
+        sale: sale,
+        saleId: saleId,
+        anuladaPor: anuladaPor,
+      );
+    } catch (e) {
+      print(
+          '⚠️ La venta fue anulada y el stock devuelto, pero falló la reversa automática CxC/abono: $e');
+    }
+  }
+
+  static Future<void> _reverseReceivableForVoidedCreditSale({
+    required Sale sale,
+    required int saleId,
+    required String anuladaPor,
+  }) async {
+    final method = (sale.paymentMethod ?? '').toLowerCase();
+    final isCreditSale = method.contains('crédito') || method.contains('credito');
+    if (!isCreditSale) return;
+
+    final invoiceNumber = 'POS-$saleId';
+    final receivableRows = await _database!.query(
+      'accounts_receivable',
+      where: 'invoice_number = ?',
+      whereArgs: [invoiceNumber],
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+    if (receivableRows.isEmpty) return;
+
+    final receivable = receivableRows.first;
+    final receivableId = receivable['id'] as int;
+    final nowIso = DateTime.now().toIso8601String();
+
+    final paymentRows = await _database!.query(
+      'receivable_payments',
+      where: 'accounts_receivable_id = ?',
+      whereArgs: [receivableId],
+      orderBy: 'payment_date DESC',
+    );
+    final totalPaid = paymentRows.fold<double>(
+      0.0,
+      (sum, r) => sum + ((r['amount'] as num?)?.toDouble() ?? 0.0),
+    );
+    final refundMethod = paymentRows.isNotEmpty
+        ? ((paymentRows.first['payment_method'] as String?) ?? 'Efectivo')
+        : 'Efectivo';
+
+    // Registrar contramovimiento de abonos para auditoría de CxC.
+    if (totalPaid > 1e-9) {
+      final userId = await _resolveUserIdForSaleVoid(
+        anuladaPor: anuladaPor,
+        saleUser: sale.user,
+      );
+      await _database!.insert(
+        'receivable_payments',
+        {
+          'accounts_receivable_id': receivableId,
+          'amount': -totalPaid,
+          'payment_date': nowIso,
+          'payment_method': refundMethod,
+          'reference': 'void_sale_$saleId',
+          'notes':
+              'Reversa automática por anulación de factura $invoiceNumber.',
+          'user_id': userId ?? 1,
+          'created_at': nowIso,
+        },
+      );
+
+      await _registerVoidRefundCashMovement(
+        amount: totalPaid,
+        paymentMethod: refundMethod,
+        description:
+            'Devolución abono CxC por anulación de factura $invoiceNumber',
+        userId: userId ?? 1,
+        nowIso: nowIso,
+      );
+    }
+
+    final oldNotes = (receivable['notes'] as String?)?.trim();
+    final newNote = oldNotes == null || oldNotes.isEmpty
+        ? 'Cancelada por anulación de venta $invoiceNumber.'
+        : '$oldNotes | Cancelada por anulación de venta $invoiceNumber.';
+    await _database!.update(
+      'accounts_receivable',
+      {
+        'paid_amount': 0.0,
+        'pending_amount': 0.0,
+        'status': 'cancelled',
+        'notes': newNote,
+        'updated_at': nowIso,
+      },
+      where: 'id = ?',
+      whereArgs: [receivableId],
+    );
+  }
+
+  static Future<int?> _resolveUserIdForSaleVoid({
+    required String anuladaPor,
+    required String saleUser,
+  }) async {
+    final name = anuladaPor.trim();
+    if (name.isNotEmpty) {
+      final byFullName = await _database!.query(
+        'users',
+        columns: ['id'],
+        where: 'fullName = ?',
+        whereArgs: [name],
+        limit: 1,
+      );
+      if (byFullName.isNotEmpty) return byFullName.first['id'] as int?;
+
+      final byUsername = await _database!.query(
+        'users',
+        columns: ['id'],
+        where: 'username = ?',
+        whereArgs: [name],
+        limit: 1,
+      );
+      if (byUsername.isNotEmpty) return byUsername.first['id'] as int?;
+    }
+
+    final saleUserTrim = saleUser.trim();
+    if (saleUserTrim.isNotEmpty) {
+      final bySaleUser = await _database!.query(
+        'users',
+        columns: ['id'],
+        where: 'username = ?',
+        whereArgs: [saleUserTrim],
+        limit: 1,
+      );
+      if (bySaleUser.isNotEmpty) return bySaleUser.first['id'] as int?;
+    }
+    return null;
+  }
+
+  static bool _skipPhysicalCashMovementForMethod(String? method) {
+    final m = (method ?? '').toLowerCase().trim();
+    return m.contains('saldo a favor') ||
+        m.contains('saldoafavor') ||
+        m.contains('cambio inmediato');
+  }
+
+  static Future<void> _registerVoidRefundCashMovement({
+    required double amount,
+    required String paymentMethod,
+    required String description,
+    required int userId,
+    required String nowIso,
+  }) async {
+    if (amount <= 1e-9) return;
+
+    final openSession = await _database!.query(
+      'cash_sessions',
+      columns: ['id'],
+      where: 'status = ? AND is_active = ?',
+      whereArgs: ['open', 1],
+      orderBy: 'open_date DESC',
+      limit: 1,
+    );
+    final cashSessionId =
+        openSession.isNotEmpty ? openSession.first['id'] as int? : null;
+
+    await _database!.insert(
+      'accounting_entries',
+      {
+        'type': 'expense',
+        'amount': amount,
+        'description': description,
+        'category': 'Cuentas por Cobrar',
+        'date': nowIso,
+        'payment_method': paymentMethod,
+        'user_id': userId,
+        'cash_session_id': cashSessionId,
+        'reference': 'void_sale_refund',
+        'notes': 'Reversa automática de abono por anulación.',
+        'document_number': '',
+        'created_at': nowIso,
+        'updated_at': nowIso,
+        'is_active': 1,
+      },
+    );
+
+    if (_skipPhysicalCashMovementForMethod(paymentMethod)) return;
+
+    await _database!.insert(
+      'cash_movements',
+      {
+        'type': 'expense',
+        'amount': amount,
+        'description': description,
+        'payment_method': paymentMethod,
+        'date': nowIso,
+        'user_id': userId,
+        'cash_session_id': cashSessionId,
+        'reference': 'void_sale_refund',
+        'category': 'Cuentas por Cobrar',
+        'created_at': nowIso,
+        'is_active': 1,
+        'notes': 'Reversa automática de abono por anulación.',
+      },
+    );
   }
 
   // ================== MOVIMIENTOS DE INVENTARIO ==================
@@ -1900,6 +2330,26 @@ FROM products
       },
       where: 'id = ?',
       whereArgs: [customerId],
+    );
+  }
+
+  /// Ajusta [storeCredit] del cliente (positivo = acreditar, negativo = descontar).
+  /// No permite saldo negativo.
+  static Future<void> adjustCustomerStoreCredit(int customerId, double delta) async {
+    final c = await getCustomerById(customerId);
+    if (c == null) {
+      throw Exception('Cliente #$customerId no encontrado o inactivo');
+    }
+    final nv = c.storeCredit + delta;
+    if (nv < -1e-6) {
+      throw Exception(
+          'Saldo a favor insuficiente (disponible: ${c.storeCredit.toStringAsFixed(0)})');
+    }
+    await updateCustomer(
+      c.copyWith(
+        storeCredit: nv.clamp(0.0, 1e15),
+        updatedAt: DateTime.now(),
+      ),
     );
   }
 
@@ -2441,7 +2891,8 @@ FROM products
           pointsRate REAL NOT NULL DEFAULT 1.0,
           accumulatedPoints INTEGER NOT NULL DEFAULT 0,
           lastPurchase TEXT,
-          totalPurchases REAL NOT NULL DEFAULT 0.0
+          totalPurchases REAL NOT NULL DEFAULT 0.0,
+          storeCredit REAL NOT NULL DEFAULT 0.0
         )
       ''');
 
@@ -2478,7 +2929,8 @@ FROM products
           pointsRate REAL NOT NULL DEFAULT 1.0,
           accumulatedPoints INTEGER NOT NULL DEFAULT 0,
           lastPurchase TEXT,
-          totalPurchases REAL NOT NULL DEFAULT 0.0
+          totalPurchases REAL NOT NULL DEFAULT 0.0,
+          storeCredit REAL NOT NULL DEFAULT 0.0
         )
       ''');
 
@@ -2562,7 +3014,8 @@ FROM products
           pointsRate REAL NOT NULL DEFAULT 1.0,
           accumulatedPoints INTEGER NOT NULL DEFAULT 0,
           lastPurchase TEXT,
-          totalPurchases REAL NOT NULL DEFAULT 0.0
+          totalPurchases REAL NOT NULL DEFAULT 0.0,
+          storeCredit REAL NOT NULL DEFAULT 0.0
         )
       ''');
 

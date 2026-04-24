@@ -10,7 +10,7 @@ import '../services/auth_service.dart';
 import '../models/permissions.dart';
 import '../services/permissions_service.dart';
 import '../screens/pos_controller.dart';
-import '../modules/accounting/services/accounting_service.dart';
+import 'partial_return_dialog.dart';
 
 class ReprintMenuWidget extends StatefulWidget {
   const ReprintMenuWidget({super.key});
@@ -170,13 +170,20 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
     final role = AuthService.to.currentUser?.role;
     final canCancel = role != null &&
         PermissionsService.to.hasPermission(role, Permission.cancelSales);
-    final alreadyHasReturn = sale.id != null
+    final hasAnyReturn = sale.id != null &&
+            !sale.isReturn &&
+            !sale.isAnulada
         ? await SQLiteDatabaseService.hasReturnForSale(sale.id!)
-        : true;
+        : false;
+    final fullyReturned = sale.id != null &&
+            !sale.isReturn &&
+            !sale.isAnulada
+        ? await SQLiteDatabaseService.isOriginalSaleFullyReturned(sale)
+        : false;
     if (!mounted) return;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dlgContext) => AlertDialog(
         title: Row(
           children: [
             Icon(
@@ -252,7 +259,33 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                         ? dateFormat.format(sale.anuladaAt!)
                         : '—'),
               ],
-              if (alreadyHasReturn && !sale.isAnulada && !sale.isReturn) ...[
+              if (fullyReturned && !sale.isAnulada && !sale.isReturn) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.inventory_2,
+                          color: Colors.grey.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Toda la mercancía de esta factura consta como devuelta.',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade900),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (hasAnyReturn &&
+                  !fullyReturned &&
+                  !sale.isAnulada &&
+                  !sale.isReturn) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -262,13 +295,16 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle,
+                      Icon(Icons.info_outline,
                           color: Colors.orange.shade700, size: 20),
                       const SizedBox(width: 8),
-                      Text(
-                        'Esta factura ya tiene una devolución registrada.',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.orange.shade900),
+                      Expanded(
+                        child: Text(
+                          'Hay devoluciones parciales. Puede registrar otra por ítems '
+                          'hasta completar lo vendido.',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.orange.shade900),
+                        ),
                       ),
                     ],
                   ),
@@ -288,6 +324,14 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                     itemCount: sale.items.length,
                     itemBuilder: (context, index) {
                       final item = sale.items[index];
+                      final isKgLine = item.weightKg != null &&
+                          item.weightKg! > 1e-9;
+                      final lineMoney = isKgLine
+                          ? item.price
+                          : item.price * item.quantity;
+                      final qtyLabel = isKgLine
+                          ? '${item.weightKg!.toStringAsFixed(3)} kg'
+                          : 'x${item.quantity}';
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 2),
                         child: Padding(
@@ -297,13 +341,12 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  '${item.name} x${item.quantity}',
+                                  '${item.name} $qtyLabel',
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
                               Text(
-                                currencyFormat
-                                    .format(item.price * item.quantity),
+                                currencyFormat.format(lineMoney),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -322,13 +365,13 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dlgContext).pop(),
             child: const Text('Cerrar'),
           ),
           if (!sale.isAnulada)
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(dlgContext).pop();
                 _reprintInvoice(sale);
               },
               icon: const Icon(Icons.print),
@@ -338,12 +381,23 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
                 foregroundColor: Colors.white,
               ),
             ),
-          if (!sale.isAnulada &&
-              !sale.isReturn &&
-              !alreadyHasReturn &&
-              canCancel)
+          if (!sale.isAnulada && !sale.isReturn && !fullyReturned && canCancel)
             ElevatedButton.icon(
-              onPressed: () => _confirmRegistrarDevolucion(context, sale),
+              onPressed: () => showPartialReturnDialog(
+                dialogContext: dlgContext,
+                detailContext: dlgContext,
+                original: sale,
+                currencyFormat: currencyFormat,
+                onSuccess: _loadSales,
+                onImmediateExchangeCreditCreated: (amount) {
+                  if (!Get.isRegistered<PosController>()) return;
+                  final pos = Get.find<PosController>();
+                  pos.assignImmediateExchangeCredit(
+                    amount,
+                    sourceSaleId: sale.id,
+                  );
+                },
+              ),
               icon: const Icon(Icons.keyboard_return),
               label: const Text('Registrar devolución'),
               style: ElevatedButton.styleFrom(
@@ -353,7 +407,7 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
             ),
           if (!sale.isAnulada && canCancel)
             ElevatedButton.icon(
-              onPressed: () => _confirmVoidSale(context, sale),
+              onPressed: () => _confirmVoidSale(dlgContext, sale),
               icon: const Icon(Icons.cancel),
               label: const Text('Anular venta'),
               style: ElevatedButton.styleFrom(
@@ -364,210 +418,6 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
         ],
       ),
     );
-  }
-
-  Future<void> _confirmRegistrarDevolucion(
-      BuildContext context, Sale sale) async {
-    String metodoDevolucion = 'Efectivo';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.keyboard_return, color: Colors.orange, size: 28),
-                SizedBox(width: 8),
-                Text('Registrar devolución'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Factura #${sale.id.toString().padLeft(6, '0')} · Total: ${currencyFormat.format(sale.total)}',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Se creará un registro de devolución: vuelve el stock al inventario, '
-                  'se registra en Movimientos de inventario, ajusta caja (si aplica), '
-                  'y si la venta tenía cliente de puntos se revierten puntos y total de compras.',
-                  style: TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  initialValue: metodoDevolucion,
-                  decoration: const InputDecoration(
-                    labelText: 'Método de devolución',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'Efectivo', child: Text('Efectivo')),
-                    DropdownMenuItem(value: 'Tarjeta', child: Text('Tarjeta')),
-                    DropdownMenuItem(
-                        value: 'Transferencia', child: Text('Transferencia')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      metodoDevolucion = value;
-                      setStateDialog(() {});
-                    }
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Cancelar'),
-              ),
-              ElevatedButton.icon(
-                onPressed: () => Navigator.of(ctx).pop(true),
-                icon: const Icon(Icons.check),
-                label: const Text('Registrar devolución'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange.shade700,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    if (confirmed != true) return;
-    // Evitar doble devolución por si acaso
-    final alreadyHasReturn =
-        await SQLiteDatabaseService.hasReturnForSale(sale.id!);
-    if (alreadyHasReturn && mounted) {
-      Get.snackbar(
-        'Ya registrada',
-        'Esta factura ya tiene una devolución. No se puede registrar otra.',
-        backgroundColor: Colors.orange,
-        colorText: Colors.white,
-      );
-      return;
-    }
-    Navigator.of(context).pop(); // Cerrar detalle
-    try {
-      // Igual que en POS (pos_controller): se guarda username para que el cierre
-      // de caja (getCierreDeCajaData filtra por username de la sesión) incluya
-      // esta devolución. Si se usara fullName primero, la fila queda fuera del reporte.
-      final user = AuthService.to.currentUser?.username ?? 'usuario';
-      final returnSale = Sale(
-        date: DateTime.now(),
-        total: sale.total,
-        user: user,
-        paymentMethod: metodoDevolucion,
-        items: List<SaleItem>.from(sale.items.map((i) => SaleItem(
-              name: i.name,
-              price: i.price,
-              quantity: i.quantity,
-              unit: i.unit,
-              discount: i.discount,
-              discountPercentage: i.discountPercentage,
-              ivaPercentage: i.ivaPercentage,
-              productId: i.productId,
-              weightKg: i.weightKg,
-            ))),
-        paymentBreakdown: null,
-        customerId: sale.customerId,
-        clientId: sale.clientId,
-        discount: sale.discount ?? 0.0,
-        discountPercentage: sale.discountPercentage ?? 0.0,
-        isReturn: true,
-        originalSaleId: sale.id,
-        returnedAmount: sale.total,
-      );
-      await SQLiteDatabaseService.saveSale(returnSale);
-
-      try {
-        final invUserId = AuthService.to.currentUser?.id ?? 1;
-        await SQLiteDatabaseService.logPosReturnInventoryMovements(
-          returnSale,
-          invUserId,
-        );
-      } catch (e) {
-        if (mounted) {
-          Get.snackbar(
-            'Movimientos inventario',
-            'El stock ya se devolvió, pero no se pudo registrar el movimiento en '
-                'historial: ${e.toString().replaceFirst('Exception: ', '')}',
-            backgroundColor: Colors.orange,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 5),
-          );
-        }
-      }
-
-      try {
-        await SQLiteDatabaseService.applyCustomerBalanceAfterReturn(
-          returnSale.customerId,
-          sale.total,
-        );
-      } catch (e) {
-        if (mounted) {
-          Get.snackbar(
-            'Cliente / puntos',
-            'No se pudo ajustar puntos o total de compras del cliente: '
-                '${e.toString().replaceFirst('Exception: ', '')}',
-            backgroundColor: Colors.orange,
-            colorText: Colors.white,
-            duration: const Duration(seconds: 5),
-          );
-        }
-      }
-
-      // Egreso en caja: el cierre de caja descuenta devoluciones en efectivo desde
-      // accounting_entries (categoría con "DEVOLUCIÓN"), no solo desde la tabla sales.
-      final uid = AuthService.to.currentUser?.id;
-      if (uid != null) {
-        try {
-          await AccountingService.recordExpense(
-            sale.total,
-            'Devolución factura #${sale.id!.toString().padLeft(6, '0')} '
-            '(mov. #${returnSale.id!.toString().padLeft(6, '0')})',
-            uid,
-            category: 'Devolución POS',
-            paymentMethod: metodoDevolucion,
-            reference: 'return_of_${sale.id}',
-          );
-        } catch (e) {
-          if (mounted) {
-            Get.snackbar(
-              'Aviso contable',
-              'La devolución quedó registrada en ventas/stock, pero no se pudo '
-                  'registrar el movimiento en caja: ${e.toString().replaceFirst('Exception: ', '')}',
-              backgroundColor: Colors.orange,
-              colorText: Colors.white,
-              duration: const Duration(seconds: 6),
-            );
-          }
-        }
-      }
-      if (mounted) {
-        _loadSales();
-        Get.snackbar(
-          'Devolución registrada',
-          'Factura #${sale.id.toString().padLeft(6, '0')} · Stock e historial de '
-              'inventario · Reportes → Devoluciones · Cierre de caja (si aplica).',
-          backgroundColor: Colors.green,
-          colorText: Colors.white,
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Get.snackbar(
-          'Error',
-          e.toString().replaceFirst('Exception: ', ''),
-          backgroundColor: Colors.red,
-          colorText: Colors.white,
-        );
-      }
-    }
   }
 
   Future<void> _confirmVoidSale(BuildContext context, Sale sale) async {
@@ -626,6 +476,7 @@ class _ReprintMenuWidgetState extends State<ReprintMenuWidget> {
       ),
     );
     if (confirm != true) return;
+    if (!context.mounted) return;
     Navigator.of(context).pop(); // Cerrar detalle
     try {
       final user = AuthService.to.currentUser?.fullName ??

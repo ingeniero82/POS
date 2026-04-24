@@ -16,6 +16,12 @@ class PaymentPart {
       );
 }
 
+/// Pago o liquidación de devolución usando crédito interno del cliente (no es efectivo físico en caja).
+const String kSalePaymentMethodStoreCredit = 'Saldo a favor';
+
+/// Canje inmediato entre devolución y venta en la misma visita (no mueve efectivo físico).
+const String kSalePaymentMethodInstantExchange = 'Cambio inmediato';
+
 class Sale {
   int? id;
   late DateTime date;
@@ -94,6 +100,10 @@ class SaleItem {
   /// True cuando la edición se hizo usando "Precio con IVA" en POS.
   bool priceEditedFromIva;
 
+  /// Índice 0-based del ítem en la factura original (solo filas de devolución POS).
+  /// Permite varias devoluciones parciales y trazabilidad línea ↔ factura origen.
+  int? originalItemIndex;
+
   // Constructor
   SaleItem({
     required this.name,
@@ -110,5 +120,6 @@ class SaleItem {
     this.priceEditedAt,
     this.priceEditedBy,
     this.priceEditedFromIva = false,
+    this.originalItemIndex,
   });
 }

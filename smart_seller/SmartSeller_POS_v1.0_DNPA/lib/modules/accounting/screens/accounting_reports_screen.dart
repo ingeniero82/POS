@@ -944,6 +944,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         (data['totalDevoluciones'] as num?)?.toDouble() ?? 0.0;
     final totalEfectivo = (data['totalEfectivo'] as num?)?.toDouble() ?? 0.0;
     final totalTarjeta = (data['totalTarjeta'] as num?)?.toDouble() ?? 0.0;
+    final totalSaldoAfavor =
+        (data['totalSaldoAfavor'] as num?)?.toDouble() ?? 0.0;
 
     final sb = StringBuffer();
     String fmtNum(double n) => n.toStringAsFixed(0).replaceAllMapped(
@@ -963,7 +965,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     sb.writeln(padR('TICKET', 6) +
         padR('HORA', 6) +
         padR('CAJERO', 14) +
-        padR('MOTIVO', 24) +
+        padR('LIQUIDACION', 24) +
         padR('MONTO', 14));
     sb.writeln(dashW);
 
@@ -974,9 +976,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       final cajero = (m['cajero'] as String? ?? '').length > 14
           ? (m['cajero'] as String).substring(0, 14)
           : (m['cajero'] as String? ?? '');
-      final motivo = (m['motivo'] as String? ?? '—').length > 24
-          ? (m['motivo'] as String).substring(0, 24)
-          : (m['motivo'] as String? ?? '—');
+      final liqRaw = (m['motivo'] as String?)?.trim().isNotEmpty == true
+          ? (m['motivo'] as String)
+          : (m['paymentMethod'] as String? ?? '—');
+      final motivo = liqRaw.length > 24
+          ? liqRaw.substring(0, 24)
+          : liqRaw;
       final amount = (m['amount'] as num?)?.toDouble() ?? 0.0;
       sb.writeln(
           '${padR(ticket, 6)}${padR(hora, 6)}${padR(cajero, 14)}${padR(motivo, 24)}${padR('\$${fmtNum(amount)}', 14)}');
@@ -987,7 +992,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         '${padR('TOTAL DEVOLUCIONES:', 54)}${padR('\$${fmtNum(totalDevoluciones)}', 14)}');
     sb.writeln('');
     sb.writeln('Devoluciones en efectivo:    \$${fmtNum(totalEfectivo)}');
-    sb.writeln('Devoluciones a tarjeta:     \$${fmtNum(totalTarjeta)}');
+    sb.writeln('Devoluciones a tarjeta/otros: \$${fmtNum(totalTarjeta)}');
+    sb.writeln(
+        'Acreditado saldo a favor:   \$${fmtNum(totalSaldoAfavor)} (sin caja física)');
     sb.writeln(sepW);
     return sb.toString();
   }
@@ -1256,6 +1263,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     try {
       setState(() => _isLoading = true);
       final d = _cierreDeCajaData!;
+      final cashIncomeDetails = d['cashIncomeDetails'] as List<dynamic>? ?? [];
+      final cashExpenseDetails = d['cashExpenseDetails'] as List<dynamic>? ?? [];
       final closeDate = d['closeDate'] as DateTime? ?? DateTime.now();
       final baseName =
           'cierre_de_caja_${DateFormat('yyyyMMdd').format(closeDate)}_sesion_${d['sessionId'] ?? ''}';
@@ -1288,6 +1297,20 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
               .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
               .value =
           '${DateFormat('dd/MM/yyyy').format(closeDate)} · ${d['userName'] ?? 'Cajero'} · Sesión #${d['sessionId']}';
+      row += 2;
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+          .value = 'Guía rápida de interpretación';
+      row++;
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+          .value =
+          'Otros ingresos = entradas de efectivo que NO son ventas del POS.';
+      row++;
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+          .value =
+          'Diferencia: 0=cuadre, positiva=sobrante, negativa=faltante.';
       row += 2;
 
       sheet
@@ -1378,9 +1401,10 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       final arqueoLabels = [
         'Fondo inicial',
         '(+) Ventas efectivo',
-        '(+) Otros ingresos',
+        '(+) Otros ingresos (entradas distintas de venta)',
         '(-) Retiros',
         '(-) Gastos',
+        '(-) Devoluciones en efectivo',
         'Saldo esperado',
         'Saldo real',
         'Diferencia'
@@ -1391,6 +1415,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         'otrosIngresos',
         'retiros',
         'gastos',
+        'devolucionesEfectivo',
         'saldoEsperado',
         'saldoReal',
         'diferencia'
@@ -1404,6 +1429,97 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
             .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
             .value = v;
         row++;
+      }
+      row++;
+      final initial = (d['initialAmount'] as num?)?.toDouble() ?? 0.0;
+      final cashSales = (d['ventasEfectivo'] as num?)?.toDouble() ?? 0.0;
+      final otherIncome = (d['otrosIngresos'] as num?)?.toDouble() ?? 0.0;
+      final retiros = (d['retiros'] as num?)?.toDouble() ?? 0.0;
+      final gastos = (d['gastos'] as num?)?.toDouble() ?? 0.0;
+      final devol = (d['devolucionesEfectivo'] as num?)?.toDouble() ?? 0.0;
+      final expected = (d['saldoEsperado'] as num?)?.toDouble() ?? 0.0;
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+          .value = 'Formula saldo esperado';
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
+          .value =
+          '$initial + $cashSales + $otherIncome - $retiros - $gastos - $devol = $expected';
+
+      final incomesSheet = excel['Detalle Entradas Caja'];
+      incomesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
+          .value = 'Hora';
+      incomesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0))
+          .value = 'Categoría';
+      incomesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0))
+          .value = 'Descripción';
+      incomesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0))
+          .value = 'Medio';
+      incomesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0))
+          .value = 'Monto';
+      int incomeRow = 1;
+      for (final e in cashIncomeDetails) {
+        if (e is! Map) continue;
+        final item = Map<String, dynamic>.from(e.cast<String, dynamic>());
+        incomesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: incomeRow))
+            .value = item['time'] ?? '';
+        incomesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: incomeRow))
+            .value = item['category'] ?? '';
+        incomesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: incomeRow))
+            .value = item['description'] ?? '';
+        incomesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: incomeRow))
+            .value = item['paymentMethod'] ?? '';
+        incomesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: incomeRow))
+            .value = (item['amount'] as num?)?.toDouble() ?? 0.0;
+        incomeRow++;
+      }
+
+      final expensesSheet = excel['Detalle Salidas Caja'];
+      expensesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
+          .value = 'Hora';
+      expensesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0))
+          .value = 'Categoría';
+      expensesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0))
+          .value = 'Descripción';
+      expensesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0))
+          .value = 'Medio';
+      expensesSheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0))
+          .value = 'Monto';
+      int expenseRow = 1;
+      for (final e in cashExpenseDetails) {
+        if (e is! Map) continue;
+        final item = Map<String, dynamic>.from(e.cast<String, dynamic>());
+        expensesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: expenseRow))
+            .value = item['time'] ?? '';
+        expensesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: expenseRow))
+            .value = item['category'] ?? '';
+        expensesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: expenseRow))
+            .value = item['description'] ?? '';
+        expensesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: expenseRow))
+            .value = item['paymentMethod'] ?? '';
+        expensesSheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: expenseRow))
+            .value = (item['amount'] as num?)?.toDouble() ?? 0.0;
+        expenseRow++;
       }
 
       final bytes = excel.encode();
@@ -1456,6 +1572,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       );
     }
     final d = _cierreDeCajaData!;
+    final cashIncomeDetails = d['cashIncomeDetails'] as List<dynamic>? ?? [];
+    final cashExpenseDetails = d['cashExpenseDetails'] as List<dynamic>? ?? [];
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -1477,7 +1595,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 ?.copyWith(color: Colors.grey.shade700),
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
             children: [
               OutlinedButton.icon(
                 onPressed: _isLoading
@@ -1522,6 +1642,15 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.green.shade700,
                   side: BorderSide(color: Colors.green.shade700),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _showCierreExplanationDialog(d),
+                icon: const Icon(Icons.help_outline, size: 20),
+                label: const Text('Explícame este cierre'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.deepPurple.shade700,
+                  side: BorderSide(color: Colors.deepPurple.shade300),
                 ),
               ),
             ],
@@ -1695,12 +1824,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                           '\$${_currencyFormat.format((d['initialAmount'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('(+) Ventas efectivo',
                           '\$${_currencyFormat.format((d['ventasEfectivo'] as num?)?.toDouble() ?? 0)}'),
-                      _dataRow('(+) Otros ingresos',
+                      _dataRow('(+) Otros ingresos (entradas distintas de venta)',
                           '\$${_currencyFormat.format((d['otrosIngresos'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('(-) Retiros',
                           '-\$${_currencyFormat.format((d['retiros'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('(-) Gastos',
                           '-\$${_currencyFormat.format((d['gastos'] as num?)?.toDouble() ?? 0)}'),
+                      _dataRow('(-) Devoluciones en efectivo',
+                          '-\$${_currencyFormat.format((d['devolucionesEfectivo'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('Saldo esperado',
                           '\$${_currencyFormat.format((d['saldoEsperado'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('Saldo real',
@@ -1710,9 +1841,113 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                           bold: true),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  Builder(builder: (_) {
+                    final diferencia =
+                        (d['diferencia'] as num?)?.toDouble() ?? 0.0;
+                    final isOk = diferencia.abs() < 1e-9;
+                    final isSobrante = diferencia > 0;
+                    final label = isOk
+                        ? 'Cuadre perfecto'
+                        : (isSobrante
+                            ? 'Sobrante en caja'
+                            : 'Faltante en caja');
+                    final color = isOk
+                        ? Colors.green.shade700
+                        : (isSobrante
+                            ? Colors.blue.shade700
+                            : Colors.red.shade700);
+                    final icon = isOk
+                        ? Icons.check_circle
+                        : (isSobrante
+                            ? Icons.trending_up
+                            : Icons.warning_amber_rounded);
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: color.withValues(alpha: 0.45)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(icon, color: color, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Estado de diferencia: $label',
+                              style: TextStyle(
+                                color: color,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  Builder(builder: (_) {
+                    final initial =
+                        (d['initialAmount'] as num?)?.toDouble() ?? 0.0;
+                    final cashSales =
+                        (d['ventasEfectivo'] as num?)?.toDouble() ?? 0.0;
+                    final otherIncome =
+                        (d['otrosIngresos'] as num?)?.toDouble() ?? 0.0;
+                    final retiros = (d['retiros'] as num?)?.toDouble() ?? 0.0;
+                    final gastos = (d['gastos'] as num?)?.toDouble() ?? 0.0;
+                    final devol =
+                        (d['devolucionesEfectivo'] as num?)?.toDouble() ?? 0.0;
+                    final expected =
+                        (d['saldoEsperado'] as num?)?.toDouble() ?? 0.0;
+                    final formula =
+                        '${_currencyFormat.format(initial)} + ${_currencyFormat.format(cashSales)} + ${_currencyFormat.format(otherIncome)} - ${_currencyFormat.format(retiros)} - ${_currencyFormat.format(gastos)} - ${_currencyFormat.format(devol)} = ${_currencyFormat.format(expected)}';
+                    return Text(
+                      'Cálculo del saldo esperado: $formula',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            color: Colors.blueGrey.shade50,
+            child: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Guía rápida: "Otros ingresos" son entradas de efectivo que NO vienen de ventas del POS '
+                '(por ejemplo recaudos, ajustes o ingresos operativos). '
+                'Revise el detalle por concepto en las tarjetas siguientes.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tip: si una fila no se entiende, pulse "Explícame este cierre".',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 16),
+          _buildCashMovementDetailCard(
+            title: 'Detalle de entradas de caja (otros ingresos)',
+            details: cashIncomeDetails,
+            emptyMessage:
+                'No hay entradas adicionales en efectivo para este cierre.',
+            isExpense: false,
+          ),
+          const SizedBox(height: 16),
+          _buildCashMovementDetailCard(
+            title: 'Detalle de salidas de caja (gastos, retiros y devoluciones)',
+            details: cashExpenseDetails,
+            emptyMessage: 'No hay salidas en efectivo para este cierre.',
+            isExpense: true,
           ),
           const SizedBox(height: 20),
           Text(
@@ -1737,6 +1972,169 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
             style: TextStyle(
                 fontWeight: bold ? FontWeight.bold : FontWeight.normal))),
       ],
+    );
+  }
+
+  void _showCierreExplanationDialog(Map<String, dynamic> d) {
+    final initial = (d['initialAmount'] as num?)?.toDouble() ?? 0.0;
+    final cashSales = (d['ventasEfectivo'] as num?)?.toDouble() ?? 0.0;
+    final otherIncome = (d['otrosIngresos'] as num?)?.toDouble() ?? 0.0;
+    final retiros = (d['retiros'] as num?)?.toDouble() ?? 0.0;
+    final gastos = (d['gastos'] as num?)?.toDouble() ?? 0.0;
+    final devol = (d['devolucionesEfectivo'] as num?)?.toDouble() ?? 0.0;
+    final expected = (d['saldoEsperado'] as num?)?.toDouble() ?? 0.0;
+    final real = (d['saldoReal'] as num?)?.toDouble() ?? 0.0;
+    final diff = (d['diferencia'] as num?)?.toDouble() ?? 0.0;
+
+    String money(double v) => '\$${_currencyFormat.format(v)}';
+    final diffState = diff.abs() < 1e-9
+        ? 'Cuadre perfecto'
+        : (diff > 0 ? 'Sobrante de caja' : 'Faltante de caja');
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Explicación simple del cierre'),
+        content: SizedBox(
+          width: 650,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '¿Cómo se calcula el Saldo esperado?',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${money(initial)} + ${money(cashSales)} + ${money(otherIncome)} - ${money(retiros)} - ${money(gastos)} - ${money(devol)} = ${money(expected)}',
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Qué significa cada concepto:',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                const Text('• Fondo inicial: efectivo con el que arrancó la caja.'),
+                const Text('• Ventas efectivo: solo ventas cobradas en dinero físico.'),
+                const Text('• Otros ingresos: entradas de caja que no son ventas POS.'),
+                const Text('• Retiros: dinero que se sacó de la caja.'),
+                const Text('• Gastos: pagos en efectivo hechos desde caja.'),
+                const Text('• Devoluciones en efectivo: dinero devuelto al cliente.'),
+                const SizedBox(height: 12),
+                Text('Saldo esperado: ${money(expected)}'),
+                Text('Saldo real contado: ${money(real)}'),
+                Text('Diferencia: ${money(diff)}  ($diffState)'),
+                const SizedBox(height: 10),
+                const Text(
+                  'Lectura rápida: si la diferencia es 0, caja cuadró. '
+                  'Si es positiva sobra dinero; si es negativa falta dinero.',
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cerrar')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCashMovementDetailCard({
+    required String title,
+    required List<dynamic> details,
+    required String emptyMessage,
+    required bool isExpense,
+  }) {
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final row in details) {
+      if (row is! Map) continue;
+      final map = Map<String, dynamic>.from(row.cast<String, dynamic>());
+      final category = (map['category'] as String?)?.trim();
+      final fallback = isExpense ? 'Salida sin categoría' : 'Ingreso sin categoría';
+      final key = (category == null || category.isEmpty) ? fallback : category;
+      grouped.putIfAbsent(key, () => <Map<String, dynamic>>[]).add(map);
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            if (grouped.isEmpty)
+              Text(emptyMessage, style: TextStyle(color: Colors.grey.shade700))
+            else
+              ...grouped.entries.map((entry) {
+                final items = entry.value;
+                final subtotal = items.fold<double>(
+                  0.0,
+                  (sum, item) => sum + ((item['amount'] as num?)?.toDouble() ?? 0.0),
+                );
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${entry.key} · Subtotal: ${isExpense ? '-' : ''}\$${_currencyFormat.format(subtotal)}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      ...items.map((item) {
+                        final time = (item['time'] as String?)?.trim();
+                        final desc = (item['description'] as String?)?.trim();
+                        final amount = (item['amount'] as num?)?.toDouble() ?? 0.0;
+                        final method = (item['paymentMethod'] as String?)?.trim();
+                        final parts = <String>[
+                          if (time != null && time.isNotEmpty) time,
+                          if (desc != null && desc.isNotEmpty) desc,
+                          if (method != null && method.isNotEmpty) 'Medio: $method',
+                        ];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  parts.isEmpty ? 'Movimiento sin descripción' : parts.join(' · '),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                              Text(
+                                '${isExpense ? '-' : ''}\$${_currencyFormat.format(amount)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1933,6 +2331,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     final total = (d['totalDevoluciones'] as num?)?.toDouble() ?? 0.0;
     final totalEfectivo = (d['totalEfectivo'] as num?)?.toDouble() ?? 0.0;
     final totalTarjeta = (d['totalTarjeta'] as num?)?.toDouble() ?? 0.0;
+    final totalSaldoAfavor =
+        (d['totalSaldoAfavor'] as num?)?.toDouble() ?? 0.0;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -1966,7 +2366,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                       label: Text('CAJERO',
                           style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(
-                      label: Text('MOTIVO',
+                      label: Text('LIQUIDACIÓN',
                           style: TextStyle(fontWeight: FontWeight.bold))),
                   DataColumn(
                       label: Text('MONTO',
@@ -1988,7 +2388,10 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                         final ticket = m['ticket'] as String? ?? '${m['id']}';
                         final hora = m['hora'] as String? ?? '—';
                         final cajero = m['cajero'] as String? ?? '';
-                        final motivo = m['motivo'] as String? ?? '—';
+                        final motivo =
+                            (m['motivo'] as String?)?.trim().isNotEmpty == true
+                                ? (m['motivo'] as String)
+                                : (m['paymentMethod'] as String? ?? '—');
                         final amount = (m['amount'] as num?)?.toDouble() ?? 0.0;
                         return DataRow(cells: [
                           DataCell(Text(ticket)),
@@ -2007,8 +2410,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 bold: true),
             _row('Devoluciones en efectivo',
                 '\$${_currencyFormat.format(totalEfectivo)}'),
-            _row('Devoluciones a tarjeta',
+            _row('Devoluciones a tarjeta / otros medios',
                 '\$${_currencyFormat.format(totalTarjeta)}'),
+            _row(
+              'Acreditado a saldo a favor (sin salida de caja)',
+              '\$${_currencyFormat.format(totalSaldoAfavor)}',
+            ),
           ]),
         ],
       ),
@@ -3959,6 +4366,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     final period = DateFormat('dd/MM/yyyy').format(closeDate);
     final subtitle =
         '${d['userName'] ?? 'Cajero'} · Sesión #${d['sessionId'] ?? '-'}';
+    final cashIncomeDetails = d['cashIncomeDetails'] as List<dynamic>? ?? [];
+    final cashExpenseDetails = d['cashExpenseDetails'] as List<dynamic>? ?? [];
 
     final pdf = pw.Document();
     pdf.addPage(
@@ -4042,12 +4451,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 'Fondo inicial', (d['initialAmount'] as num?)?.toDouble() ?? 0),
             _buildPDFTableRow('(+) Ventas efectivo',
                 (d['ventasEfectivo'] as num?)?.toDouble() ?? 0),
-            _buildPDFTableRow('(+) Otros ingresos',
+            _buildPDFTableRow('(+) Otros ingresos (entradas distintas de venta)',
                 (d['otrosIngresos'] as num?)?.toDouble() ?? 0),
             _buildPDFTableRow(
                 '(-) Retiros', (d['retiros'] as num?)?.toDouble() ?? 0),
             _buildPDFTableRow(
                 '(-) Gastos', (d['gastos'] as num?)?.toDouble() ?? 0),
+            _buildPDFTableRow('(-) Devoluciones en efectivo',
+                (d['devolucionesEfectivo'] as num?)?.toDouble() ?? 0),
             _buildPDFTableRow('Saldo esperado',
                 (d['saldoEsperado'] as num?)?.toDouble() ?? 0),
             _buildPDFTableRow(
@@ -4055,12 +4466,31 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
             _buildPDFTableRow(
                 'Diferencia', (d['diferencia'] as num?)?.toDouble() ?? 0),
           ];
+          final diferencia = (d['diferencia'] as num?)?.toDouble() ?? 0.0;
+          final diffLabel = diferencia.abs() < 1e-9
+              ? 'Cuadre perfecto'
+              : (diferencia > 0 ? 'Sobrante en caja' : 'Faltante en caja');
           return [
             _buildPDFTitle(companyName, 'Cierre de Caja', period),
             pw.SizedBox(height: 4),
             pw.Text(subtitle,
                 style:
                     const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
+            pw.SizedBox(height: 8),
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey400),
+                borderRadius: pw.BorderRadius.circular(6),
+                color: PdfColors.blue50,
+              ),
+              child: pw.Text(
+                'Guía rápida: "Otros ingresos" = entradas de efectivo que NO son ventas del POS. '
+                'Diferencia: 0=cuadre, positiva=sobrante, negativa=faltante.',
+                style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+              ),
+            ),
             pw.SizedBox(height: 16),
             pw.Text('Resumen de ventas',
                 style:
@@ -4111,6 +4541,34 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
               },
               children: rowsArqueo,
             ),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              'Estado de diferencia: $diffLabel',
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: diferencia.abs() < 1e-9
+                    ? PdfColors.green700
+                    : (diferencia > 0 ? PdfColors.blue700 : PdfColors.red700),
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Cálculo saldo esperado = Fondo inicial + Ventas efectivo + Otros ingresos - Retiros - Gastos - Devoluciones en efectivo',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+            ),
+            pw.SizedBox(height: 14),
+            pw.Text('Detalle de entradas de caja (otros ingresos)',
+                style:
+                    pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 6),
+            _buildPdfCashMovementDetailTable(cashIncomeDetails, isExpense: false),
+            pw.SizedBox(height: 12),
+            pw.Text('Detalle de salidas de caja (gastos, retiros y devoluciones)',
+                style:
+                    pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 6),
+            _buildPdfCashMovementDetailTable(cashExpenseDetails, isExpense: true),
           ];
         },
       ),
@@ -4680,6 +5138,63 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
             padding: const pw.EdgeInsets.all(8),
             child: pw.Text(_currencyFormat.format(value))),
       ],
+    );
+  }
+
+  pw.Widget _buildPdfCashMovementDetailTable(
+    List<dynamic> details, {
+    required bool isExpense,
+  }) {
+    if (details.isEmpty) {
+      return pw.Text(
+        isExpense
+            ? 'Sin salidas de efectivo en este cierre.'
+            : 'Sin entradas adicionales de efectivo en este cierre.',
+        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+      );
+    }
+
+    final rows = <pw.TableRow>[
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+        children: [
+          _buildPDFTableCell('Hora', isHeader: true),
+          _buildPDFTableCell('Categoría', isHeader: true),
+          _buildPDFTableCell('Descripción', isHeader: true),
+          _buildPDFTableCell('Medio', isHeader: true),
+          _buildPDFTableCell('Monto', isHeader: true),
+        ],
+      ),
+    ];
+
+    for (final row in details) {
+      if (row is! Map) continue;
+      final item = Map<String, dynamic>.from(row.cast<String, dynamic>());
+      final amount = (item['amount'] as num?)?.toDouble() ?? 0.0;
+      final value =
+          '${isExpense ? '-' : ''}${_currencyFormat.format(amount)}';
+      rows.add(
+        pw.TableRow(
+          children: [
+            _buildPDFTableCell((item['time'] as String?) ?? ''),
+            _buildPDFTableCell((item['category'] as String?) ?? ''),
+            _buildPDFTableCell((item['description'] as String?) ?? ''),
+            _buildPDFTableCell((item['paymentMethod'] as String?) ?? ''),
+            _buildPDFTableCell(value),
+          ],
+        ),
+      );
+    }
+
+    return pw.Table(
+      columnWidths: {
+        0: const pw.FlexColumnWidth(0.8),
+        1: const pw.FlexColumnWidth(1.3),
+        2: const pw.FlexColumnWidth(2.0),
+        3: const pw.FlexColumnWidth(1.0),
+        4: const pw.FlexColumnWidth(1.0),
+      },
+      children: rows,
     );
   }
 

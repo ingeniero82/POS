@@ -81,7 +81,11 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
-    _posController = Get.put(PosController());
+    // Permanente / reutilizar: tras imprimir se usa Get.offAllNamed('/pos'); si el
+    // controlador se destruye, se pierde canje pendiente (remanente) en memoria.
+    _posController = Get.isRegistered<PosController>()
+        ? Get.find<PosController>()
+        : Get.put(PosController(), permanent: true);
     _balanzaService = Get.find<BalanzaService>();
     _pesoEnVivoKg = _balanzaService.ultimoPeso;
     _pesoSub = _balanzaService.pesosStream.listen((peso) {
@@ -1342,21 +1346,50 @@ class _PosScreenState extends State<PosScreen> {
                 ),
               );
             }),
+            Obx(() {
+              final applied = _posController.immediateExchangeApplied;
+              if (applied <= 1e-9) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Canje inmediato:',
+                      style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.deepOrange.shade800,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      '-\$${applied.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepOrange.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
             const Divider(),
             // Total
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'TOTAL:',
+                  'TOTAL A COBRAR:',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.orange,
                   ),
                 ),
                 Obx(() => Text(
-                      '\$${_posController.total.toStringAsFixed(0)}',
+                      '\$${_posController.totalToCollect.toStringAsFixed(0)}',
                       textAlign: TextAlign.right,
                       style: const TextStyle(
                         fontSize: 28,
@@ -1366,6 +1399,27 @@ class _PosScreenState extends State<PosScreen> {
                     )),
               ],
             ),
+            Obx(() {
+              if (_posController.immediateExchangeApplied <= 1e-9) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total mercancía:',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                    Text(
+                      '\$${_posController.total.toStringAsFixed(0)}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -1657,6 +1711,59 @@ class _PosScreenState extends State<PosScreen> {
                 ],
               ],
             ),
+            Obx(() {
+              final activeCredit = _posController.immediateExchangeCredit.value;
+              if (activeCredit <= 1e-9) {
+                return const SizedBox.shrink();
+              }
+              final sourceId = _posController.immediateExchangeSourceSaleId.value;
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _showImmediateExchangeStatusDialog,
+                        icon: const Icon(Icons.swap_horiz),
+                        label: Text(
+                          sourceId != null
+                              ? 'Canje activo #${sourceId.toString().padLeft(6, '0')} · \$${activeCredit.toStringAsFixed(0)}'
+                              : 'Canje activo · \$${activeCredit.toStringAsFixed(0)}',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(fontSize: isNarrow ? 11 : 12),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepOrange.shade50,
+                          foregroundColor: Colors.deepOrange.shade800,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: isNarrow ? 110 : 150,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          _posController.clearImmediateExchangeCredit(showSnack: true);
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        label: Text(
+                          'Quitar',
+                          style: TextStyle(fontSize: isNarrow ? 11 : 12),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.deepOrange.shade800,
+                          side: BorderSide(color: Colors.deepOrange.shade200),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         );
       },
@@ -1693,6 +1800,127 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   // ================== MÉTODOS DE LÓGICA ==================
+
+  void _showImmediateExchangeStatusDialog() {
+    String refundMethod = 'Efectivo';
+    bool isRefunding = false;
+    Get.dialog(
+      StatefulBuilder(
+        builder: (context, setDialogState) {
+          final activeCredit = _posController.immediateExchangeCredit.value;
+          final sourceId = _posController.immediateExchangeSourceSaleId.value;
+          final applied = _posController.immediateExchangeApplied;
+          final pending =
+              (activeCredit - applied).clamp(0.0, double.infinity);
+          final remainder = _posController.immediateExchangeUnusedRemainder;
+          return AlertDialog(
+            title: const Text('Canje inmediato activo'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (sourceId != null)
+                  Text(
+                      'Factura origen: #${sourceId.toString().padLeft(6, '0')}'),
+                Text('Crédito disponible: \$${activeCredit.toStringAsFixed(0)}'),
+                Text(
+                    'Aplicado en venta actual: \$${applied.toStringAsFixed(0)}'),
+                Text(
+                    'Saldo pendiente en este canje: \$${pending.toStringAsFixed(0)}'),
+                const SizedBox(height: 8),
+                Text(
+                  'El POS cobrará solo la diferencia real para no afectar el cierre de caja.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+                if (remainder > 1e-9) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Si el producto de cambio vale menos y sobra plata a favor del cliente, '
+                    'registre aquí la devolución del remanente (\$${remainder.toStringAsFixed(0)}) '
+                    'para que caja y contabilidad cuadren.',
+                    style: TextStyle(fontSize: 12, color: Colors.brown.shade800),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey<String>(refundMethod),
+                    initialValue: refundMethod,
+                    decoration: const InputDecoration(
+                      labelText: 'Medio de devolución del remanente',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'Efectivo', child: Text('Efectivo')),
+                      DropdownMenuItem(
+                          value: 'Tarjeta', child: Text('Tarjeta')),
+                      DropdownMenuItem(
+                          value: 'Transferencia',
+                          child: Text('Transferencia')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        setDialogState(() => refundMethod = v);
+                      }
+                    },
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('Cerrar'),
+              ),
+              if (remainder > 1e-9)
+                ElevatedButton.icon(
+                  onPressed: isRefunding
+                      ? null
+                      : () async {
+                          setDialogState(() => isRefunding = true);
+                          final ok = await _posController
+                              .refundImmediateExchangeUnusedRemainder(
+                                  refundMethod);
+                          if (!context.mounted) return;
+                          setDialogState(() => isRefunding = false);
+                          if (ok) {
+                            Get.back();
+                            setState(() {});
+                          }
+                        },
+                  icon: isRefunding
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.payments_outlined, size: 20),
+                  label: Text(isRefunding
+                      ? 'Registrando devolución...'
+                      : 'Devolver remanente (\$${remainder.toStringAsFixed(0)})'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade700,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  _posController.clearImmediateExchangeCredit(showSnack: true);
+                  Get.back();
+                  setState(() {});
+                },
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Quitar canje'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   void _handleKeyPress(KeyEvent event) {
     if (event is KeyDownEvent) {

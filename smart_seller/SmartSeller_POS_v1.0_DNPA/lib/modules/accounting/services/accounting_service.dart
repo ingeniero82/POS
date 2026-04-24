@@ -18,6 +18,14 @@ class AccountingService {
 
   // ==================== ENTRADAS CONTABLES ====================
 
+  /// Medios que no deben generar fila en [cash_movements] (no billetes en caja).
+  static bool _paymentMethodSkipsPhysicalCashMovement(String? method) {
+    final m = (method ?? '').toLowerCase().trim();
+    return m.contains('saldo a favor') ||
+        m.contains('saldoafavor') ||
+        m.contains('cambio inmediato');
+  }
+
   // Crear entrada contable
   static Future<int> createAccountingEntry(AccountingEntry entry) async {
     try {
@@ -26,8 +34,10 @@ class AccountingService {
 
       final id = await db.insert(_accountingTableName, entry.toMap());
 
-      // Crear movimiento de caja automáticamente si es necesario
-      if (entry.paymentMethod != null) {
+      // Crear movimiento de caja solo cuando el medio implica efectivo físico en caja.
+      // «Saldo a favor» es pasivo interno: queda trazado en accounting_entries pero no en cash_movements.
+      if (entry.paymentMethod != null &&
+          !_paymentMethodSkipsPhysicalCashMovement(entry.paymentMethod)) {
         await _createCashMovementFromEntry(entry, id);
       }
 

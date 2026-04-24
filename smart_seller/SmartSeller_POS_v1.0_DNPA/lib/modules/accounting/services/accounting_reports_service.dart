@@ -1201,6 +1201,7 @@ class AccountingReportsService {
       double totalDevoluciones = 0;
       double totalEfectivo = 0;
       double totalTarjeta = 0;
+      double totalSaldoAfavor = 0;
 
       for (final r in rows) {
         final amount = (r['returnedAmount'] as num?)?.toDouble() ??
@@ -1210,6 +1211,7 @@ class AccountingReportsService {
 
         double efectivo = 0.0;
         double tarjeta = 0.0;
+        double saldoRow = 0.0;
         final pbStr = r['payment_breakdown'] as String?;
         if (pbStr != null && pbStr.isNotEmpty && pbStr.contains('[')) {
           try {
@@ -1224,6 +1226,8 @@ class AccountingReportsService {
                     : 0.0;
                 if (method.contains('EFECTIVO')) {
                   efectivo += amt;
+                } else if (method.contains('SALDO') && method.contains('FAVOR')) {
+                  saldoRow += amt;
                 } else {
                   tarjeta += amt;
                 }
@@ -1231,10 +1235,15 @@ class AccountingReportsService {
             }
           } catch (_) {}
         }
-        if (efectivo == 0 && tarjeta == 0) {
+        if (saldoRow > 0) {
+          totalSaldoAfavor += saldoRow;
+        }
+        if (efectivo == 0 && tarjeta == 0 && saldoRow == 0) {
           final method =
               (r['paymentMethod'] as String? ?? 'Efectivo').toUpperCase();
-          if (method.contains('TARJETA') || method.contains('CARD')) {
+          if (method.contains('SALDO') && method.contains('FAVOR')) {
+            totalSaldoAfavor += amount;
+          } else if (method.contains('TARJETA') || method.contains('CARD')) {
             totalTarjeta += amount;
           } else {
             totalEfectivo += amount;
@@ -1251,6 +1260,8 @@ class AccountingReportsService {
             ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
             : '—';
         final cajero = r['user'] as String? ?? '';
+        final pm = (r['paymentMethod'] as String?)?.trim();
+        final liquidacion = (pm == null || pm.isEmpty) ? '—' : pm;
 
         list.add({
           'id': r['id'],
@@ -1258,10 +1269,11 @@ class AccountingReportsService {
           'date': date,
           'hora': hora,
           'cajero': cajero,
-          'motivo': '—',
+          'motivo': liquidacion,
           'amount': amount,
           'user': cajero,
           'originalSaleId': r['originalSaleId'],
+          'paymentMethod': pm,
         });
       }
 
@@ -1273,6 +1285,7 @@ class AccountingReportsService {
         'totalDevoluciones': totalDevoluciones,
         'totalEfectivo': totalEfectivo,
         'totalTarjeta': totalTarjeta,
+        'totalSaldoAfavor': totalSaldoAfavor,
       };
     } catch (e) {
       print('❌ Error getDevolucionesData: $e');
@@ -1282,6 +1295,7 @@ class AccountingReportsService {
         'totalDevoluciones': 0.0,
         'totalEfectivo': 0.0,
         'totalTarjeta': 0.0,
+        'totalSaldoAfavor': 0.0,
       };
     }
   }

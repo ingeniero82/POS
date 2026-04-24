@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -133,6 +135,10 @@ class PosController extends GetxController {
   double? _creditReceiptPending;
   String? _creditReceiptMethod;
 
+  /// Crédito temporal de canje inmediato (devolución aplicada en esta misma visita).
+  final immediateExchangeCredit = 0.0.obs;
+  final immediateExchangeSourceSaleId = RxnInt();
+
   // Normalización centralizada para valores monetarios de caja (pesos enteros).
   double _normalizeCashAmount(num value) => value.toDouble().roundToDouble();
 
@@ -151,6 +157,140 @@ class PosController extends GetxController {
   void setLastCashPayment(double received, double change) {
     _lastCashReceived = received;
     _lastChange = change;
+  }
+
+  void assignImmediateExchangeCredit(double amount, {int? sourceSaleId}) {
+    final normalized = _normalizeCashAmount(amount);
+    if (normalized <= 0) return;
+    immediateExchangeCredit.value =
+        _normalizeCashAmount(immediateExchangeCredit.value + normalized);
+    immediateExchangeSourceSaleId.value = sourceSaleId;
+  }
+
+  void clearImmediateExchangeCredit({bool showSnack = false}) {
+    if (immediateExchangeCredit.value <= 1e-9) return;
+    immediateExchangeCredit.value = 0.0;
+    immediateExchangeSourceSaleId.value = null;
+    if (showSnack) {
+      Get.snackbar(
+        'Cambio inmediato',
+        'Se limpió el saldo temporal de canje.',
+        backgroundColor: Colors.blueGrey,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    }
+  }
+
+  void _decreaseImmediateExchangeCreditBy(double amount) {
+    final n = _normalizeCashAmount(amount);
+    if (n <= 0) return;
+    final next = _normalizeCashAmount(immediateExchangeCredit.value - n)
+        .clamp(0.0, double.infinity);
+    immediateExchangeCredit.value = next;
+    if (next <= 1e-9) {
+      immediateExchangeSourceSaleId.value = null;
+    }
+  }
+
+  void _consumeImmediateExchangeCredit(double usedAmount) {
+    _decreaseImmediateExchangeCreditBy(usedAmount);
+  }
+
+  /// Crédito de canje que no cubre el total del carrito actual (sobrante a favor del cliente).
+  double get immediateExchangeUnusedRemainder => _normalizeCashAmount(
+        (immediateExchangeCredit.value - immediateExchangeApplied)
+            .clamp(0.0, double.infinity),
+      );
+
+  /// Registra egreso por remanente de canje.
+  /// Retorna `true` si se registró correctamente.
+  Future<bool> refundImmediateExchangeUnusedRemainder(String paymentMethod) async {
+    final amount = immediateExchangeUnusedRemainder;
+    if (amount <= 1e-9) {
+      Get.snackbar(
+        'Canje inmediato',
+        'No hay remanente por devolver respecto al carrito actual.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    final uid = AuthService.to.currentUser?.id;
+    if (uid == null) {
+      Get.snackbar(
+        'Sesión',
+        'No hay usuario válido para registrar la devolución.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return false;
+    }
+    try {
+      final orig = immediateExchangeSourceSaleId.value;
+      await AccountingService.recordExpense(
+            amount,
+            orig != null
+                ? 'Devolución remanente cambio inmediato · Fact. orig. #${orig.toString().padLeft(6, '0')}'
+                : 'Devolución remanente cambio inmediato',
+            uid,
+            category: 'Devolución POS (cambio inmediato)',
+            paymentMethod: paymentMethod,
+            reference:
+                'instant_exchange_remainder_${DateTime.now().millisecondsSinceEpoch}',
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (e) {
+      final msg = e is TimeoutException
+          ? 'Se demoró demasiado al registrar el egreso. Revise conexión/BD e intente de nuevo.'
+          : e.toString().replaceFirst('Exception: ', '');
+      Get.snackbar(
+        'Contabilidad',
+        'No se pudo registrar el egreso: $msg',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 5),
+      );
+      return false;
+    }
+    _decreaseImmediateExchangeCreditBy(amount);
+    // Si la devolución se hace en efectivo, intentar abrir cajón automáticamente.
+    if (paymentMethod.trim().toLowerCase() == 'efectivo') {
+      try {
+        final opened = await PrintService.instance.openCashDrawer();
+        if (!opened) {
+          Get.snackbar(
+            'Cajón',
+            'Remanente registrado, pero no se pudo abrir el cajón automáticamente.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+          );
+        }
+      } catch (_) {
+        Get.snackbar(
+          'Cajón',
+          'Remanente registrado, pero hubo error al abrir el cajón.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+    Get.snackbar(
+      'Canje inmediato',
+      'Devolución registrada: \$${amount.toStringAsFixed(0)} ($paymentMethod).',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.green,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 3),
+    );
+    return true;
   }
 
   // ✅ NUEVO: Variables para gestión de clientes
@@ -436,6 +576,7 @@ class PosController extends GetxController {
   // ✅ NUEVO: Método para seleccionar cliente
   void selectCustomer(Customer customer) {
     selectedCustomer.value = customer;
+    Future.microtask(() => _reloadSelectedCustomerFromDb());
     Get.back(); // Cerrar modal de búsqueda
     WidgetsBinding.instance
         .addPostFrameCallback((_) => notifyCustomerDisplayChanged());
@@ -831,6 +972,8 @@ class PosController extends GetxController {
   void clearCart() {
     cartDiscountPercent.value = 0.0;
     cartItems.clear();
+    // No llamar clearImmediateExchangeCredit aquí: tras una venta con canje puede
+    // quedar saldo pendiente (remanente) hasta «Devolver remanente» o «Quitar».
     Get.snackbar(
       'Carrito limpiado',
       'Todos los productos han sido removidos',
@@ -1009,6 +1152,7 @@ class PosController extends GetxController {
     cartDiscountPercent.value = 0.0;
     cartItems.clear();
     heldSales.clear();
+    clearImmediateExchangeCredit();
     selectedCustomer.value = null;
     selectedClient.value = null;
     notifyCustomerDisplayChanged();
@@ -1118,6 +1262,14 @@ class PosController extends GetxController {
   /// Total a cobrar (neto tras descuento global).
   double get total =>
       (grossTotal - cartDiscountAmount).clamp(0.0, double.infinity);
+
+  /// Monto del canje inmediato que realmente se puede aplicar en esta venta.
+  double get immediateExchangeApplied =>
+      math.min(immediateExchangeCredit.value, total);
+
+  /// Valor que sí debe pagar el cliente después de aplicar canje inmediato.
+  double get totalToCollect =>
+      _normalizeCashAmount((total - immediateExchangeApplied).clamp(0.0, double.infinity));
 
   /// Campos de descuento para persistir en [Sale] (0 si no aplica).
   ({double amount, double percent}) get _cartSaleDiscount {
@@ -1276,6 +1428,178 @@ class PosController extends GetxController {
     });
   }
 
+  Future<void> _reloadSelectedCustomerFromDb() async {
+    final id = selectedCustomer.value?.id;
+    if (id == null) return;
+    try {
+      final c = await SQLiteDatabaseService.getCustomerById(id);
+      if (c != null) selectedCustomer.value = c;
+    } catch (_) {}
+  }
+
+  /// Saldo a favor insuficiente para la parte en «Saldo a favor» del pago mixto.
+  Future<bool> _validateStoreCreditForPayment(double creditAmount) async {
+    if (creditAmount <= 1e-9) return true;
+    final cid = selectedCustomer.value?.id;
+    if (cid == null) return false;
+    final c = await SQLiteDatabaseService.getCustomerById(cid);
+    return c != null && c.storeCredit + 1e-6 >= creditAmount;
+  }
+
+  void _showStoreCreditPlusComplementDialog(NumberFormat copFormat) {
+    Get.back(); // Cierra el diálogo de métodos de pago
+    final maxCred = selectedCustomer.value?.storeCredit ?? 0.0;
+    final payTotal = totalToCollect;
+    if (maxCred <= 0 || payTotal <= 0) return;
+    final useCred = math.min(maxCred, payTotal);
+    final rest = _normalizeCashAmount(payTotal - useCred);
+    var complement = 'Tarjeta';
+
+    void applyBreakdown(String secondMethod) {
+      _processPaymentWithBreakdown(
+        [
+          PaymentPart(method: kSalePaymentMethodStoreCredit, amount: useCred),
+          PaymentPart(method: secondMethod, amount: rest),
+        ],
+        copFormat,
+      );
+    }
+
+    void openCashComplement() {
+      Get.back();
+      final controller = TextEditingController();
+      final vuelto = 0.0.obs;
+      final canConfirm = false.obs;
+      void upd() {
+        final value = parseMontoPuntosMiles(controller.text) ?? 0;
+        canConfirm.value = _canCoverCashTotal(value, rest);
+        vuelto.value = _calculateCashChange(value, rest);
+      }
+
+      Get.dialog(
+        Dialog(
+          child: Container(
+            width: 380,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Complemento en efectivo',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Ya aplicado ${copFormat.format(useCred)} con saldo a favor.\n'
+                  'Cobrar en efectivo: ${copFormat.format(rest)}',
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  autofocus: true,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                    PuntosMilesInputFormatter(),
+                  ],
+                  decoration: const InputDecoration(
+                    prefixText: '\$ ',
+                    border: OutlineInputBorder(),
+                    labelText: 'Monto recibido',
+                  ),
+                  onChanged: (_) => upd(),
+                ),
+                const SizedBox(height: 12),
+                Obx(() => Text('Vuelto: ${copFormat.format(vuelto.value)}')),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    TextButton(onPressed: () => Get.back(), child: const Text('Cancelar')),
+                    const Spacer(),
+                    Obx(() => ElevatedButton(
+                          onPressed: canConfirm.value
+                              ? () {
+                                  final value =
+                                      parseMontoPuntosMiles(controller.text) ??
+                                          0.0;
+                                  if (!_canCoverCashTotal(value, rest)) return;
+                                  setLastCashPayment(
+                                    _normalizeCashAmount(value),
+                                    _calculateCashChange(value, rest),
+                                  );
+                                  Get.back();
+                                  applyBreakdown('Efectivo');
+                                }
+                              : null,
+                          child: const Text('Confirmar'),
+                        )),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Saldo a favor + complemento'),
+        content: StatefulBuilder(
+          builder: (ctx, setSt) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Saldo disponible: ${copFormat.format(maxCred)}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                    'Se usará ${copFormat.format(useCred)} del saldo; complemento: ${copFormat.format(rest)}.'),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  key: ValueKey<String>(complement),
+                  initialValue: complement,
+                  decoration: const InputDecoration(
+                    labelText: 'Medio del complemento',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Tarjeta', child: Text('Tarjeta')),
+                    DropdownMenuItem(
+                        value: 'Transferencia', child: Text('Transferencia')),
+                    DropdownMenuItem(value: 'Efectivo', child: Text('Efectivo')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setSt(() => complement = v);
+                  },
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              if (complement == 'Efectivo') {
+                openCashComplement();
+              } else {
+                applyBreakdown(complement);
+              }
+            },
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Procesar pago
   void processPayment() async {
     final NumberFormat copFormat = NumberFormat.currency(
@@ -1291,6 +1615,8 @@ class PosController extends GetxController {
       );
       return;
     }
+
+    await _reloadSelectedCustomerFromDb();
 
     // Mostrar opciones de pago (Builder: cerrar este modal con Navigator para no dejarlo debajo del flujo crédito)
     Get.dialog(
@@ -1313,12 +1639,77 @@ class PosController extends GetxController {
                   ),
                   const SizedBox(height: 16),
                   Obx(() => Text(
-                        'Total a pagar: ${copFormat.format(total)}',
+                        'Total a pagar: ${copFormat.format(totalToCollect)}',
                         style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF4CAF50)),
                       )),
+                  Obx(() {
+                    final applied = immediateExchangeApplied;
+                    if (applied <= 1e-9) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Canje inmediato aplicado: -${copFormat.format(applied)}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.deepOrange.shade700,
+                            ),
+                          ),
+                          if (immediateExchangeSourceSaleId.value != null)
+                            Text(
+                              'Origen: Factura #${immediateExchangeSourceSaleId.value!.toString().padLeft(6, '0')}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey.shade700),
+                            ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.center,
+                            child: TextButton.icon(
+                              onPressed: () =>
+                                  clearImmediateExchangeCredit(showSnack: true),
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              label: const Text('Quitar canje inmediato'),
+                            ),
+                          ),
+                          if (immediateExchangeUnusedRemainder > 1e-9) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: Colors.amber.shade700, width: 1),
+                              ),
+                              child: Text(
+                                'Sobrante del canje (a favor del cliente): '
+                                '${copFormat.format(immediateExchangeUnusedRemainder)}.\n'
+                                'Tras confirmar esta venta, use el aviso «Canje activo» '
+                                'y «Devolver remanente» para registrar la devolución.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.35,
+                                  color: Colors.brown.shade800,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
                   Obx(() {
                     if (cartDiscountAmount <= 0) return const SizedBox.shrink();
                     final p = cartDiscountPercent.value;
@@ -1360,6 +1751,28 @@ class PosController extends GetxController {
                     );
                   }),
                   const SizedBox(height: 12),
+
+                  Obx(() {
+                    if (totalToCollect > 1e-9 || immediateExchangeApplied <= 1e-9) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () =>
+                              _processPaymentWithMethod(kSalePaymentMethodInstantExchange),
+                          icon: const Icon(Icons.swap_horiz),
+                          label: const Text('Confirmar cambio inmediato (sin cobro)'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepOrange,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
 
                   // Opciones de pago
                   Row(
@@ -1423,11 +1836,77 @@ class PosController extends GetxController {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  Obx(() {
+                    final cust = selectedCustomer.value;
+                    final sc = cust?.storeCredit ?? 0.0;
+                    if (cust == null || sc <= 1e-9) {
+                      return const SizedBox.shrink();
+                    }
+                    final pay = totalToCollect;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Saldo a favor del cliente: ${copFormat.format(sc)}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.teal.shade800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (sc + 1e-6 >= pay)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _processPaymentWithMethod(
+                                  kSalePaymentMethodStoreCredit),
+                              icon: const Icon(Icons.savings_outlined),
+                              label: const Text('Pagar todo con saldo a favor'),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                foregroundColor: Colors.teal.shade900,
+                                side: BorderSide(color: Colors.teal.shade700),
+                              ),
+                            ),
+                          ),
+                        if (sc + 1e-6 < pay)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  _showStoreCreditPlusComplementDialog(
+                                      copFormat),
+                              icon: const Icon(Icons.balance),
+                              label: const Text('Saldo a favor + otro medio'),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                foregroundColor: Colors.teal.shade900,
+                                side: BorderSide(color: Colors.teal.shade700),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                      ],
+                    );
+                  }),
                   // Venta a crédito: queda en cuentas por cobrar (requiere cliente seleccionado)
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () {
+                        if (immediateExchangeApplied > 1e-9) {
+                          Get.snackbar(
+                            'Cambio inmediato',
+                            'Para usar el canje inmediato finalice esta venta en contado (incluyendo pago mixto).',
+                            backgroundColor: Colors.orange,
+                            colorText: Colors.white,
+                          );
+                          return;
+                        }
                         Navigator.of(paymentDialogContext, rootNavigator: true)
                             .pop();
                         Future.microtask(
@@ -1478,8 +1957,7 @@ class PosController extends GetxController {
   /// Usa punto de miles automático (Colombia) para no confundir cifras.
   void _showCashReceivedDialog(NumberFormat copFormat) {
     Get.back(); // Cierra el diálogo de métodos de pago
-    final totalToPay = total;
-    final requiredCash = _normalizeCashAmount(totalToPay);
+    final requiredCash = totalToCollect;
     final controller =
         TextEditingController(); // Vacío para que el cajero ingrese con cuánto le pagan
     final vuelto = 0.0.obs;
@@ -1614,8 +2092,7 @@ class PosController extends GetxController {
 
   void _showMixedPaymentDialog(NumberFormat copFormat) {
     Get.back(); // Cierra el diálogo de métodos de pago
-    final totalToPay = total;
-    final requiredTotal = _normalizeCashAmount(totalToPay);
+    final requiredTotal = totalToCollect;
     final parts = <PaymentPart>[];
     final amountControllers = <TextEditingController>[];
 
@@ -1802,25 +2279,46 @@ class PosController extends GetxController {
     );
   }
 
-  void _processPaymentWithBreakdown(
+  Future<void> _processPaymentWithBreakdown(
       List<PaymentPart> parts, NumberFormat copFormat) async {
     Get.back();
-    final totalToPay = total;
-    final requiredTotal = _normalizeCashAmount(totalToPay);
+    final requiredTotal = totalToCollect;
     final sum = _normalizeCashAmount(parts.fold(0.0, (s, p) => s + p.amount));
     if (!_isExactCashTotal(sum, requiredTotal)) {
       Get.snackbar('Error', 'La suma de los pagos debe ser igual al total',
           backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
+    final creditPart = parts
+        .where((p) => p.method == kSalePaymentMethodStoreCredit)
+        .fold<double>(0.0, (s, p) => s + p.amount);
+    if (creditPart > 0 && !await _validateStoreCreditForPayment(creditPart)) {
+      Get.snackbar(
+        'Saldo insuficiente',
+        'El cliente no tiene saldo a favor suficiente para esta combinación de pago.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+      return;
+    }
     try {
+      final exchangeApplied = immediateExchangeApplied;
+      final effectiveParts = <PaymentPart>[
+        if (exchangeApplied > 1e-9)
+          PaymentPart(
+              method: kSalePaymentMethodInstantExchange, amount: exchangeApplied),
+        ...parts,
+      ];
+      final saleMethod = effectiveParts.length > 1
+          ? 'Mixto'
+          : effectiveParts.first.method;
       final disc = _cartSaleDiscount;
       final sale = Sale(
         date: DateTime.now(),
-        total: requiredTotal,
+        total: total,
         user: AuthService.to.currentUser?.username ?? 'usuario',
-        paymentMethod: 'Mixto',
-        paymentBreakdown: parts,
+        paymentMethod: saleMethod,
+        paymentBreakdown: effectiveParts.length > 1 ? effectiveParts : null,
         customerId: selectedCustomer.value?.id,
         clientId: selectedClient.value?.id,
         discount: disc.amount > 0 ? disc.amount : null,
@@ -1844,10 +2342,32 @@ class PosController extends GetxController {
       );
       await SQLiteDatabaseService.saveSale(sale);
       _notifySaleCompleted();
+
+      final creditUsed = parts
+          .where((p) => p.method == kSalePaymentMethodStoreCredit)
+          .fold<double>(0.0, (s, p) => s + p.amount);
+      if (creditUsed > 0 && selectedCustomer.value?.id != null) {
+        try {
+          await SQLiteDatabaseService.adjustCustomerStoreCredit(
+            selectedCustomer.value!.id!,
+            -creditUsed,
+          );
+          await _reloadSelectedCustomerFromDb();
+        } catch (e) {
+          Get.snackbar(
+            'Saldo a favor',
+            'Venta guardada pero error al descontar saldo: $e',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 5),
+          );
+        }
+      }
+
       try {
         final currentUser = AuthService.to.currentUser;
         if (currentUser != null && currentUser.id != null) {
-          for (final part in parts) {
+          for (final part in effectiveParts) {
             await AccountingService.recordSaleIncome(
               part.amount,
               'Venta POS - ${part.method}',
@@ -1863,7 +2383,8 @@ class PosController extends GetxController {
       final customerForReceipt = selectedCustomer.value;
       final clientForReceipt = selectedClient.value;
       await updateCustomerAfterSale();
-      _showPrintConfirmationDialog(sale, 'Mixto', copFormat,
+      _consumeImmediateExchangeCredit(exchangeApplied);
+      _showPrintConfirmationDialog(sale, saleMethod, copFormat,
           customer: customerForReceipt, client: clientForReceipt);
     } catch (e) {
       Get.snackbar('Error', 'Error al procesar la venta: $e',
@@ -2077,7 +2598,7 @@ class PosController extends GetxController {
     );
   }
 
-  void _processPaymentWithMethod(String method) async {
+  Future<void> _processPaymentWithMethod(String method) async {
     final NumberFormat copFormat = NumberFormat.currency(
         locale: 'es_CO',
         symbol: '\$ ',
@@ -2086,13 +2607,52 @@ class PosController extends GetxController {
     Get.back(); // Cierra el diálogo de métodos de pago
 
     try {
+      final exchangeApplied = immediateExchangeApplied;
+      final dueAmount = totalToCollect;
+
+      if (dueAmount <= 1e-9 && method != kSalePaymentMethodInstantExchange) {
+        method = kSalePaymentMethodInstantExchange;
+      }
+
+      if (method == kSalePaymentMethodStoreCredit) {
+        final cid = selectedCustomer.value?.id;
+        if (cid == null) {
+          Get.snackbar('Cliente', 'Seleccione un cliente del sistema para usar saldo a favor.',
+              backgroundColor: Colors.orange, colorText: Colors.white);
+          return;
+        }
+        final fresh = await SQLiteDatabaseService.getCustomerById(cid);
+        if (fresh == null || fresh.storeCredit + 1e-6 < dueAmount) {
+          Get.snackbar(
+            'Saldo insuficiente',
+            'El cliente no tiene saldo a favor suficiente para esta venta.',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          return;
+        }
+      }
+
+      final paymentParts = <PaymentPart>[
+        if (exchangeApplied > 1e-9)
+          PaymentPart(
+              method: kSalePaymentMethodInstantExchange, amount: exchangeApplied),
+        if (dueAmount > 1e-9) PaymentPart(method: method, amount: dueAmount),
+      ];
+      final saleMethod = paymentParts.length > 1
+          ? 'Mixto'
+          : paymentParts.isNotEmpty
+              ? paymentParts.first.method
+              : kSalePaymentMethodInstantExchange;
+
       // Crear la venta (guardar cliente para reimpresión con nombre en ticket)
       final disc = _cartSaleDiscount;
       final sale = Sale(
         date: DateTime.now(),
         total: total,
         user: AuthService.to.currentUser?.username ?? 'usuario',
-        paymentMethod: method,
+        paymentMethod: saleMethod,
+        paymentBreakdown: paymentParts.length > 1 ? paymentParts : null,
         customerId: selectedCustomer.value?.id,
         clientId: selectedClient.value?.id,
         discount: disc.amount > 0 ? disc.amount : null,
@@ -2119,17 +2679,48 @@ class PosController extends GetxController {
       await SQLiteDatabaseService.saveSale(sale);
       _notifySaleCompleted();
 
+      if (method == kSalePaymentMethodStoreCredit &&
+          selectedCustomer.value?.id != null) {
+        try {
+          await SQLiteDatabaseService.adjustCustomerStoreCredit(
+            selectedCustomer.value!.id!,
+            -dueAmount,
+          );
+          await _reloadSelectedCustomerFromDb();
+        } catch (e) {
+          Get.snackbar(
+            'Saldo a favor',
+            'Venta guardada pero error al descontar saldo: $e',
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 5),
+          );
+        }
+      }
+
       // ✅ NUEVO: Registrar ingreso contable automático
       try {
         final currentUser = AuthService.to.currentUser;
         if (currentUser != null && currentUser.id != null) {
-          await AccountingService.recordSaleIncome(
-            total,
-            'Venta POS - $method',
-            currentUser.id!,
-            paymentMethod: method,
-            reference: 'sale_${sale.id ?? 'temp'}',
-          );
+          if (paymentParts.length > 1) {
+            for (final part in paymentParts) {
+              await AccountingService.recordSaleIncome(
+                part.amount,
+                'Venta POS - ${part.method}',
+                currentUser.id!,
+                paymentMethod: part.method,
+                reference: 'sale_${sale.id ?? 'temp'}',
+              );
+            }
+          } else {
+            await AccountingService.recordSaleIncome(
+              total,
+              'Venta POS - $saleMethod',
+              currentUser.id!,
+              paymentMethod: saleMethod,
+              reference: 'sale_${sale.id ?? 'temp'}',
+            );
+          }
           print('✅ Ingreso contable registrado automáticamente: \$$total');
         }
       } catch (e) {
@@ -2143,11 +2734,12 @@ class PosController extends GetxController {
 
       // ✅ NUEVO: Actualizar puntos del cliente si hay uno seleccionado
       await updateCustomerAfterSale();
+      _consumeImmediateExchangeCredit(exchangeApplied);
 
       // El stock se actualiza automáticamente en saveSale
 
       // Mostrar confirmación con opción de imprimir (pasamos cliente sistema y/o facturación para el ticket)
-      _showPrintConfirmationDialog(sale, method, copFormat,
+      _showPrintConfirmationDialog(sale, saleMethod, copFormat,
           customer: customerForReceipt, client: clientForReceipt);
     } catch (e) {
       Get.snackbar(
@@ -2328,6 +2920,36 @@ class PosController extends GetxController {
                       : 'Método: $method',
                   style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
+                Obx(() {
+                  final pending = immediateExchangeCredit.value;
+                  if (pending <= 1e-9) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.shade700),
+                      ),
+                      child: Text(
+                        'Aún hay canje pendiente: ${copFormat.format(pending)}.\n'
+                        'Si ya entregó dinero al cliente, pulse en el POS «Canje activo» '
+                        'y luego «Devolver remanente» para que caja y contabilidad cuadren.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: Colors.brown.shade800,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
                 const SizedBox(height: 24),
 
                 // Pregunta sobre imprimir
