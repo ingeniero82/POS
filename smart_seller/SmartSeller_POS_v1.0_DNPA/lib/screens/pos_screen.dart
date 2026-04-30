@@ -280,6 +280,8 @@ class _PosScreenState extends State<PosScreen> {
         // ✅ MEJORADO: Solo manejar teclas específicas, permitir que otras pasen
         if (event is KeyDownEvent) {
           final keyLabel = event.logicalKey.keyLabel;
+          final isEnterKey = event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.numpadEnter;
           if (keyLabel == 'F1' ||
               keyLabel == 'F2' ||
               keyLabel == 'F3' ||
@@ -287,7 +289,7 @@ class _PosScreenState extends State<PosScreen> {
               keyLabel == 'F5' ||
               keyLabel == 'F6' ||
               keyLabel == 'Escape' ||
-              keyLabel == 'Enter') {
+              isEnterKey) {
             _handleKeyPress(event);
           }
           // Si no es una tecla de función, no hacer nada (permitir que pase)
@@ -1924,6 +1926,26 @@ class _PosScreenState extends State<PosScreen> {
 
   void _handleKeyPress(KeyEvent event) {
     if (event is KeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.enter ||
+          event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+        if (_selectedProduct != null) {
+          if (_selectedProduct!.isWeighted) {
+            if (!_tryCommitWeightedFromBalanca()) {
+              Get.snackbar(
+                'Balanza',
+                'No se pudo agregar. Revisa el peso o usa «Peso manual».',
+                backgroundColor: Colors.orange,
+                colorText: Colors.white,
+                duration: const Duration(seconds: 3),
+              );
+            }
+          } else {
+            _addToCart(int.tryParse(_quantityController.text) ?? 1);
+          }
+        }
+        return;
+      }
+
       // Solo manejar teclas de función
       switch (event.logicalKey.keyLabel) {
         case 'F1':
@@ -1946,12 +1968,6 @@ class _PosScreenState extends State<PosScreen> {
           break;
         case 'Escape':
           _cancelSelection();
-          break;
-        case 'Enter':
-          // Solo si hay producto seleccionado
-          if (_selectedProduct != null) {
-            _addToCart(int.tryParse(_quantityController.text) ?? 1);
-          }
           break;
       }
     }
@@ -2251,6 +2267,9 @@ class _PosScreenState extends State<PosScreen> {
       if (!mounted) return;
       if (!product.isWeighted) {
         _quantityFocus.requestFocus();
+      } else if (_keyboardListenerFocus.canRequestFocus) {
+        // En productos pesados, Enter debe ir al atajo global (no al campo de búsqueda).
+        _keyboardListenerFocus.requestFocus();
       }
     });
 
@@ -2461,9 +2480,9 @@ class _PosScreenState extends State<PosScreen> {
             ),
             ListTile(
               leading: Icon(Icons.percent, color: Colors.teal.shade700),
-              title: const Text('Descuento % al total de la venta'),
+              title: const Text('Descuento % al subtotal de la venta'),
               subtitle: const Text(
-                  'Sobre subtotal + IVA; mismo ajuste que en Método de pago'),
+                  'Se aplica al subtotal sin IVA; mismo ajuste que en Método de pago'),
               onTap: () {
                 Navigator.of(context).pop();
                 if (_posController.selectedCustomer.value == null &&
