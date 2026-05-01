@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sale.dart';
-import '../models/product.dart';
 import '../models/customer.dart';
 import '../models/client.dart';
 import '../screens/pos_controller.dart';

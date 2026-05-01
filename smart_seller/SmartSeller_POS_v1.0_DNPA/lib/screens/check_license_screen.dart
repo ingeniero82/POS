@@ -26,6 +26,23 @@ class _CheckLicenseScreenState extends State<CheckLicenseScreen> {
         Get.offAllNamed('/login');
       } else {
         Get.offAllNamed('/activation');
+        if (await LicenseService.isDemoBlockedByClockTampering()) {
+          Get.snackbar(
+            'Demo bloqueada',
+            'Se detecto cambio manual de fecha/hora del equipo. Active una licencia para continuar.',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 5),
+          );
+          return;
+        }
+        if (await LicenseService.isDemoExpired()) {
+          Get.snackbar(
+            'Demo vencida',
+            'El periodo de demostracion finalizo. Active una licencia para continuar.',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 5),
+          );
+        }
       }
     } catch (_) {
       if (!mounted) return;

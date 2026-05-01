@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../controllers/license_controller.dart';
 import '../services/auth_service.dart';
+import '../services/contact_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -84,6 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final licenseController = Get.find<LicenseController>();
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       body: Center(
@@ -122,6 +125,61 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
             const SizedBox(height: 40),
+            Obx(() {
+              if (!licenseController.isDemo.value) return const SizedBox.shrink();
+              final status = licenseController.isExpired.value
+                  ? 'Demo vencida. Solicite activacion comercial.'
+                  : 'Demo activa: ${licenseController.daysLeft.value} dia(s) restantes'
+                      '${licenseController.expirationDateText.value.isNotEmpty ? ' (vence ${licenseController.expirationDateText.value})' : ''}.';
+              return Container(
+                width: 420,
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer_outlined, color: Colors.orange.shade800),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            Obx(() {
+              if (!licenseController.isDemo.value) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => Get.toNamed('/activation'),
+                      icon: const Icon(Icons.vpn_key_outlined),
+                      label: const Text('Activar licencia de compra'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => ContactService.openWhatsAppForLicense(
+                        source: 'Login',
+                      ),
+                      icon: const Icon(Icons.chat_outlined),
+                      label: const Text('Comprar licencia por WhatsApp'),
+                    ),
+                  ],
+                ),
+              );
+            }),
             // Formulario centrado y compacto
             Container(
               padding: const EdgeInsets.all(24),

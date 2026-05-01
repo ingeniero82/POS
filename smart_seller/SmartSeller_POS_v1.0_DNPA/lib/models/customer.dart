@@ -16,6 +16,7 @@ class Customer {
   int accumulatedPoints = 0; // ✅ NUEVO: Puntos acumulados del cliente
   DateTime? lastPurchase;
   double totalPurchases = 0.0;
+  double storeCredit = 0.0; // ✅ NUEVO: Saldo a favor del cliente
   
   // Constructor
   Customer({
@@ -34,6 +35,7 @@ class Customer {
     this.accumulatedPoints = 0, // ✅ NUEVO: Puntos acumulados por defecto 0
     this.lastPurchase,
     this.totalPurchases = 0.0,
+    this.storeCredit = 0.0,
   });
   
   // Constructor desde Map (para base de datos)
@@ -55,6 +57,7 @@ class Customer {
         ? DateTime.parse(map['lastPurchase']) 
         : null;
     totalPurchases = map['totalPurchases'] ?? 0.0;
+    storeCredit = (map['storeCredit'] ?? 0.0).toDouble();
   }
   
   // Convertir a Map (para base de datos)
@@ -75,6 +78,7 @@ class Customer {
       'accumulatedPoints': accumulatedPoints, // ✅ NUEVO: Puntos acumulados
       'lastPurchase': lastPurchase?.toIso8601String(),
       'totalPurchases': totalPurchases,
+      'storeCredit': storeCredit,
     };
   }
   
@@ -95,6 +99,7 @@ class Customer {
     int? accumulatedPoints, // ✅ NUEVO: Puntos acumulados
     DateTime? lastPurchase,
     double? totalPurchases,
+    double? storeCredit,
   }) {
     return Customer(
       id: id ?? this.id,
@@ -112,6 +117,7 @@ class Customer {
       accumulatedPoints: accumulatedPoints ?? this.accumulatedPoints, // ✅ NUEVO: Puntos acumulados
       lastPurchase: lastPurchase ?? this.lastPurchase,
       totalPurchases: totalPurchases ?? this.totalPurchases,
+      storeCredit: storeCredit ?? this.storeCredit,
     );
   }
   

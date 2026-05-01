@@ -9,6 +9,12 @@ class LicenseService {
   static const String _keyActivated = 'license_activated';
   static const String _keyLicense = 'license_key';
   static const String _keyMachineId = 'license_machine_id';
+  static const String _keyDemoStart = 'demo_start_date';
+  static const String _keyDemoDurationDays = 'demo_duration_days';
+  static const String _keyDemoUsedOnce = 'demo_used_once';
+  static const String _keyDemoLastSeenDate = 'demo_last_seen_date';
+  static const String _keyDemoClockTampered = 'demo_clock_tampered';
+  static const int _defaultDemoDurationDays = 5;
   /// ID especial: clave generada para "DEMO" vale en cualquier equipo (para muestras en local).
   static const String _demoMachineId = 'DEMO';
 
@@ -31,7 +37,7 @@ class LicenseService {
     try {
       if (Platform.isAndroid) {
         final hostname = Platform.localHostname;
-        final raw = 'ANDROID-${hostname ?? 'device'}'.trim();
+        final raw = 'ANDROID-$hostname'.trim();
         final bytes = utf8.encode(raw);
         final digest = sha256.convert(bytes);
         return digest.toString().substring(0, 16).toUpperCase();
@@ -73,8 +79,12 @@ class LicenseService {
       if (savedKey == null || savedMachineId == null) return false;
       // Licencia demo: válida en cualquier equipo (para muestras en local).
       if (savedMachineId == _demoMachineId) {
+        // Si la demo es de una version vieja sin fecha de inicio, se considera invalida.
+        if (!prefs.containsKey(_keyDemoStart)) return false;
         final expectedDemoKey = await _generateKeyForMachine(_demoMachineId);
-        return savedKey == expectedDemoKey;
+        if (savedKey != expectedDemoKey) return false;
+        if (await _isClockTamperedForDemo()) return false;
+        return !(await isDemoExpired());
       }
       final currentMachineId = await getMachineId();
       if (savedMachineId != currentMachineId) return false;
@@ -96,14 +106,114 @@ class LicenseService {
     }
   }
 
+  /// Indica si ya se inició una demo en este equipo.
+  static Future<bool> hasStartedDemo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.containsKey(_keyDemoStart);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Indica si este equipo ya consumio su demo al menos una vez.
+  static Future<bool> hasUsedDemoOnce() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyDemoUsedOnce) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Detecta si el reloj del sistema fue atrasado durante la demo.
+  static Future<bool> _isClockTamperedForDemo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final alreadyTampered = prefs.getBool(_keyDemoClockTampered) ?? false;
+      if (alreadyTampered) return true;
+
+      if (!prefs.containsKey(_keyDemoStart)) return false;
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final lastSeenRaw = prefs.getString(_keyDemoLastSeenDate);
+
+      if (lastSeenRaw != null && lastSeenRaw.isNotEmpty) {
+        final lastSeen = DateTime.tryParse(lastSeenRaw);
+        if (lastSeen != null) {
+          final lastDate = DateTime(lastSeen.year, lastSeen.month, lastSeen.day);
+          if (today.isBefore(lastDate)) {
+            await prefs.setBool(_keyDemoClockTampered, true);
+            return true;
+          }
+        }
+      }
+
+      await prefs.setString(_keyDemoLastSeenDate, today.toIso8601String());
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// True cuando se detecto manipulacion de reloj en demo.
+  static Future<bool> isDemoBlockedByClockTampering() async {
+    return _isClockTamperedForDemo();
+  }
+
+  /// Fecha de vencimiento de demo (si existe).
+  static Future<DateTime?> getDemoExpirationDate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final startRaw = prefs.getString(_keyDemoStart);
+      if (startRaw == null || startRaw.isEmpty) return null;
+      final startDate = DateTime.tryParse(startRaw);
+      if (startDate == null) return null;
+      final duration = prefs.getInt(_keyDemoDurationDays) ?? _defaultDemoDurationDays;
+      return startDate.add(Duration(days: duration));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Días restantes de demo. Retorna 0 si ya expiró.
+  static Future<int> getDemoDaysLeft() async {
+    final expiration = await getDemoExpirationDate();
+    if (expiration == null) return 0;
+    final now = DateTime.now();
+    final nowDate = DateTime(now.year, now.month, now.day);
+    final expDate = DateTime(expiration.year, expiration.month, expiration.day);
+    final diff = expDate.difference(nowDate).inDays;
+    return diff <= 0 ? 0 : diff;
+  }
+
+  /// True cuando el periodo demo ya terminó.
+  static Future<bool> isDemoExpired() async {
+    final started = await hasStartedDemo();
+    if (!started) return false;
+    final left = await getDemoDaysLeft();
+    return left <= 0;
+  }
+
   /// Activa como DEMO sin pedir clave (para que el cliente pueda usar ya).
-  static Future<bool> activateAsDemo() async {
+  static Future<bool> activateAsDemo({int durationDays = _defaultDemoDurationDays}) async {
     try {
       final expectedDemoKey = await _generateKeyForMachine(_demoMachineId);
       final prefs = await SharedPreferences.getInstance();
+      final alreadyUsedDemo = prefs.getBool(_keyDemoUsedOnce) ?? false;
+      if (alreadyUsedDemo) return false;
+      final safeDuration = durationDays <= 0 ? _defaultDemoDurationDays : durationDays;
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
       await prefs.setBool(_keyActivated, true);
       await prefs.setString(_keyLicense, expectedDemoKey);
       await prefs.setString(_keyMachineId, _demoMachineId);
+      await prefs.setString(_keyDemoStart, now.toIso8601String());
+      await prefs.setInt(_keyDemoDurationDays, safeDuration);
+      await prefs.setBool(_keyDemoUsedOnce, true);
+      await prefs.setString(_keyDemoLastSeenDate, today.toIso8601String());
+      await prefs.setBool(_keyDemoClockTampered, false);
       return true;
     } catch (_) {
       return false;
@@ -116,6 +226,11 @@ class LicenseService {
     await prefs.remove(_keyActivated);
     await prefs.remove(_keyLicense);
     await prefs.remove(_keyMachineId);
+    await prefs.remove(_keyDemoStart);
+    await prefs.remove(_keyDemoDurationDays);
+    // No se borra _keyDemoUsedOnce: la demo debe ser de un solo uso por equipo.
+    await prefs.remove(_keyDemoLastSeenDate);
+    await prefs.remove(_keyDemoClockTampered);
   }
 
   /// Normaliza la clave pegada: quita espacios y caracteres raros (mantiene guión y guión bajo, base64url).
@@ -135,9 +250,23 @@ class LicenseService {
       // Comprobar si es la clave DEMO (para muestras en local; vale en cualquier equipo).
       final expectedDemoKey = await _generateKeyForMachine(_demoMachineId);
       if (normalized == _normalizeEnteredKey(expectedDemoKey)) {
+        final alreadyUsedDemo = prefs.getBool(_keyDemoUsedOnce) ?? false;
+        final machineId = prefs.getString(_keyMachineId);
+        final alreadyActiveDemo = machineId == _demoMachineId && prefs.containsKey(_keyDemoStart);
+        if (alreadyUsedDemo && !alreadyActiveDemo) return false;
+
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
         await prefs.setBool(_keyActivated, true);
         await prefs.setString(_keyLicense, expectedDemoKey);
         await prefs.setString(_keyMachineId, _demoMachineId);
+        if (!prefs.containsKey(_keyDemoStart)) {
+          await prefs.setString(_keyDemoStart, now.toIso8601String());
+          await prefs.setInt(_keyDemoDurationDays, _defaultDemoDurationDays);
+          await prefs.setBool(_keyDemoUsedOnce, true);
+          await prefs.setString(_keyDemoLastSeenDate, today.toIso8601String());
+          await prefs.setBool(_keyDemoClockTampered, false);
+        }
         return true;
       }
 

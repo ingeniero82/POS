@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../controllers/license_controller.dart';
+import '../services/contact_service.dart';
 import '../services/license_service.dart';
 
 /// Pantalla de activación de licencia. Se muestra solo si la app no está activada.
@@ -14,10 +16,15 @@ class ActivationScreen extends StatefulWidget {
 
 class _ActivationScreenState extends State<ActivationScreen> {
   final _keyController = TextEditingController();
+  static const int _demoDays = 5;
   String _machineId = '';
   bool _loading = true;
   bool _activating = false;
   String? _error;
+  int _demoDaysLeft = 0;
+  bool _demoExpired = false;
+  bool _clockTampered = false;
+  bool _demoUsedOnce = false;
 
   @override
   void initState() {
@@ -27,9 +34,17 @@ class _ActivationScreenState extends State<ActivationScreen> {
 
   Future<void> _loadMachineId() async {
     final id = await LicenseService.getMachineId();
+    final isExpired = await LicenseService.isDemoExpired();
+    final daysLeft = await LicenseService.getDemoDaysLeft();
+    final clockTampered = await LicenseService.isDemoBlockedByClockTampering();
+    final usedOnce = await LicenseService.hasUsedDemoOnce();
     if (mounted) {
       setState(() {
         _machineId = id;
+        _demoExpired = isExpired;
+        _demoDaysLeft = daysLeft;
+        _clockTampered = clockTampered;
+        _demoUsedOnce = usedOnce;
         _loading = false;
       });
     }
@@ -49,6 +64,9 @@ class _ActivationScreenState extends State<ActivationScreen> {
     if (!mounted) return;
     setState(() => _activating = false);
     if (ok) {
+      if (Get.isRegistered<LicenseController>()) {
+        await Get.find<LicenseController>().refreshStatus();
+      }
       Get.offAllNamed('/login');
     } else {
       setState(() => _error = 'Clave incorrecta. La clave debe generarse para el ID de ESTE equipo (el de arriba).');
@@ -62,6 +80,28 @@ class _ActivationScreenState extends State<ActivationScreen> {
       _keyController.clear();
     });
     Get.snackbar('Listo', 'Puede pegar una nueva clave.');
+  }
+
+  Future<void> _startDemo() async {
+    final ok = await LicenseService.activateAsDemo(durationDays: _demoDays);
+    if (!mounted) return;
+    if (ok) {
+      if (Get.isRegistered<LicenseController>()) {
+        await Get.find<LicenseController>().refreshStatus();
+      }
+      Get.offAllNamed('/login');
+      Get.snackbar(
+        'Demo activada',
+        'La demo se activo por $_demoDays dias.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } else {
+      setState(() {
+        _error = _demoUsedOnce
+            ? 'La demo ya fue utilizada en este equipo. Active una licencia de compra.'
+            : 'No fue posible iniciar la demo. Intente nuevamente.';
+      });
+    }
   }
 
   void _copyMachineId() {
@@ -159,6 +199,49 @@ class _ActivationScreenState extends State<ActivationScreen> {
                       ),
                     ],
                     const SizedBox(height: 24),
+                    if (_clockTampered) ...[
+                      Text(
+                        'Demo bloqueada por cambio manual de fecha/hora del equipo. Active una licencia de compra.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                    ] else if (_demoExpired || (_demoUsedOnce && _demoDaysLeft <= 0)) ...[
+                      Text(
+                        _demoUsedOnce
+                            ? 'La demo ya fue usada en este equipo. Para continuar, active una licencia de compra.'
+                            : 'La demo de este equipo ya vencio. Para continuar, active una licencia de compra.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      if (_demoDaysLeft > 0) ...[
+                        Text(
+                          'Demo activa: quedan $_demoDaysLeft dia(s).',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.orange.shade800,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (!_demoUsedOnce) ...[
+                        OutlinedButton.icon(
+                          onPressed: _activating ? null : _startDemo,
+                          icon: const Icon(Icons.play_circle_outline),
+                          label: const Text('Iniciar demo por 5 dias'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
                     FilledButton(
                       onPressed: _activating ? null : _activate,
                       child: _activating
@@ -168,6 +251,19 @@ class _ActivationScreenState extends State<ActivationScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('Activar'),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => ContactService.openWhatsAppForLicense(
+                        source: 'Pantalla Activacion',
+                      ),
+                      icon: const Icon(Icons.chat_outlined),
+                      label: const Text('Comprar licencia por WhatsApp'),
+                    ),
+                    TextButton.icon(
+                      onPressed: ContactService.showEditWhatsAppDialog,
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Editar numero WhatsApp'),
                     ),
                     const SizedBox(height: 16),
                     Text(

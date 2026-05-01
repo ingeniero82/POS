@@ -13,7 +13,6 @@ import 'package:path/path.dart' as path;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:excel/excel.dart' hide Border;
-import '../../../models/sale.dart';
 import '../../../services/sqlite_database_service.dart';
 import '../models/accounting_reports.dart';
 import '../services/accounting_reports_service.dart';
@@ -979,9 +978,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       final liqRaw = (m['motivo'] as String?)?.trim().isNotEmpty == true
           ? (m['motivo'] as String)
           : (m['paymentMethod'] as String? ?? '—');
-      final motivo = liqRaw.length > 24
-          ? liqRaw.substring(0, 24)
-          : liqRaw;
+      final motivo = liqRaw.length > 24 ? liqRaw.substring(0, 24) : liqRaw;
       final amount = (m['amount'] as num?)?.toDouble() ?? 0.0;
       sb.writeln(
           '${padR(ticket, 6)}${padR(hora, 6)}${padR(cajero, 14)}${padR(motivo, 24)}${padR('\$${fmtNum(amount)}', 14)}');
@@ -1264,7 +1261,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       setState(() => _isLoading = true);
       final d = _cierreDeCajaData!;
       final cashIncomeDetails = d['cashIncomeDetails'] as List<dynamic>? ?? [];
-      final cashExpenseDetails = d['cashExpenseDetails'] as List<dynamic>? ?? [];
+      final cashExpenseDetails =
+          d['cashExpenseDetails'] as List<dynamic>? ?? [];
       final closeDate = d['closeDate'] as DateTime? ?? DateTime.now();
       final baseName =
           'cierre_de_caja_${DateFormat('yyyyMMdd').format(closeDate)}_sesion_${d['sessionId'] ?? ''}';
@@ -1303,13 +1301,13 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
           .value = 'Guía rápida de interpretación';
       row++;
       sheet
-          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
-          .value =
+              .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+              .value =
           'Otros ingresos = entradas de efectivo que NO son ventas del POS.';
       row++;
       sheet
-          .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
-          .value =
+              .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+              .value =
           'Diferencia: 0=cuadre, positiva=sobrante, negativa=faltante.';
       row += 2;
 
@@ -1442,8 +1440,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
           .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
           .value = 'Formula saldo esperado';
       sheet
-          .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .value =
+              .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
+              .value =
           '$initial + $cashSales + $otherIncome - $retiros - $gastos - $devol = $expected';
 
       final incomesSheet = excel['Detalle Entradas Caja'];
@@ -1467,19 +1465,24 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         if (e is! Map) continue;
         final item = Map<String, dynamic>.from(e.cast<String, dynamic>());
         incomesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: incomeRow))
+            .cell(
+                CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: incomeRow))
             .value = item['time'] ?? '';
         incomesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: incomeRow))
+            .cell(
+                CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: incomeRow))
             .value = item['category'] ?? '';
         incomesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: incomeRow))
+            .cell(
+                CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: incomeRow))
             .value = item['description'] ?? '';
         incomesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: incomeRow))
+            .cell(
+                CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: incomeRow))
             .value = item['paymentMethod'] ?? '';
         incomesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: incomeRow))
+            .cell(
+                CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: incomeRow))
             .value = (item['amount'] as num?)?.toDouble() ?? 0.0;
         incomeRow++;
       }
@@ -1505,19 +1508,24 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         if (e is! Map) continue;
         final item = Map<String, dynamic>.from(e.cast<String, dynamic>());
         expensesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: expenseRow))
+            .cell(CellIndex.indexByColumnRow(
+                columnIndex: 0, rowIndex: expenseRow))
             .value = item['time'] ?? '';
         expensesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: expenseRow))
+            .cell(CellIndex.indexByColumnRow(
+                columnIndex: 1, rowIndex: expenseRow))
             .value = item['category'] ?? '';
         expensesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: expenseRow))
+            .cell(CellIndex.indexByColumnRow(
+                columnIndex: 2, rowIndex: expenseRow))
             .value = item['description'] ?? '';
         expensesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: expenseRow))
+            .cell(CellIndex.indexByColumnRow(
+                columnIndex: 3, rowIndex: expenseRow))
             .value = item['paymentMethod'] ?? '';
         expensesSheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: expenseRow))
+            .cell(CellIndex.indexByColumnRow(
+                columnIndex: 4, rowIndex: expenseRow))
             .value = (item['amount'] as num?)?.toDouble() ?? 0.0;
         expenseRow++;
       }
@@ -1824,7 +1832,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                           '\$${_currencyFormat.format((d['initialAmount'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('(+) Ventas efectivo',
                           '\$${_currencyFormat.format((d['ventasEfectivo'] as num?)?.toDouble() ?? 0)}'),
-                      _dataRow('(+) Otros ingresos (entradas distintas de venta)',
+                      _dataRow(
+                          '(+) Otros ingresos (entradas distintas de venta)',
                           '\$${_currencyFormat.format((d['otrosIngresos'] as num?)?.toDouble() ?? 0)}'),
                       _dataRow('(-) Retiros',
                           '-\$${_currencyFormat.format((d['retiros'] as num?)?.toDouble() ?? 0)}'),
@@ -1868,7 +1877,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: color.withValues(alpha: 0.45)),
+                        border:
+                            Border.all(color: color.withValues(alpha: 0.45)),
                       ),
                       child: Row(
                         children: [
@@ -1944,7 +1954,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
           ),
           const SizedBox(height: 16),
           _buildCashMovementDetailCard(
-            title: 'Detalle de salidas de caja (gastos, retiros y devoluciones)',
+            title:
+                'Detalle de salidas de caja (gastos, retiros y devoluciones)',
             details: cashExpenseDetails,
             emptyMessage: 'No hay salidas en efectivo para este cierre.',
             isExpense: true,
@@ -2015,12 +2026,16 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 6),
-                const Text('• Fondo inicial: efectivo con el que arrancó la caja.'),
-                const Text('• Ventas efectivo: solo ventas cobradas en dinero físico.'),
-                const Text('• Otros ingresos: entradas de caja que no son ventas POS.'),
+                const Text(
+                    '• Fondo inicial: efectivo con el que arrancó la caja.'),
+                const Text(
+                    '• Ventas efectivo: solo ventas cobradas en dinero físico.'),
+                const Text(
+                    '• Otros ingresos: entradas de caja que no son ventas POS.'),
                 const Text('• Retiros: dinero que se sacó de la caja.'),
                 const Text('• Gastos: pagos en efectivo hechos desde caja.'),
-                const Text('• Devoluciones en efectivo: dinero devuelto al cliente.'),
+                const Text(
+                    '• Devoluciones en efectivo: dinero devuelto al cliente.'),
                 const SizedBox(height: 12),
                 Text('Saldo esperado: ${money(expected)}'),
                 Text('Saldo real contado: ${money(real)}'),
@@ -2052,7 +2067,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       if (row is! Map) continue;
       final map = Map<String, dynamic>.from(row.cast<String, dynamic>());
       final category = (map['category'] as String?)?.trim();
-      final fallback = isExpense ? 'Salida sin categoría' : 'Ingreso sin categoría';
+      final fallback =
+          isExpense ? 'Salida sin categoría' : 'Ingreso sin categoría';
       final key = (category == null || category.isEmpty) ? fallback : category;
       grouped.putIfAbsent(key, () => <Map<String, dynamic>>[]).add(map);
     }
@@ -2078,7 +2094,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 final items = entry.value;
                 final subtotal = items.fold<double>(
                   0.0,
-                  (sum, item) => sum + ((item['amount'] as num?)?.toDouble() ?? 0.0),
+                  (sum, item) =>
+                      sum + ((item['amount'] as num?)?.toDouble() ?? 0.0),
                 );
                 return Container(
                   width: double.infinity,
@@ -2100,12 +2117,15 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                       ...items.map((item) {
                         final time = (item['time'] as String?)?.trim();
                         final desc = (item['description'] as String?)?.trim();
-                        final amount = (item['amount'] as num?)?.toDouble() ?? 0.0;
-                        final method = (item['paymentMethod'] as String?)?.trim();
+                        final amount =
+                            (item['amount'] as num?)?.toDouble() ?? 0.0;
+                        final method =
+                            (item['paymentMethod'] as String?)?.trim();
                         final parts = <String>[
                           if (time != null && time.isNotEmpty) time,
                           if (desc != null && desc.isNotEmpty) desc,
-                          if (method != null && method.isNotEmpty) 'Medio: $method',
+                          if (method != null && method.isNotEmpty)
+                            'Medio: $method',
                         ];
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 2),
@@ -2113,7 +2133,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  parts.isEmpty ? 'Movimiento sin descripción' : parts.join(' · '),
+                                  parts.isEmpty
+                                      ? 'Movimiento sin descripción'
+                                      : parts.join(' · '),
                                   style: const TextStyle(fontSize: 12),
                                 ),
                               ),
@@ -2331,8 +2353,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     final total = (d['totalDevoluciones'] as num?)?.toDouble() ?? 0.0;
     final totalEfectivo = (d['totalEfectivo'] as num?)?.toDouble() ?? 0.0;
     final totalTarjeta = (d['totalTarjeta'] as num?)?.toDouble() ?? 0.0;
-    final totalSaldoAfavor =
-        (d['totalSaldoAfavor'] as num?)?.toDouble() ?? 0.0;
+    final totalSaldoAfavor = (d['totalSaldoAfavor'] as num?)?.toDouble() ?? 0.0;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -4451,7 +4472,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 'Fondo inicial', (d['initialAmount'] as num?)?.toDouble() ?? 0),
             _buildPDFTableRow('(+) Ventas efectivo',
                 (d['ventasEfectivo'] as num?)?.toDouble() ?? 0),
-            _buildPDFTableRow('(+) Otros ingresos (entradas distintas de venta)',
+            _buildPDFTableRow(
+                '(+) Otros ingresos (entradas distintas de venta)',
                 (d['otrosIngresos'] as num?)?.toDouble() ?? 0),
             _buildPDFTableRow(
                 '(-) Retiros', (d['retiros'] as num?)?.toDouble() ?? 0),
@@ -4488,7 +4510,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
               child: pw.Text(
                 'Guía rápida: "Otros ingresos" = entradas de efectivo que NO son ventas del POS. '
                 'Diferencia: 0=cuadre, positiva=sobrante, negativa=faltante.',
-                style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
+                style:
+                    const pw.TextStyle(fontSize: 9, color: PdfColors.grey800),
               ),
             ),
             pw.SizedBox(height: 16),
@@ -4562,13 +4585,16 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 style:
                     pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 6),
-            _buildPdfCashMovementDetailTable(cashIncomeDetails, isExpense: false),
+            _buildPdfCashMovementDetailTable(cashIncomeDetails,
+                isExpense: false),
             pw.SizedBox(height: 12),
-            pw.Text('Detalle de salidas de caja (gastos, retiros y devoluciones)',
+            pw.Text(
+                'Detalle de salidas de caja (gastos, retiros y devoluciones)',
                 style:
                     pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 6),
-            _buildPdfCashMovementDetailTable(cashExpenseDetails, isExpense: true),
+            _buildPdfCashMovementDetailTable(cashExpenseDetails,
+                isExpense: true),
           ];
         },
       ),
@@ -5171,8 +5197,7 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       if (row is! Map) continue;
       final item = Map<String, dynamic>.from(row.cast<String, dynamic>());
       final amount = (item['amount'] as num?)?.toDouble() ?? 0.0;
-      final value =
-          '${isExpense ? '-' : ''}${_currencyFormat.format(amount)}';
+      final value = '${isExpense ? '-' : ''}${_currencyFormat.format(amount)}';
       rows.add(
         pw.TableRow(
           children: [

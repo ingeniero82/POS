@@ -5,6 +5,8 @@ import 'pos_screen.dart';
 import 'users_screen.dart';
 import 'products_screen.dart';
 import '../services/auth_service.dart';
+import '../controllers/license_controller.dart';
+import '../services/contact_service.dart';
 import '../models/permissions.dart';
 import 'package:intl/intl.dart';
 import 'customers_screen.dart';
@@ -18,6 +20,26 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.put(DashboardController());
     final authService = Get.put(AuthService());
+    final licenseController = Get.find<LicenseController>();
+    bool isBlockedInDemo(String moduleKey) {
+      if (!licenseController.isDemo.value || licenseController.isExpired.value) {
+        return false;
+      }
+      const blockedModules = <String>{
+        'reports',
+        'accountingReports',
+      };
+      return blockedModules.contains(moduleKey);
+    }
+
+    void denyByDemo(String moduleLabel) {
+      Get.snackbar(
+        'Disponible en plan comercial',
+        '$moduleLabel esta bloqueado en modo demo. Active su licencia para usarlo.',
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FA), // Fondo general gris claro
@@ -132,6 +154,10 @@ class DashboardScreen extends StatelessWidget {
                           label: 'Cuentas por Cobrar',
                           selected: false,
                           onTap: () {
+                            if (isBlockedInDemo('accountingReports')) {
+                              denyByDemo('Cuentas por Cobrar');
+                              return;
+                            }
                             Get.toNamed('/cuentas-cobrar-pagar');
                           },
                         ),
@@ -142,6 +168,10 @@ class DashboardScreen extends StatelessWidget {
                           label: 'Ventas y estadísticas',
                           selected: false,
                           onTap: () {
+                            if (isBlockedInDemo('reports')) {
+                              denyByDemo('Ventas y estadisticas');
+                              return;
+                            }
                             Get.toNamed('/reportes');
                           },
                         ),
@@ -152,6 +182,10 @@ class DashboardScreen extends StatelessWidget {
                           label: 'Reportes contables',
                           selected: false,
                           onTap: () {
+                            if (isBlockedInDemo('accountingReports')) {
+                              denyByDemo('Reportes contables');
+                              return;
+                            }
                             Get.toNamed('/reportes-contables');
                           },
                         ),
@@ -578,6 +612,7 @@ class _DashboardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = Get.find<AuthService>();
+    final licenseController = Get.find<LicenseController>();
 
     // Funciones para los accesos rápidos
     void nuevaVenta() {
@@ -625,6 +660,15 @@ class _DashboardContent extends StatelessWidget {
     }
 
     void verReportes() {
+      if (licenseController.isDemo.value && !licenseController.isExpired.value) {
+        Get.snackbar(
+          'Disponible en plan comercial',
+          'Los reportes estan bloqueados en modo demo. Active su licencia.',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+        return;
+      }
       if (authService.hasPermission(Permission.viewReports)) {
         Get.toNamed('/reportes');
       } else {
@@ -669,6 +713,60 @@ class _DashboardContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Obx(() {
+            if (!licenseController.isDemo.value) return const SizedBox.shrink();
+            final isExpired = licenseController.isExpired.value;
+            final days = licenseController.daysLeft.value;
+            final exp = licenseController.expirationDateText.value;
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isExpired ? Colors.red.shade50 : Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isExpired ? Colors.red.shade300 : Colors.orange.shade300,
+                ),
+              ),
+              child: Text(
+                isExpired
+                    ? 'Demo vencida. Para habilitar todos los modulos, active una licencia comercial.'
+                    : 'Modo demo activo: $days dia(s) restantes${exp.isNotEmpty ? ' (vence $exp)' : ''}. Algunos modulos estan limitados.',
+                style: TextStyle(
+                  color: isExpired ? Colors.red.shade800 : Colors.orange.shade900,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            );
+          }),
+          Obx(() {
+            if (!licenseController.isDemo.value) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => Get.toNamed('/activation'),
+                      icon: const Icon(Icons.vpn_key_outlined),
+                      label: const Text('Activar licencia de compra'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => ContactService.openWhatsAppForLicense(
+                        source: 'Dashboard',
+                      ),
+                      icon: const Icon(Icons.chat_outlined),
+                      label: const Text('Comprar licencia por WhatsApp'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 16),
           // Header azul
           Container(
             width: double.infinity,
