@@ -1590,6 +1590,12 @@ class _PosScreenState extends State<PosScreen> {
                         color: Colors.indigo,
                       ),
                       _actionBtn(
+                        onPressed: _showReprintMenu,
+                        icon: Icons.print,
+                        label: 'Reimprimir (F2)',
+                        color: Colors.teal.shade700,
+                      ),
+                      _actionBtn(
                         onPressed: _finalizeSale,
                         icon: Icons.payment,
                         label: 'Finalizar Venta (F6)',
@@ -1637,6 +1643,15 @@ class _PosScreenState extends State<PosScreen> {
                           icon: Icons.pause_circle_outline,
                           label: 'En espera',
                           color: Colors.indigo,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _actionBtn(
+                          onPressed: _showReprintMenu,
+                          icon: Icons.print,
+                          label: 'Reimprimir (F2)',
+                          color: Colors.teal.shade700,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -3562,7 +3577,7 @@ class _PosScreenState extends State<PosScreen> {
         ),
       ),
       barrierDismissible: true,
-    );
+    ).then((_) => _restoreFocusForF6());
   }
 
   /// Diálogo de carritos en espera: dejar carrito actual en espera o recuperar/cancelar uno.
