@@ -436,6 +436,18 @@ class AccountingReportsService {
       case 'PAYMENTS':
       case 'PAGOS':
         return 'Pagos de Clientes';
+      case 'OTHER_INCOME':
+        return 'Otros ingresos';
+      case 'ELECTRONIC_INVOICE':
+        return 'Facturas electrónicas';
+      case 'INVOICE_PAYMENT':
+        return 'Pagos de facturas';
+      case 'OPERATIONAL':
+        return 'Gastos operativos';
+      case 'ADMINISTRATIVE':
+        return 'Gastos administrativos';
+      case 'REFUNDS':
+        return 'Devoluciones';
       case 'CASH':
       case 'EFECTIVO':
         return 'Efectivo';
@@ -860,7 +872,8 @@ class AccountingReportsService {
                   ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
                   : '',
               'description': desc,
-              'category': e['category'] as String? ?? '',
+              'category':
+                  _translateCategory(e['category'] as String? ?? ''),
               'amount': amount,
               'paymentMethod': paymentMethod ?? 'N/A',
               'reference': reference,
@@ -1367,6 +1380,412 @@ class AccountingReportsService {
         'total': 0.0,
       };
     }
+  }
+
+  /// Egresos por método: todos los egresos del período, con resumen por método
+  /// y total específico por banco/transferencia.
+  static Future<Map<String, dynamic>> getSupplierPaymentsData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT ae.id, ae.amount, ae.description, ae.category, ae.date, ae.payment_method, ae.user_id, ae.document_number
+           FROM accounting_entries ae
+           WHERE ae.type = 'expense'
+             AND ae.date >= ? AND ae.date < ?
+           ORDER BY ae.date DESC''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      final totalsByMethod = <String, double>{};
+      double total = 0.0;
+      double totalBanco = 0.0;
+
+      for (final r in rows) {
+        final amount = (r['amount'] as num?)?.toDouble() ?? 0.0;
+        total += amount;
+
+        String userName = '';
+        if (r['user_id'] != null) {
+          final u = await db.query(
+            'users',
+            columns: ['fullName'],
+            where: 'id = ?',
+            whereArgs: [r['user_id']],
+          );
+          if (u.isNotEmpty && u.first['fullName'] != null) {
+            userName = u.first['fullName'] as String;
+          }
+        }
+
+        final paymentMethodRaw = r['payment_method'] as String? ?? 'N/A';
+        final paymentMethod = _translatePaymentMethod(paymentMethodRaw);
+        totalsByMethod[paymentMethod] =
+            (totalsByMethod[paymentMethod] ?? 0.0) + amount;
+        if (_isBankLikePaymentMethod(paymentMethodRaw)) {
+          totalBanco += amount;
+        }
+
+        list.add({
+          'id': r['id'],
+          'amount': amount,
+          'description': r['description'] as String? ?? '',
+          'category': _translateCategory(r['category'] as String? ?? ''),
+          'date':
+              r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'paymentMethod': paymentMethod,
+          'paymentMethodRaw': paymentMethodRaw,
+          'userName': userName,
+          'documentNumber': r['document_number'] as String? ?? '',
+          'isBank': _isBankLikePaymentMethod(paymentMethodRaw),
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'pagos': list,
+        'egresos': list,
+        'cantidad': list.length,
+        'total': total,
+        'totalBanco': totalBanco,
+        'totalsByMethod': totalsByMethod,
+      };
+    } catch (e) {
+      print('❌ Error getSupplierPaymentsData: $e');
+      return {
+        'pagos': <Map<String, dynamic>>[],
+        'cantidad': 0,
+        'total': 0.0,
+        'totalBanco': 0.0,
+        'totalsByMethod': <String, double>{},
+      };
+    }
+  }
+
+  /// Trazabilidad de egresos: detalla impacto operativo/contable por método.
+  static Future<Map<String, dynamic>> getExpenseTraceabilityData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT ae.id, ae.amount, ae.description, ae.category, ae.date, ae.payment_method, ae.user_id, ae.cash_session_id, ae.reference, ae.document_number
+           FROM accounting_entries ae
+           WHERE ae.type = 'expense'
+             AND ae.date >= ? AND ae.date < ?
+           ORDER BY ae.date DESC''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double total = 0.0;
+      double totalAfectaCaja = 0.0;
+      double totalNoAfectaCaja = 0.0;
+      int countAfectaCaja = 0;
+      int countNoAfectaCaja = 0;
+      final totalsByMethod = <String, double>{};
+      final totalsByCategory = <String, double>{};
+      final totalsByModule = <String, double>{};
+
+      for (final r in rows) {
+        final amount = (r['amount'] as num?)?.toDouble() ?? 0.0;
+        total += amount;
+
+        String userName = '';
+        if (r['user_id'] != null) {
+          final u = await db.query(
+            'users',
+            columns: ['fullName'],
+            where: 'id = ?',
+            whereArgs: [r['user_id']],
+          );
+          if (u.isNotEmpty && u.first['fullName'] != null) {
+            userName = u.first['fullName'] as String;
+          }
+        }
+
+        final methodRaw = r['payment_method'] as String? ?? 'N/A';
+        final method = _translatePaymentMethod(methodRaw);
+        final category = _translateCategory(r['category'] as String? ?? '');
+        final reference = r['reference'] as String? ?? '';
+        final description = r['description'] as String? ?? '';
+        final origenModulo =
+            _inferExpenseOriginModule(category, reference, description);
+        totalsByMethod[method] = (totalsByMethod[method] ?? 0.0) + amount;
+        totalsByCategory[category] = (totalsByCategory[category] ?? 0.0) + amount;
+        totalsByModule[origenModulo] = (totalsByModule[origenModulo] ?? 0.0) + amount;
+        final afectaCaja = _isCashPaymentMethod(methodRaw);
+        if (afectaCaja) {
+          totalAfectaCaja += amount;
+          countAfectaCaja++;
+        } else {
+          totalNoAfectaCaja += amount;
+          countNoAfectaCaja++;
+        }
+
+        list.add({
+          'id': r['id'],
+          'amount': amount,
+          'description': description,
+          'category': category,
+          'date':
+              r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'paymentMethod': method,
+          'paymentMethodRaw': methodRaw,
+          'userName': userName,
+          'cashSessionId': r['cash_session_id'],
+          'reference': reference,
+          'documentNumber': r['document_number'] as String? ?? '',
+          'origenModulo': origenModulo,
+          'afectaCaja': afectaCaja,
+          'afectaFlujoContable': true,
+          'afectaEstadoResultados': true,
+          'afectaArqueoEfectivo': afectaCaja,
+          'impacto': afectaCaja
+              ? 'Afecta cierre de caja (efectivo)'
+              : 'No afecta cierre de caja (banco/externo)',
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'egresos': list,
+        'cantidad': list.length,
+        'total': total,
+        'totalAfectaCaja': totalAfectaCaja,
+        'totalNoAfectaCaja': totalNoAfectaCaja,
+        'countAfectaCaja': countAfectaCaja,
+        'countNoAfectaCaja': countNoAfectaCaja,
+        'totalsByMethod': totalsByMethod,
+        'totalsByCategory': totalsByCategory,
+        'totalsByModule': totalsByModule,
+      };
+    } catch (e) {
+      print('❌ Error getExpenseTraceabilityData: $e');
+      return {
+        'egresos': <Map<String, dynamic>>[],
+        'cantidad': 0,
+        'total': 0.0,
+        'totalAfectaCaja': 0.0,
+        'totalNoAfectaCaja': 0.0,
+        'countAfectaCaja': 0,
+        'countNoAfectaCaja': 0,
+        'totalsByMethod': <String, double>{},
+        'totalsByCategory': <String, double>{},
+        'totalsByModule': <String, double>{},
+      };
+    }
+  }
+
+  /// Trazabilidad de ingresos: impacto en cierre de caja (efectivo) vs solo contable.
+  static Future<Map<String, dynamic>> getIncomeTraceabilityData(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) throw Exception('Base de datos no inicializada');
+
+      final start = DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final end = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      final rows = await db.rawQuery(
+        '''SELECT ae.id, ae.amount, ae.description, ae.category, ae.date, ae.payment_method, ae.user_id, ae.cash_session_id, ae.reference, ae.document_number
+           FROM accounting_entries ae
+           WHERE ae.type = 'income'
+             AND ae.date >= ? AND ae.date < ?
+           ORDER BY ae.date DESC''',
+        [start.toIso8601String(), end.toIso8601String()],
+      );
+
+      final list = <Map<String, dynamic>>[];
+      double total = 0.0;
+      double totalAfectaCaja = 0.0;
+      double totalNoAfectaCaja = 0.0;
+      int countAfectaCaja = 0;
+      int countNoAfectaCaja = 0;
+      final totalsByMethod = <String, double>{};
+      final totalsByCategory = <String, double>{};
+      final totalsByModule = <String, double>{};
+
+      for (final r in rows) {
+        final amount = (r['amount'] as num?)?.toDouble() ?? 0.0;
+        total += amount;
+
+        String userName = '';
+        if (r['user_id'] != null) {
+          final u = await db.query(
+            'users',
+            columns: ['fullName'],
+            where: 'id = ?',
+            whereArgs: [r['user_id']],
+          );
+          if (u.isNotEmpty && u.first['fullName'] != null) {
+            userName = u.first['fullName'] as String;
+          }
+        }
+
+        final methodRaw = r['payment_method'] as String? ?? 'N/A';
+        final method = _translatePaymentMethod(methodRaw);
+        final rawCategory = r['category'] as String? ?? '';
+        final category = _translateCategory(rawCategory);
+        final reference = r['reference'] as String? ?? '';
+        final description = r['description'] as String? ?? '';
+        final origenModulo =
+            _inferIncomeOriginModule(rawCategory, reference, description);
+        totalsByMethod[method] = (totalsByMethod[method] ?? 0.0) + amount;
+        totalsByCategory[category] =
+            (totalsByCategory[category] ?? 0.0) + amount;
+        totalsByModule[origenModulo] =
+            (totalsByModule[origenModulo] ?? 0.0) + amount;
+        final afectaCaja = _isCashPaymentMethod(methodRaw);
+        if (afectaCaja) {
+          totalAfectaCaja += amount;
+          countAfectaCaja++;
+        } else {
+          totalNoAfectaCaja += amount;
+          countNoAfectaCaja++;
+        }
+
+        list.add({
+          'id': r['id'],
+          'amount': amount,
+          'description': description,
+          'category': category,
+          'date':
+              r['date'] != null ? DateTime.parse(r['date'] as String) : null,
+          'paymentMethod': method,
+          'paymentMethodRaw': methodRaw,
+          'userName': userName,
+          'cashSessionId': r['cash_session_id'],
+          'reference': reference,
+          'documentNumber': r['document_number'] as String? ?? '',
+          'origenModulo': origenModulo,
+          'afectaCaja': afectaCaja,
+          'afectaFlujoContable': true,
+          'afectaEstadoResultados': true,
+          'afectaArqueoEfectivo': afectaCaja,
+          'impacto': afectaCaja
+              ? 'Suma en «Otros ingresos» del cierre de caja (efectivo), si no es venta POS'
+              : 'Ingreso contable; no entra al arqueo de efectivo del cierre',
+        });
+      }
+
+      return {
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'ingresos': list,
+        'cantidad': list.length,
+        'total': total,
+        'totalAfectaCaja': totalAfectaCaja,
+        'totalNoAfectaCaja': totalNoAfectaCaja,
+        'countAfectaCaja': countAfectaCaja,
+        'countNoAfectaCaja': countNoAfectaCaja,
+        'totalsByMethod': totalsByMethod,
+        'totalsByCategory': totalsByCategory,
+        'totalsByModule': totalsByModule,
+      };
+    } catch (e) {
+      print('❌ Error getIncomeTraceabilityData: $e');
+      return {
+        'ingresos': <Map<String, dynamic>>[],
+        'cantidad': 0,
+        'total': 0.0,
+        'totalAfectaCaja': 0.0,
+        'totalNoAfectaCaja': 0.0,
+        'countAfectaCaja': 0,
+        'countNoAfectaCaja': 0,
+        'totalsByMethod': <String, double>{},
+        'totalsByCategory': <String, double>{},
+        'totalsByModule': <String, double>{},
+      };
+    }
+  }
+
+  static String _inferIncomeOriginModule(
+      String rawCategory, String reference, String description) {
+    final u = rawCategory.toUpperCase();
+    final r = reference.toLowerCase();
+    final d = description.toLowerCase();
+    if (u.contains('SALES') || u.contains('VENTA')) {
+      return 'Ventas / POS';
+    }
+    if (u.contains('CUSTOMER')) {
+      return 'Abonos / clientes';
+    }
+    if (u.contains('ELECTRONIC_INVOICE')) {
+      return 'Facturación electrónica';
+    }
+    if (u.contains('INVOICE_PAYMENT')) {
+      return 'Cobro de facturas';
+    }
+    if (u.contains('OTHER_INCOME')) {
+      return 'Ingresos manuales';
+    }
+    if (r.contains('electronic') ||
+        r.contains('invoice') ||
+        d.contains('factura electronica')) {
+      return 'Facturación';
+    }
+    return 'Otros ingresos';
+  }
+
+  static bool _isBankLikePaymentMethod(String? method) {
+    final normalized = (method ?? '')
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .trim();
+    return normalized.contains('banco') || normalized.contains('transfer');
+  }
+
+  static String _inferExpenseOriginModule(
+      String category, String reference, String description) {
+    final c = category.toLowerCase();
+    final r = reference.toLowerCase();
+    final d = description.toLowerCase();
+
+    if (c.contains('proveedor') || c.contains('supplier')) {
+      return 'Proveedores';
+    }
+    if (c.contains('servicios publicos') ||
+        d.contains('servicios publicos') ||
+        d.contains('servicio publico')) {
+      return 'Servicios Publicos';
+    }
+    if (c.contains('mantenimiento') || d.contains('mantenimiento')) {
+      return 'Mantenimiento';
+    }
+    if (r.contains('electronic') ||
+        r.contains('invoice') ||
+        d.contains('factura electronica')) {
+      return 'Facturacion Electronica';
+    }
+    if (c.contains('gasto')) {
+      return 'Gastos Operativos';
+    }
+    if (r.contains('account') ||
+        r.contains('receivable') ||
+        r.contains('cxp')) {
+      return 'Cuentas por Cobrar/Pagar';
+    }
+    return 'Otros Egresos';
   }
 
   // ==================== REPORTES DE VENTAS ====================

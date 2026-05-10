@@ -50,6 +50,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
   Map<String, dynamic>? _ventasPorFormaDePagoData;
   Map<String, dynamic>? _movimientosDeEfectivoData;
   Map<String, dynamic>? _arqueoDeCajaData;
+  Map<String, dynamic>? _supplierPaymentsData;
+  Map<String, dynamic>? _expenseTraceabilityData;
+  Map<String, dynamic>? _incomeTraceabilityData;
 
   bool _isLoading = false;
 
@@ -124,10 +127,20 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
           _fromDate, _toDate);
       if (mounted) setState(() => _ventasPorCategoriaData = data);
     } else if (index == 4) {
-      setState(() => _transaccionesDiaData = null);
+      setState(() {
+        _transaccionesDiaData = null;
+        _movimientosDiaData = null;
+      });
       final data = await AccountingReportsService.getTransaccionesDiaData(
           _fromDate, _toDate);
-      if (mounted) setState(() => _transaccionesDiaData = data);
+      final accountingData = await AccountingReportsService.getMovimientosDiaData(
+          _fromDate, _toDate);
+      if (mounted) {
+        setState(() {
+          _transaccionesDiaData = data;
+          _movimientosDiaData = accountingData;
+        });
+      }
     } else if (index == 5) {
       setState(() => _ventasPorHoraData = null);
       final data = await AccountingReportsService.getVentasPorHoraData(
@@ -143,6 +156,21 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
       final data = await AccountingReportsService.getResumenSemanalMensualData(
           _fromDate, _toDate);
       if (mounted) setState(() => _resumenSemanalData = data);
+    } else if (index == 8) {
+      setState(() => _supplierPaymentsData = null);
+      final data = await AccountingReportsService.getSupplierPaymentsData(
+          _fromDate, _toDate);
+      if (mounted) setState(() => _supplierPaymentsData = data);
+    } else if (index == 9) {
+      setState(() => _expenseTraceabilityData = null);
+      final data = await AccountingReportsService.getExpenseTraceabilityData(
+          _fromDate, _toDate);
+      if (mounted) setState(() => _expenseTraceabilityData = data);
+    } else if (index == 10) {
+      setState(() => _incomeTraceabilityData = null);
+      final data = await AccountingReportsService.getIncomeTraceabilityData(
+          _fromDate, _toDate);
+      if (mounted) setState(() => _incomeTraceabilityData = data);
     }
   }
 
@@ -223,6 +251,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         _ventasPorHoraData = null;
         _devolucionesData = null;
         _resumenSemanalData = null;
+        _supplierPaymentsData = null;
+        _expenseTraceabilityData = null;
+        _incomeTraceabilityData = null;
       });
       if (_selectedDailyReport != null) {
         _selectDailyReport(_selectedDailyReport!);
@@ -1161,6 +1192,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                                 6, 'Devoluciones', Icons.keyboard_return),
                             _buildDailyReportTile(7, 'Resumen Semanal/Mensual',
                                 Icons.calendar_view_week),
+                            _buildDailyReportTile(
+                                8, 'Egresos por Método', Icons.payments),
+                            _buildDailyReportTile(9, 'Trazabilidad Egresos',
+                                Icons.alt_route),
+                            _buildDailyReportTile(10, 'Trazabilidad Ingresos',
+                                Icons.trending_up),
                           ],
                         ),
                       ),
@@ -1219,6 +1256,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     if (_selectedDailyReport == 5) return _buildVentasPorHoraContent();
     if (_selectedDailyReport == 6) return _buildDevolucionesContent();
     if (_selectedDailyReport == 7) return _buildResumenSemanalContent();
+    if (_selectedDailyReport == 8) return _buildSupplierPaymentsContent();
+    if (_selectedDailyReport == 9) return _buildExpenseTraceabilityContent();
+    if (_selectedDailyReport == 10) return _buildIncomeTraceabilityContent();
     return const SizedBox.shrink();
   }
 
@@ -2888,17 +2928,89 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
   }
 
   Widget _buildTransaccionesDiaContent() {
-    final d = _transaccionesDiaData;
-    if (d == null) return const Center(child: CircularProgressIndicator());
-    final list = d['transacciones'] as List<dynamic>? ?? [];
-    final totalVentas = (d['totalVentas'] as num?)?.toDouble() ?? 0.0;
+    final sales = _transaccionesDiaData;
+    final accounting = _movimientosDiaData;
+    if (sales == null || accounting == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final salesList = (sales['transacciones'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>();
+    final accountingList = (accounting['movimientos'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>();
+
+    final fromDate = sales['fromDate'] as DateTime? ?? _fromDate;
+    final toDate = sales['toDate'] as DateTime? ?? _toDate;
+
+    final totalVentas = (sales['totalVentas'] as num?)?.toDouble() ?? 0.0;
     final totalDevoluciones =
-        (d['totalDevoluciones'] as num?)?.toDouble() ?? 0.0;
-    final neto = (d['neto'] as num?)?.toDouble() ?? 0.0;
-    final countVentas = d['countVentas'] as int? ?? 0;
-    final countDevoluciones = d['countDevoluciones'] as int? ?? 0;
-    final fromDate = d['fromDate'] as DateTime? ?? _fromDate;
-    final toDate = d['toDate'] as DateTime? ?? _toDate;
+        (sales['totalDevoluciones'] as num?)?.toDouble() ?? 0.0;
+    final netoVentas = (sales['neto'] as num?)?.toDouble() ?? 0.0;
+    final countVentas = sales['countVentas'] as int? ?? 0;
+    final countDevoluciones = sales['countDevoluciones'] as int? ?? 0;
+
+    final totalIngresosContables =
+        (accounting['totalIngresos'] as num?)?.toDouble() ?? 0.0;
+    final totalEgresosContables =
+        (accounting['totalEgresos'] as num?)?.toDouble() ?? 0.0;
+    double ingresosVentasContables = 0.0;
+    double otrosIngresosContables = 0.0;
+
+    final unified = <Map<String, dynamic>>[];
+    for (final m in salesList) {
+      final tipo = m['tipo'] as String? ?? 'Venta';
+      unified.add({
+        'origen': 'POS',
+        'id': m['id'],
+        'date': m['date'],
+        'tipo': tipo,
+        'detalle': tipo,
+        'userName': m['userName'] ?? '',
+        'paymentMethod': m['paymentMethod'] ?? '',
+        'category': tipo,
+        'amount': (m['amount'] as num?)?.toDouble() ?? 0.0,
+      });
+    }
+    for (final m in accountingList) {
+      final type = (m['type'] as String? ?? '').toLowerCase();
+      final amount = (m['amount'] as num?)?.toDouble() ?? 0.0;
+      final category = (m['category'] as String? ?? '').toLowerCase();
+      final description = (m['description'] as String? ?? '').toLowerCase();
+      final isSaleIncome = type == 'income' &&
+          (category.contains('venta') ||
+              category.contains('sales') ||
+              description.contains('venta') ||
+              description.contains('sale'));
+      if (type == 'income') {
+        if (isSaleIncome) {
+          ingresosVentasContables += amount;
+        } else {
+          otrosIngresosContables += amount;
+        }
+      }
+      final signed = type == 'expense' ? -amount.abs() : amount.abs();
+      unified.add({
+        'origen': 'Contable',
+        'id': m['id'],
+        'date': m['date'],
+        'tipo': type == 'expense' ? 'Egreso' : 'Ingreso',
+        'detalle': m['description'] ?? '',
+        'userName': m['userName'] ?? '',
+        'paymentMethod': m['paymentMethod'] ?? '',
+        'category': m['category'] ?? '',
+        'amount': signed,
+      });
+    }
+    unified.sort((a, b) {
+      final ad = a['date'] as DateTime?;
+      final bd = b['date'] as DateTime?;
+      if (ad == null && bd == null) return 0;
+      if (ad == null) return 1;
+      if (bd == null) return -1;
+      return bd.compareTo(ad);
+    });
+
+    final totalMovimientos = unified.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -2922,12 +3034,21 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
           ),
           const SizedBox(height: 24),
           _buildCierreCard('Resumen', [
-            _row('Total movimientos',
-                '${list.length} ($countVentas ventas + $countDevoluciones devoluciones)'),
-            _row('Total ventas', '\$${_currencyFormat.format(totalVentas)}'),
-            _row('Total devoluciones',
+            _row('Total movimientos', '$totalMovimientos'),
+            _row('Ventas POS', '\$${_currencyFormat.format(totalVentas)}'),
+            _row('Devoluciones POS',
                 '-\$${_currencyFormat.format(totalDevoluciones)}'),
-            _row('Neto', '\$${_currencyFormat.format(neto)}', bold: true),
+            _row('Neto POS', '\$${_currencyFormat.format(netoVentas)}'),
+            _row('Ingresos contables por ventas',
+                '\$${_currencyFormat.format(ingresosVentasContables)}'),
+            _row('Otros ingresos contables',
+                '\$${_currencyFormat.format(otrosIngresosContables)}'),
+            _row('Total ingresos contables (suma)',
+                '\$${_currencyFormat.format(totalIngresosContables)}'),
+            _row('Egresos contables',
+                '-\$${_currencyFormat.format(totalEgresosContables)}'),
+            _row('Detalle rápido',
+                '$countVentas ventas, $countDevoluciones devoluciones, ${accountingList.length} mov. contables'),
           ]),
           const SizedBox(height: 16),
           Card(
@@ -2937,14 +3058,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Detalle de transacciones',
+                    'Detalle unificado (POS + Contabilidad)',
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  if (list.isEmpty)
+                  if (unified.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: Text('No hay movimientos en el período.',
@@ -2958,6 +3079,10 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                             WidgetStateProperty.all(Colors.blue.shade50),
                         columns: const [
                           DataColumn(
+                              label: Text('Origen',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(
                               label: Text('Ticket',
                                   style:
                                       TextStyle(fontWeight: FontWeight.bold))),
@@ -2967,6 +3092,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                                       TextStyle(fontWeight: FontWeight.bold))),
                           DataColumn(
                               label: Text('Tipo',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(
+                              label: Text('Categoría',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold))),
+                          DataColumn(
+                              label: Text('Detalle',
                                   style:
                                       TextStyle(fontWeight: FontWeight.bold))),
                           DataColumn(
@@ -2983,11 +3116,14 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                                       TextStyle(fontWeight: FontWeight.bold)),
                               numeric: true),
                         ],
-                        rows: list.take(500).map<DataRow>((e) {
-                          final m = e as Map<String, dynamic>;
+                        rows: unified.take(700).map<DataRow>((m) {
                           final id = m['id'] as int? ?? 0;
                           final date = m['date'] as DateTime?;
                           final tipo = m['tipo'] as String? ?? 'Venta';
+                          final categoria =
+                              (m['category'] as String?)?.trim() ?? '';
+                          final detalle = m['detalle'] as String? ?? '';
+                          final origen = m['origen'] as String? ?? '';
                           final userName = m['userName'] as String? ?? '';
                           final paymentMethod =
                               m['paymentMethod'] as String? ?? '';
@@ -2995,11 +3131,26 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                               (m['amount'] as num?)?.toDouble() ?? 0.0;
                           return DataRow(
                             cells: [
+                              DataCell(Text(origen)),
                               DataCell(Text(id.toString().padLeft(5, '0'))),
                               DataCell(Text(date != null
                                   ? DateFormat('HH:mm').format(date)
                                   : '--:--')),
                               DataCell(Text(tipo)),
+                              DataCell(SizedBox(
+                                width: 160,
+                                child: Text(
+                                  categoria.isEmpty ? '—' : categoria,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(SizedBox(
+                                width: 220,
+                                child: Text(
+                                  detalle,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
                               DataCell(Text(userName)),
                               DataCell(Text(paymentMethod)),
                               DataCell(Text(amount >= 0
@@ -3021,6 +3172,705 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 .textTheme
                 .bodySmall
                 ?.copyWith(color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupplierPaymentsContent() {
+    final d = _supplierPaymentsData;
+    if (d == null) return const Center(child: CircularProgressIndicator());
+
+    final list = ((d['egresos'] ?? d['pagos']) as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .toList();
+    final total = (d['total'] as num?)?.toDouble() ?? 0.0;
+    final totalBanco = (d['totalBanco'] as num?)?.toDouble() ?? 0.0;
+    final fromDate = d['fromDate'] as DateTime? ?? _fromDate;
+    final toDate = d['toDate'] as DateTime? ?? _toDate;
+    final totalsByMethod =
+        (d['totalsByMethod'] as Map<String, dynamic>? ?? <String, dynamic>{})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+
+    final onlyBank = ValueNotifier<bool>(true);
+
+    List<Map<String, dynamic>> filtered(bool bankOnly) => bankOnly
+        ? list.where((e) => (e['isBank'] as bool? ?? false)).toList()
+        : list;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Egresos por Método',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${DateFormat('dd/MM/yyyy').format(fromDate)} - ${DateFormat('dd/MM/yyyy').format(toDate)}',
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 24),
+          _buildCierreCard('Resumen', [
+            _row('Cantidad de egresos', '${list.length}'),
+            _row('Total egresos', '\$${_currencyFormat.format(total)}'),
+            _row(
+              'Total Banco/Transferencia',
+              '\$${_currencyFormat.format(totalBanco)}',
+              bold: true,
+            ),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Totales por método', [
+            ...(totalsByMethod.entries.isEmpty
+                ? [
+                    _row('Sin datos', '-'),
+                  ]
+                : totalsByMethod.entries.map(
+                    (e) => _row(
+                      e.key,
+                      '\$${_currencyFormat.format(e.value)}',
+                    ),
+                  )),
+          ]),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Detalle',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: onlyBank,
+                        builder: (context, bankOnly, _) => SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment<bool>(
+                              value: true,
+                              label: Text('Solo Banco'),
+                              icon: Icon(Icons.account_balance),
+                            ),
+                            ButtonSegment<bool>(
+                              value: false,
+                              label: Text('Todos'),
+                              icon: Icon(Icons.list_alt),
+                            ),
+                          ],
+                          selected: {bankOnly},
+                          onSelectionChanged: (v) {
+                            if (v.isNotEmpty) {
+                              onlyBank.value = v.first;
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: onlyBank,
+                    builder: (context, bankOnly, _) {
+                      final rowsData = filtered(bankOnly);
+                      if (rowsData.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text('No hay pagos para el filtro seleccionado.',
+                              style: TextStyle(color: Colors.grey)),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowColor:
+                              WidgetStateProperty.all(Colors.blue.shade50),
+                          columns: const [
+                            DataColumn(
+                                label: Text('Fecha',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Monto',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                numeric: true),
+                            DataColumn(
+                                label: Text('Detalle',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Método',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Categoría',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Documento',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Usuario',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                          ],
+                          rows: rowsData.take(500).map<DataRow>((m) {
+                            final date = m['date'] as DateTime?;
+                            final description = m['description'] as String? ?? '';
+                            final method = m['paymentMethod'] as String? ?? '';
+                            final category = m['category'] as String? ?? '';
+                            final document =
+                                m['documentNumber'] as String? ?? '';
+                            final userName = m['userName'] as String? ?? '';
+                            final amount =
+                                (m['amount'] as num?)?.toDouble() ?? 0.0;
+                            return DataRow(cells: [
+                              DataCell(Text(date != null
+                                  ? DateFormat('dd/MM/yyyy HH:mm').format(date)
+                                  : '--')),
+                              DataCell(
+                                  Text('\$${_currencyFormat.format(amount)}')),
+                              DataCell(SizedBox(
+                                  width: 220,
+                                  child: Text(
+                                    description,
+                                    overflow: TextOverflow.ellipsis,
+                                  ))),
+                              DataCell(Text(method)),
+                              DataCell(Text(category)),
+                              DataCell(Text(document.isEmpty ? '-' : document)),
+                              DataCell(Text(userName.isEmpty ? '-' : userName)),
+                            ]);
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpenseTraceabilityContent() {
+    final d = _expenseTraceabilityData;
+    if (d == null) return const Center(child: CircularProgressIndicator());
+
+    final list = (d['egresos'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .toList();
+    final total = (d['total'] as num?)?.toDouble() ?? 0.0;
+    final totalAfectaCaja = (d['totalAfectaCaja'] as num?)?.toDouble() ?? 0.0;
+    final totalNoAfectaCaja =
+        (d['totalNoAfectaCaja'] as num?)?.toDouble() ?? 0.0;
+    final countAfectaCaja = d['countAfectaCaja'] as int? ?? 0;
+    final countNoAfectaCaja = d['countNoAfectaCaja'] as int? ?? 0;
+    final fromDate = d['fromDate'] as DateTime? ?? _fromDate;
+    final toDate = d['toDate'] as DateTime? ?? _toDate;
+    final totalsByMethod =
+        (d['totalsByMethod'] as Map<String, dynamic>? ?? <String, dynamic>{})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+    final totalsByCategory =
+        (d['totalsByCategory'] as Map<String, dynamic>? ?? <String, dynamic>{})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+    final totalsByModule =
+        (d['totalsByModule'] as Map<String, dynamic>? ?? <String, dynamic>{})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+
+    final filterAfectaCaja = ValueNotifier<String>('todos');
+
+    List<Map<String, dynamic>> filtered(String mode) {
+      if (mode == 'si') {
+        return list.where((e) => (e['afectaCaja'] as bool? ?? false)).toList();
+      }
+      if (mode == 'no') {
+        return list.where((e) => !(e['afectaCaja'] as bool? ?? false)).toList();
+      }
+      return list;
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Trazabilidad de Egresos',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${DateFormat('dd/MM/yyyy').format(fromDate)} - ${DateFormat('dd/MM/yyyy').format(toDate)}',
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 24),
+          _buildCierreCard('Impacto del período', [
+            _row('Total egresos', '\$${_currencyFormat.format(total)}',
+                bold: true),
+            _row('Afectan cierre de caja (efectivo)',
+                '\$${_currencyFormat.format(totalAfectaCaja)} ($countAfectaCaja)'),
+            _row('No afectan cierre (banco/externo)',
+                '\$${_currencyFormat.format(totalNoAfectaCaja)} ($countNoAfectaCaja)'),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Impacto contable', [
+            _row('Flujo contable', 'Todos los egresos impactan'),
+            _row('Estado de resultados', 'Todos los egresos impactan gastos'),
+            _row('Arqueo efectivo', 'Solo egresos en efectivo/caja'),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Totales por método', [
+            ...(totalsByMethod.entries.isEmpty
+                ? [_row('Sin datos', '-')]
+                : totalsByMethod.entries
+                    .map((e) => _row(e.key, '\$${_currencyFormat.format(e.value)}'))),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Totales por categoría', [
+            ...(totalsByCategory.entries.isEmpty
+                ? [_row('Sin datos', '-')]
+                : totalsByCategory.entries
+                    .map((e) => _row(e.key, '\$${_currencyFormat.format(e.value)}'))),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Totales por módulo origen', [
+            ...(totalsByModule.entries.isEmpty
+                ? [_row('Sin datos', '-')]
+                : totalsByModule.entries
+                    .map((e) => _row(e.key, '\$${_currencyFormat.format(e.value)}'))),
+          ]),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Detalle por egreso',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      ValueListenableBuilder<String>(
+                        valueListenable: filterAfectaCaja,
+                        builder: (context, mode, _) => SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment<String>(
+                              value: 'todos',
+                              label: Text('Todos'),
+                            ),
+                            ButtonSegment<String>(
+                              value: 'si',
+                              label: Text('Afecta Caja'),
+                            ),
+                            ButtonSegment<String>(
+                              value: 'no',
+                              label: Text('No Afecta Caja'),
+                            ),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (v) {
+                            if (v.isNotEmpty) filterAfectaCaja.value = v.first;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ValueListenableBuilder<String>(
+                    valueListenable: filterAfectaCaja,
+                    builder: (context, mode, _) {
+                      final rowsData = filtered(mode);
+                      if (rowsData.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text('No hay egresos para el filtro seleccionado.',
+                              style: TextStyle(color: Colors.grey)),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowColor:
+                              WidgetStateProperty.all(Colors.blue.shade50),
+                          columns: const [
+                            DataColumn(
+                                label: Text('Fecha',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Detalle',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Método',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Módulo Origen',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Trazabilidad',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Ref / Doc / Sesión',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Usuario',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Monto',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                numeric: true),
+                          ],
+                          rows: rowsData.take(800).map<DataRow>((m) {
+                            final date = m['date'] as DateTime?;
+                            final description = m['description'] as String? ?? '';
+                            final method = m['paymentMethod'] as String? ?? '';
+                            final origenModulo =
+                                m['origenModulo'] as String? ?? 'Otros Egresos';
+                            final impacto = m['impacto'] as String? ?? '';
+                            final reference = m['reference'] as String? ?? '';
+                            final document = m['documentNumber'] as String? ?? '';
+                            final sessionId = m['cashSessionId'];
+                            final userName = m['userName'] as String? ?? '';
+                            final amount =
+                                (m['amount'] as num?)?.toDouble() ?? 0.0;
+                            return DataRow(cells: [
+                              DataCell(Text(date != null
+                                  ? DateFormat('dd/MM/yyyy HH:mm').format(date)
+                                  : '--')),
+                              DataCell(SizedBox(
+                                width: 250,
+                                child: Text(
+                                  description,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(Text(method)),
+                              DataCell(Text(origenModulo)),
+                              DataCell(SizedBox(
+                                width: 280,
+                                child: Text(
+                                  impacto,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(SizedBox(
+                                width: 260,
+                                child: Text(
+                                  'Ref: ${reference.isEmpty ? "-" : reference} | Doc: ${document.isEmpty ? "-" : document} | Sesión: ${sessionId ?? "-"}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(Text(userName.isEmpty ? '-' : userName)),
+                              DataCell(
+                                  Text('\$${_currencyFormat.format(amount)}')),
+                            ]);
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIncomeTraceabilityContent() {
+    final d = _incomeTraceabilityData;
+    if (d == null) return const Center(child: CircularProgressIndicator());
+
+    final list = (d['ingresos'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .toList();
+    final total = (d['total'] as num?)?.toDouble() ?? 0.0;
+    final totalAfectaCaja = (d['totalAfectaCaja'] as num?)?.toDouble() ?? 0.0;
+    final totalNoAfectaCaja =
+        (d['totalNoAfectaCaja'] as num?)?.toDouble() ?? 0.0;
+    final countAfectaCaja = d['countAfectaCaja'] as int? ?? 0;
+    final countNoAfectaCaja = d['countNoAfectaCaja'] as int? ?? 0;
+    final fromDate = d['fromDate'] as DateTime? ?? _fromDate;
+    final toDate = d['toDate'] as DateTime? ?? _toDate;
+    final totalsByMethod =
+        (d['totalsByMethod'] as Map<String, dynamic>? ?? <String, dynamic>{})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+    final totalsByCategory =
+        (d['totalsByCategory'] as Map<String, dynamic>? ?? <String, dynamic>{})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+    final totalsByModule =
+        (d['totalsByModule'] as Map<String, dynamic>? ?? <String, dynamic>{})
+            .map((k, v) => MapEntry(k, (v as num?)?.toDouble() ?? 0.0));
+
+    final filterAfectaCaja = ValueNotifier<String>('todos');
+
+    List<Map<String, dynamic>> filtered(String mode) {
+      if (mode == 'si') {
+        return list.where((e) => (e['afectaCaja'] as bool? ?? false)).toList();
+      }
+      if (mode == 'no') {
+        return list.where((e) => !(e['afectaCaja'] as bool? ?? false)).toList();
+      }
+      return list;
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Trazabilidad de Ingresos',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${DateFormat('dd/MM/yyyy').format(fromDate)} - ${DateFormat('dd/MM/yyyy').format(toDate)}',
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 24),
+          _buildCierreCard('Impacto del período', [
+            _row('Total ingresos contables', '\$${_currencyFormat.format(total)}',
+                bold: true),
+            _row('Entran al arqueo de efectivo del cierre',
+                '\$${_currencyFormat.format(totalAfectaCaja)} ($countAfectaCaja)'),
+            _row('Solo contables (banco/externo)',
+                '\$${_currencyFormat.format(totalNoAfectaCaja)} ($countNoAfectaCaja)'),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Impacto contable', [
+            _row('Flujo contable', 'Todos los ingresos registrados impactan'),
+            _row('Estado de resultados', 'Según categoría de cada movimiento'),
+            _row('Arqueo efectivo del cierre',
+                'Solo ingresos en efectivo/caja que no sean venta POS duplicada'),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Totales por método', [
+            ...(totalsByMethod.entries.isEmpty
+                ? [_row('Sin datos', '-')]
+                : totalsByMethod.entries
+                    .map((e) => _row(e.key, '\$${_currencyFormat.format(e.value)}'))),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Totales por categoría', [
+            ...(totalsByCategory.entries.isEmpty
+                ? [_row('Sin datos', '-')]
+                : totalsByCategory.entries
+                    .map((e) => _row(e.key, '\$${_currencyFormat.format(e.value)}'))),
+          ]),
+          const SizedBox(height: 16),
+          _buildCierreCard('Totales por módulo origen', [
+            ...(totalsByModule.entries.isEmpty
+                ? [_row('Sin datos', '-')]
+                : totalsByModule.entries
+                    .map((e) => _row(e.key, '\$${_currencyFormat.format(e.value)}'))),
+          ]),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Detalle por ingreso',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      ValueListenableBuilder<String>(
+                        valueListenable: filterAfectaCaja,
+                        builder: (context, mode, _) => SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment<String>(
+                              value: 'todos',
+                              label: Text('Todos'),
+                            ),
+                            ButtonSegment<String>(
+                              value: 'si',
+                              label: Text('Afecta caja'),
+                            ),
+                            ButtonSegment<String>(
+                              value: 'no',
+                              label: Text('No afecta caja'),
+                            ),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (v) {
+                            if (v.isNotEmpty) filterAfectaCaja.value = v.first;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ValueListenableBuilder<String>(
+                    valueListenable: filterAfectaCaja,
+                    builder: (context, mode, _) {
+                      final rowsData = filtered(mode);
+                      if (rowsData.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text(
+                              'No hay ingresos para el filtro seleccionado.',
+                              style: TextStyle(color: Colors.grey)),
+                        );
+                      }
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowColor:
+                              WidgetStateProperty.all(Colors.blue.shade50),
+                          columns: const [
+                            DataColumn(
+                                label: Text('Fecha',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Categoría',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Detalle',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Método',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Módulo origen',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Trazabilidad',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Ref / Doc / Sesión',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Usuario',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold))),
+                            DataColumn(
+                                label: Text('Monto',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                numeric: true),
+                          ],
+                          rows: rowsData.take(800).map<DataRow>((m) {
+                            final date = m['date'] as DateTime?;
+                            final cat = m['category'] as String? ?? '';
+                            final description = m['description'] as String? ?? '';
+                            final method = m['paymentMethod'] as String? ?? '';
+                            final origenModulo =
+                                m['origenModulo'] as String? ?? 'Otros ingresos';
+                            final impacto = m['impacto'] as String? ?? '';
+                            final reference = m['reference'] as String? ?? '';
+                            final document = m['documentNumber'] as String? ?? '';
+                            final sessionId = m['cashSessionId'];
+                            final userName = m['userName'] as String? ?? '';
+                            final amount =
+                                (m['amount'] as num?)?.toDouble() ?? 0.0;
+                            return DataRow(cells: [
+                              DataCell(Text(date != null
+                                  ? DateFormat('dd/MM/yyyy HH:mm').format(date)
+                                  : '--')),
+                              DataCell(SizedBox(
+                                width: 140,
+                                child: Text(
+                                  cat.isEmpty ? '-' : cat,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(SizedBox(
+                                width: 220,
+                                child: Text(
+                                  description,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(Text(method)),
+                              DataCell(Text(origenModulo)),
+                              DataCell(SizedBox(
+                                width: 260,
+                                child: Text(
+                                  impacto,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(SizedBox(
+                                width: 260,
+                                child: Text(
+                                  'Ref: ${reference.isEmpty ? "-" : reference} | Doc: ${document.isEmpty ? "-" : document} | Sesión: ${sessionId ?? "-"}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              )),
+                              DataCell(Text(userName.isEmpty ? '-' : userName)),
+                              DataCell(
+                                  Text('\$${_currencyFormat.format(amount)}')),
+                            ]);
+                          }).toList(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
