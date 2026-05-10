@@ -1,11 +1,13 @@
 // Pantalla para gestión de cuentas por cobrar y pagar
 
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/accounts_receivable.dart';
 import '../models/receivable_payment.dart';
@@ -113,6 +115,15 @@ class _AccountsReceivablePayableScreenState
     final paymentsByPayableId =
         await AccountsReceivablePayableService.getPaymentsForPayables(ids);
     return {'payments': paymentsByPayableId};
+  }
+
+  /// Tamaño del detalle CxC / CxP: casi pantalla completa en tablet/móvil para capturas y lectura.
+  Size _accountsDetailDialogSize(BuildContext context) {
+    final s = MediaQuery.sizeOf(context);
+    return Size(
+      math.min(920.0, s.width * 0.96),
+      math.min(860.0, s.height * 0.90),
+    );
   }
 
   @override
@@ -431,11 +442,16 @@ class _AccountsReceivablePayableScreenState
           final data = snap.data!;
           final paymentsByReceivableId =
               data['payments'] as Map<int, List<ReceivablePayment>>;
+          final sz = MediaQuery.sizeOf(context);
+          final dialogSize = _accountsDetailDialogSize(context);
           return Dialog(
-            insetPadding: const EdgeInsets.all(24),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: math.max(6.0, (sz.width - dialogSize.width) * 0.5),
+              vertical: 8,
+            ),
             child: SizedBox(
-              width: 760,
-              height: 620,
+              width: dialogSize.width,
+              height: dialogSize.height,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -459,6 +475,71 @@ class _AccountsReceivablePayableScreenState
                                 style: TextStyle(color: Colors.grey.shade700),
                               ),
                             ],
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          tooltip: 'Constancia para el cliente',
+                          onSelected: (value) async {
+                            final text = _buildCustomerReceivableStatementText(
+                              summary,
+                              paymentsByReceivableId,
+                            );
+                            if (value == 'copy') {
+                              await Clipboard.setData(
+                                  ClipboardData(text: text));
+                              if (context.mounted) {
+                                Get.snackbar(
+                                  'Copiado',
+                                  'Constancia en el portapapeles. Pégala en WhatsApp, correo, etc.',
+                                  duration: const Duration(seconds: 3),
+                                );
+                              }
+                            } else if (value == 'share') {
+                              // Sin `subject`: en Android WhatsApp a veces solo toma el
+                              // asunto y deja vacío el cuerpo; el texto ya incluye encabezado.
+                              Share.share(text);
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'copy',
+                              child: ListTile(
+                                dense: true,
+                                leading: Icon(Icons.copy_outlined),
+                                title: Text('Copiar texto'),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'share',
+                              child: ListTile(
+                                dense: true,
+                                leading: Icon(Icons.share_outlined),
+                                title: Text('Compartir…'),
+                              ),
+                            ),
+                          ],
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.description_outlined,
+                                    size: 20,
+                                    color: Colors.blue.shade700),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Constancia',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.blue.shade800,
+                                  ),
+                                ),
+                                Icon(Icons.arrow_drop_down,
+                                    color: Colors.blue.shade700),
+                              ],
+                            ),
                           ),
                         ),
                         IconButton(
@@ -1182,12 +1263,17 @@ class _AccountsReceivablePayableScreenState
           }
           final paymentsByPayableId =
               (snap.data!['payments'] as Map<int, List<PayablePayment>>);
+          final sz = MediaQuery.sizeOf(context);
+          final dialogSize = _accountsDetailDialogSize(context);
 
           return Dialog(
-            insetPadding: const EdgeInsets.all(24),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: math.max(6.0, (sz.width - dialogSize.width) * 0.5),
+              vertical: 8,
+            ),
             child: SizedBox(
-              width: 720,
-              height: 600,
+              width: dialogSize.width,
+              height: dialogSize.height,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1211,6 +1297,69 @@ class _AccountsReceivablePayableScreenState
                                 style: TextStyle(color: Colors.grey.shade700),
                               ),
                             ],
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          tooltip: 'Resumen para compartir',
+                          onSelected: (value) async {
+                            final text = _buildSupplierPayableStatementText(
+                              summary,
+                              paymentsByPayableId,
+                            );
+                            if (value == 'copy') {
+                              await Clipboard.setData(
+                                  ClipboardData(text: text));
+                              if (context.mounted) {
+                                Get.snackbar(
+                                  'Copiado',
+                                  'Resumen en el portapapeles.',
+                                  duration: const Duration(seconds: 3),
+                                );
+                              }
+                            } else if (value == 'share') {
+                              Share.share(text);
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'copy',
+                              child: ListTile(
+                                dense: true,
+                                leading: Icon(Icons.copy_outlined),
+                                title: Text('Copiar texto'),
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'share',
+                              child: ListTile(
+                                dense: true,
+                                leading: Icon(Icons.share_outlined),
+                                title: Text('Compartir…'),
+                              ),
+                            ),
+                          ],
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.description_outlined,
+                                    size: 20,
+                                    color: Colors.orange.shade800),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Resumen',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                ),
+                                Icon(Icons.arrow_drop_down,
+                                    color: Colors.orange.shade800),
+                              ],
+                            ),
                           ),
                         ),
                         IconButton(
@@ -1322,6 +1471,123 @@ class _AccountsReceivablePayableScreenState
     ).whenComplete(() {
       detailScrollController.dispose();
     });
+  }
+
+  /// Texto plano para enviar al cliente (WhatsApp, correo, etc.): saldos y abonos por factura.
+  String _buildCustomerReceivableStatementText(
+    ReceivableCustomerSummary summary,
+    Map<int, List<ReceivablePayment>> paymentsByReceivableId,
+  ) {
+    const width = 52;
+    final sep = '=' * width;
+    final dash = '-' * width;
+    final sb = StringBuffer();
+
+    String line(String s) {
+      if (s.length <= width) return s;
+      return s.substring(0, width);
+    }
+
+    sb.writeln(sep);
+    sb.writeln(line('ESTADO DE CUENTA POR COBRAR').padLeft(width));
+    sb.writeln(dash);
+    sb.writeln(line('Cliente: ${summary.customerName}'));
+    sb.writeln(line('Documento: ${summary.customerDocument}'));
+    sb.writeln(dash);
+    sb.writeln(line('Total facturado: ${_money.format(summary.totalInvoiced)}'));
+    sb.writeln(line('Total cobrado:   ${_money.format(summary.totalPaid)}'));
+    sb.writeln(line('Saldo pendiente: ${_money.format(summary.totalPending)}'));
+    sb.writeln(line('Documentos: ${summary.documentCount}'));
+    sb.writeln(sep);
+    for (final acc in summary.accounts) {
+      final id = acc.id;
+      final payments =
+          id != null ? (paymentsByReceivableId[id] ?? []) : <ReceivablePayment>[];
+      sb.writeln(dash);
+      sb.writeln(line('Factura: ${acc.invoiceNumber}'));
+      sb.writeln(line('Fecha: ${_df.format(acc.invoiceDate)}'));
+      sb.writeln(line('Estado: ${_statusLabel(acc.status)}'));
+      sb.writeln(line(
+          'Total: ${_money.format(acc.totalAmount)} | Pagado: ${_money.format(acc.paidAmount)} | Pendiente: ${_money.format(acc.pendingAmount)}'));
+      sb.writeln(line('Vence: ${_formatDateOnly(acc.dueDate)}'));
+      if (acc.notes != null && acc.notes!.trim().isNotEmpty) {
+        sb.writeln(line('Notas: ${acc.notes!.trim()}'));
+      }
+      if (payments.isEmpty) {
+        sb.writeln(line('Abonos: ninguno registrado.'));
+      } else {
+        sb.writeln(line('Abonos / pagos:'));
+        for (final p in payments) {
+          final ref = (p.reference != null && p.reference!.trim().isNotEmpty)
+              ? ' · Ref: ${p.reference!.trim()}'
+              : '';
+          sb.writeln(line(
+              '  · ${_money.format(p.amount)} | ${_df.format(p.paymentDate)} | ${p.paymentMethod}$ref'));
+        }
+      }
+    }
+    sb.writeln(sep);
+    sb.writeln(line('Generado: ${_df.format(DateTime.now())} — Smart Seller'));
+    sb.writeln(sep);
+    return sb.toString();
+  }
+
+  String _buildSupplierPayableStatementText(
+    PayableSupplierSummary summary,
+    Map<int, List<PayablePayment>> paymentsByPayableId,
+  ) {
+    const width = 52;
+    final sep = '=' * width;
+    final dash = '-' * width;
+    final sb = StringBuffer();
+
+    String line(String s) {
+      if (s.length <= width) return s;
+      return s.substring(0, width);
+    }
+
+    sb.writeln(sep);
+    sb.writeln(line('RESUMEN CUENTAS POR PAGAR').padLeft(width));
+    sb.writeln(dash);
+    sb.writeln(line('Proveedor: ${summary.supplierName}'));
+    sb.writeln(line('Documento: ${summary.supplierDocument}'));
+    sb.writeln(dash);
+    sb.writeln(line('Total facturado: ${_money.format(summary.totalInvoiced)}'));
+    sb.writeln(line('Total pagado:    ${_money.format(summary.totalPaid)}'));
+    sb.writeln(line('Pendiente:       ${_money.format(summary.totalPending)}'));
+    sb.writeln(line('Documentos: ${summary.documentCount}'));
+    sb.writeln(sep);
+    for (final acc in summary.accounts) {
+      final id = acc.id;
+      final payments =
+          id != null ? (paymentsByPayableId[id] ?? []) : <PayablePayment>[];
+      sb.writeln(dash);
+      sb.writeln(line('Factura: ${acc.invoiceNumber}'));
+      sb.writeln(line('Fecha: ${_df.format(acc.invoiceDate)}'));
+      sb.writeln(line('Estado: ${_statusLabel(acc.status)}'));
+      sb.writeln(line(
+          'Total: ${_money.format(acc.totalAmount)} | Pagado: ${_money.format(acc.paidAmount)} | Pendiente: ${_money.format(acc.pendingAmount)}'));
+      sb.writeln(line('Vence: ${_formatDateOnly(acc.dueDate)}'));
+      if (acc.notes != null && acc.notes!.trim().isNotEmpty) {
+        sb.writeln(line('Notas: ${acc.notes!.trim()}'));
+      }
+      if (payments.isEmpty) {
+        sb.writeln(line('Pagos: ninguno registrado.'));
+      } else {
+        sb.writeln(line('Pagos:'));
+        for (final p in payments) {
+          final ref = (p.reference != null && p.reference!.trim().isNotEmpty)
+              ? ' · Ref: ${p.reference!.trim()}'
+              : '';
+          sb.writeln(line(
+              '  · ${_money.format(p.amount)} | ${_df.format(p.paymentDate)} | ${p.paymentMethod}$ref'));
+        }
+      }
+    }
+    sb.writeln(sep);
+    sb.writeln(line('Generado: ${_df.format(DateTime.now())} — Smart Seller'));
+    sb.writeln(sep);
+    return sb.toString();
   }
 
   String _formatDateOnly(DateTime date) {
