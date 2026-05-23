@@ -85,24 +85,23 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     }
   }
 
-  /// Sesión a usar para Cierre de Caja: la que cubre hoy (para ver anulaciones del día) o la primera.
-  int? _getCierreDeCajaSessionId() {
-    final sessions = _cashSessionReport?.sessions ?? [];
-    if (sessions.isEmpty) return null;
-    final today =
-        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    // Preferir la sesión que incluye hoy (apertura <= hoy y (sin cierre o cierre >= hoy))
-    for (final s in sessions) {
-      final openDay =
-          DateTime(s.openDate.year, s.openDate.month, s.openDate.day);
-      final closeDay = s.closeDate != null
-          ? DateTime(s.closeDate!.year, s.closeDate!.month, s.closeDate!.day)
-          : today;
-      if (!openDay.isAfter(today) && !closeDay.isBefore(today)) {
-        return s.sessionId;
-      }
+  String _cierreDeCajaSubtitle(Map<String, dynamic> d) {
+    final from = d['periodFrom'] as DateTime? ??
+        d['openDate'] as DateTime? ??
+        _fromDate;
+    final to =
+        d['periodTo'] as DateTime? ?? d['closeDate'] as DateTime? ?? _toDate;
+    final fromStr = DateFormat('dd/MM/yyyy').format(from);
+    final toStr = DateFormat('dd/MM/yyyy').format(to);
+    final period =
+        fromStr == toStr ? fromStr : '$fromStr – $toStr';
+    final userName = d['userName'] as String? ?? 'Cajero';
+    final sessionCount = d['sessionCount'] as int? ?? 1;
+    if (d['consolidated'] == true && sessionCount > 1) {
+      return '$period · $userName · $sessionCount sesiones de caja';
     }
-    return sessions.first.sessionId;
+    final sessionId = d['sessionId'];
+    return '$period · $userName${sessionId != null ? ' · Sesión #$sessionId' : ''}';
   }
 
   /// Selecciona un reporte y carga sus datos. 1-5 + 6 = Devoluciones.
@@ -110,12 +109,11 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     setState(() => _selectedDailyReport = index);
     if (index == 1) {
       await _loadCashSessionReport();
-      final sessionId = _getCierreDeCajaSessionId();
-      if (sessionId != null) {
-        final data =
-            await AccountingReportsService.getCierreDeCajaData(sessionId);
-        if (mounted) setState(() => _cierreDeCajaData = data);
-      } else if (mounted) setState(() => _cierreDeCajaData = null);
+      final data = await AccountingReportsService.getCierreDeCajaDataForPeriod(
+        _fromDate,
+        _toDate,
+      );
+      if (mounted) setState(() => _cierreDeCajaData = data);
     } else if (index == 2) {
       setState(() => _ventasPorProductoData = null);
       final data = await AccountingReportsService.getVentasPorProductoData(
@@ -263,20 +261,19 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
 
   /// Imprimir: Cierre de Caja o Ventas por Producto. 1) Elegir reporte 2) Elegir impresora 3) Imprimir.
   Future<void> _showPrintReportDialog() async {
-    if (_cierreDeCajaData == null &&
-        (_cashSessionReport == null || _cashSessionReport!.sessions.isEmpty)) {
-      await _loadCashSessionReport();
-    }
-    final sessionId = _getCierreDeCajaSessionId();
-    if (_cierreDeCajaData == null && sessionId != null) {
-      final data =
-          await AccountingReportsService.getCierreDeCajaData(sessionId);
+    if (_cierreDeCajaData == null) {
+      final data = await AccountingReportsService.getCierreDeCajaDataForPeriod(
+        _fromDate,
+        _toDate,
+      );
       if (mounted) setState(() => _cierreDeCajaData = data);
     }
     Map<String, dynamic>? cierreData = _cierreDeCajaData;
-    if (cierreData == null && sessionId != null) {
-      cierreData =
-          await AccountingReportsService.getCierreDeCajaData(sessionId);
+    if (cierreData == null) {
+      cierreData = await AccountingReportsService.getCierreDeCajaDataForPeriod(
+        _fromDate,
+        _toDate,
+      );
     }
     if (_ventasPorProductoData == null) {
       final data = await AccountingReportsService.getVentasPorProductoData(
@@ -592,10 +589,12 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
     sb.writeln(sepW);
     lineLR('Fecha: ${DateFormat('dd/MM/yyyy').format(closeDate)}',
         'Hora cierre: ${DateFormat('HH:mm:ss').format(closeDate)}');
-    lineLR(
-        'Caja: ${sessionId.toString().padLeft(2, '0')}', 'Cajero: $userName');
-    lineLR('Turno: Mañana-Noche',
-        'Apertura: ${DateFormat('HH:mm:ss').format(openDate)}');
+    AccountingReportsService.writeCierreTicketSessionInfo(
+      sb,
+      data,
+      lineLR: lineLR,
+      fmtTime: (d) => DateFormat('HH:mm:ss').format(d),
+    );
     sb.writeln(sepW);
     sb.writeln('');
     sb.writeln('RESUMEN DE VENTAS');
@@ -622,6 +621,13 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
         'Ventas \$${fmtNum(ventaTarifa)} | Imp \$${fmtNum(ivaTarifa)}',
       );
     }
+    AccountingReportsService.writeCierreTicketSalesByCashier(
+      sb,
+      data,
+      lineVal: lineVal,
+      dashW: dashW,
+      fmtNum: fmtNum,
+    );
     sb.writeln(sepW);
     sb.writeln('');
     sb.writeln('FORMAS DE PAGO');
@@ -1636,12 +1642,50 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            '${DateFormat('dd/MM/yyyy').format(d['closeDate'] as DateTime)} · ${d['userName'] ?? 'Cajero'} · Sesión #${d['sessionId']}',
+            _cierreDeCajaSubtitle(d),
             style: Theme.of(context)
                 .textTheme
                 .bodyLarge
                 ?.copyWith(color: Colors.grey.shade700),
           ),
+          if ((d['sessionsBreakdown'] as List<dynamic>? ?? []).length > 1) ...[
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sesiones de caja en el período',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ...((d['sessionsBreakdown'] as List<dynamic>?) ?? [])
+                        .map((raw) {
+                      final s = Map<String, dynamic>.from(raw as Map);
+                      final open = s['openDate'] as DateTime?;
+                      final close = s['closeDate'] as DateTime?;
+                      final status = s['status'] as String? ?? '';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          '• ${s['userName']} · Sesión #${s['sessionId']} · '
+                          '${open != null ? DateFormat('dd/MM HH:mm').format(open) : '-'}'
+                          '${close != null ? ' – ${DateFormat('dd/MM HH:mm').format(close)}' : (status == 'open' ? ' (abierta)' : '')} · '
+                          'Base \$${_currencyFormat.format((s['initialAmount'] as num?)?.toDouble() ?? 0)}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 12,
@@ -1653,17 +1697,17 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                     : () async {
                         setState(() => _isLoading = true);
                         await _loadCashSessionReport();
-                        final sessionId = _getCierreDeCajaSessionId();
-                        if (sessionId != null) {
-                          final data = await AccountingReportsService
-                              .getCierreDeCajaData(sessionId);
-                          if (mounted) {
-                            setState(() {
-                              _cierreDeCajaData = data;
-                              _isLoading = false;
-                            });
-                          }
-                        } else if (mounted) setState(() => _isLoading = false);
+                        final data = await AccountingReportsService
+                            .getCierreDeCajaDataForPeriod(
+                          _fromDate,
+                          _toDate,
+                        );
+                        if (mounted) {
+                          setState(() {
+                            _cierreDeCajaData = data;
+                            _isLoading = false;
+                          });
+                        }
                       },
                 icon: const Icon(Icons.refresh, size: 20),
                 label: const Text('Actualizar'),
@@ -1703,6 +1747,27 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
               ),
             ],
           ),
+          if (d['consolidated'] == true && (d['sessionCount'] as int? ?? 0) > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Material(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    'Las ventas de abajo son del día completo (${d['sessionCount']} turnos). '
+                    'El arqueo (saldo esperado) es solo del último turno (#${d['arqueoSessionId'] ?? d['sessionId']}). '
+                    'Si ya retiró el efectivo de un cierre anterior, no debe sumarlo otra vez al contar la caja.',
+                    style: TextStyle(
+                      color: Colors.amber.shade900,
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 24),
           Card(
             child: Padding(
@@ -1711,7 +1776,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Resumen de ventas',
+                    (d['consolidated'] == true && (d['sessionCount'] as int? ?? 0) > 1)
+                        ? 'Resumen de ventas (día completo)'
+                        : 'Resumen de ventas',
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -1774,6 +1841,8 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _buildSalesByCashierCard(d),
           const SizedBox(height: 16),
           Card(
             child: Padding(
@@ -1848,7 +1917,9 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Arqueo de caja (efectivo)',
+                    (d['consolidated'] == true && (d['sessionCount'] as int? ?? 0) > 1)
+                        ? 'Arqueo de caja — último turno (#${d['arqueoSessionId'] ?? d['sessionId']})'
+                        : 'Arqueo de caja (efectivo)',
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -2009,6 +2080,102 @@ class _AccountingReportsScreenState extends State<AccountingReportsScreen> {
                 ?.copyWith(color: Colors.grey.shade600),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSalesByCashierCard(Map<String, dynamic> d) {
+    final consolidated = d['consolidated'] == true;
+    final sessionCount = d['sessionCount'] as int? ?? 1;
+    final turnoList = d['salesByCashierTurno'] as List<dynamic>?;
+    final dayList = d['salesByCashierDia'] as List<dynamic>?;
+    final singleList = d['salesByCashier'] as List<dynamic>?;
+
+    final showTurno = consolidated &&
+        sessionCount > 1 &&
+        turnoList != null &&
+        turnoList.isNotEmpty;
+    final primaryList = showTurno
+        ? turnoList
+        : (singleList ?? dayList ?? const <dynamic>[]);
+
+    if (primaryList.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    String title = 'Ventas por cajero y medio de pago';
+    if (showTurno) {
+      title =
+          'Ventas por cajero y medio de pago (último turno #${d['arqueoSessionId'] ?? d['sessionId']})';
+    } else if (consolidated && sessionCount > 1) {
+      title = 'Ventas por cajero y medio de pago (día completo)';
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            if (showTurno && dayList != null && dayList.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'El resumen de ventas arriba incluye todo el día; este detalle es del turno que se arqueó.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade700),
+              ),
+            ],
+            const SizedBox(height: 12),
+            ...primaryList.map((raw) {
+              if (raw is! Map) return const SizedBox.shrink();
+              final name = raw['userName'] as String? ?? '?';
+              final count = raw['count'] as int? ?? 0;
+              final total = (raw['total'] as num?)?.toDouble() ?? 0.0;
+              final byMethod = raw['byMethod'] as Map<String, dynamic>? ?? {};
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$name · $count venta(s) · \$${_currencyFormat.format(total)}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    if (byMethod.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      ...(() {
+                        final methods = byMethod.keys.toList()..sort();
+                        return methods.map((method) {
+                          final bucket = byMethod[method];
+                          if (bucket is! Map) return const SizedBox.shrink();
+                          final amt =
+                              (bucket['amount'] as num?)?.toDouble() ?? 0.0;
+                          final cnt = bucket['count'] as int? ?? 0;
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 12, bottom: 2),
+                            child: Text(
+                              '· $method: \$${_currencyFormat.format(amt)} ($cnt venta${cnt == 1 ? '' : 's'})',
+                              style: TextStyle(color: Colors.grey.shade800),
+                            ),
+                          );
+                        });
+                      })(),
+                    ],
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

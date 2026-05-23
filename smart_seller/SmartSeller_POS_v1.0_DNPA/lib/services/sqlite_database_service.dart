@@ -103,6 +103,8 @@ class SQLiteDatabaseService {
 
     // ✅ NUEVO: Migración para tablas de contabilidad
     await migrateAddAccountingTables();
+    await ensureAccountingEntriesColumns();
+    await _ensureCashSessionsIsActiveColumn();
 
     // ❌ NO cerrar sesiones de caja al iniciar: la caja solo se cierra con el
     // procedimiento manual de cierre/arqueo. Así se mantiene trazabilidad,
@@ -3191,6 +3193,70 @@ FROM products
     }
   }
 
+  /// Asegura columnas modernas en [accounting_entries] (PRAGMA, sin depender de SELECT).
+  static Future<void> ensureAccountingEntriesColumns() async {
+    try {
+      if (_database == null) return;
+      final tableExists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='accounting_entries'",
+      );
+      if (tableExists.isEmpty) return;
+
+      final info =
+          await _database!.rawQuery('PRAGMA table_info(accounting_entries)');
+      final names = info
+          .map((c) => ((c['name'] as String?) ?? '').toLowerCase())
+          .toSet();
+
+      const columns = <String, String>{
+        'subcategory': 'TEXT',
+        'cash_session_id': 'INTEGER',
+        'document_number': 'TEXT',
+        'reference': 'TEXT',
+        'related_entity': 'TEXT',
+        'related_entity_id': 'INTEGER',
+        'notes': 'TEXT',
+        'payment_method': 'TEXT',
+        'updated_at': 'TEXT',
+      };
+
+      for (final entry in columns.entries) {
+        if (names.contains(entry.key)) continue;
+        await _database!.execute(
+          'ALTER TABLE accounting_entries ADD COLUMN ${entry.key} ${entry.value}',
+        );
+        print('✅ Columna ${entry.key} agregada a accounting_entries');
+      }
+    } catch (e) {
+      print('⚠️ Error verificando columnas de accounting_entries: $e');
+    }
+  }
+
+  /// Columna [is_active] en sesiones de caja (bases creadas antes de contabilidad completa).
+  static Future<void> _ensureCashSessionsIsActiveColumn() async {
+    try {
+      if (_database == null) return;
+      final exists = await _database!.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='cash_sessions'",
+      );
+      if (exists.isEmpty) return;
+
+      final info =
+          await _database!.rawQuery('PRAGMA table_info(cash_sessions)');
+      final names = info
+          .map((c) => ((c['name'] as String?) ?? '').toLowerCase())
+          .toSet();
+      if (!names.contains('is_active')) {
+        await _database!.execute(
+          'ALTER TABLE cash_sessions ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1',
+        );
+        print('✅ Columna is_active agregada a cash_sessions');
+      }
+    } catch (e) {
+      print('⚠️ Error verificando is_active en cash_sessions: $e');
+    }
+  }
+
   // ✅ NUEVO: Migración para tablas de contabilidad
   static Future<void> migrateAddAccountingTables() async {
     try {
@@ -3215,119 +3281,7 @@ FROM products
 
       if (missingTables.isEmpty) {
         print('✅ Todas las tablas de contabilidad ya existen');
-        // Verificar columnas faltantes en accounting_entries
-        print('🔧 Verificando columnas de accounting_entries...');
-
-        // Verificar si existe la columna subcategory
-        try {
-          await _database!
-              .rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
-          print('✅ Columna subcategory ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna subcategory...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
-          print('✅ Columna subcategory agregada');
-        }
-
-        // Verificar si existe la columna cash_session_id
-        try {
-          await _database!.rawQuery(
-              'SELECT cash_session_id FROM accounting_entries LIMIT 1');
-          print('✅ Columna cash_session_id ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna cash_session_id...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
-          print('✅ Columna cash_session_id agregada');
-        }
-
-        // Verificar si existe la columna document_number
-        try {
-          await _database!.rawQuery(
-              'SELECT document_number FROM accounting_entries LIMIT 1');
-          print('✅ Columna document_number ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna document_number...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
-          print('✅ Columna document_number agregada');
-        }
-
-        // Verificar si existe la columna reference
-        try {
-          await _database!
-              .rawQuery('SELECT reference FROM accounting_entries LIMIT 1');
-          print('✅ Columna reference ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna reference...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN reference TEXT');
-          print('✅ Columna reference agregada');
-        }
-
-        // Verificar si existe la columna related_entity
-        try {
-          await _database!.rawQuery(
-              'SELECT related_entity FROM accounting_entries LIMIT 1');
-          print('✅ Columna related_entity ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna related_entity...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN related_entity TEXT');
-          print('✅ Columna related_entity agregada');
-        }
-
-        // Verificar si existe la columna related_entity_id
-        try {
-          await _database!.rawQuery(
-              'SELECT related_entity_id FROM accounting_entries LIMIT 1');
-          print('✅ Columna related_entity_id ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna related_entity_id...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN related_entity_id INTEGER');
-          print('✅ Columna related_entity_id agregada');
-        }
-
-        // Verificar si existe la columna notes
-        try {
-          await _database!
-              .rawQuery('SELECT notes FROM accounting_entries LIMIT 1');
-          print('✅ Columna notes ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna notes...');
-          await _database!
-              .execute('ALTER TABLE accounting_entries ADD COLUMN notes TEXT');
-          print('✅ Columna notes agregada');
-        }
-
-        // Verificar si existe la columna payment_method
-        try {
-          await _database!.rawQuery(
-              'SELECT payment_method FROM accounting_entries LIMIT 1');
-          print('✅ Columna payment_method ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna payment_method...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN payment_method TEXT');
-          print('✅ Columna payment_method agregada');
-        }
-
-        // Verificar si existe la columna updated_at
-        try {
-          await _database!
-              .rawQuery('SELECT updated_at FROM accounting_entries LIMIT 1');
-          print('✅ Columna updated_at ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna updated_at...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN updated_at TEXT');
-          print('✅ Columna updated_at agregada');
-        }
-        return;
-      }
-
+      } else {
       print('🔨 Creando tablas faltantes: $missingTables');
 
       // Crear tabla de entradas contables (si no existe)
@@ -3357,45 +3311,6 @@ FROM products
           )
         ''');
         print('✅ Tabla accounting_entries creada');
-      } else {
-        // Verificar y agregar columnas faltantes a accounting_entries si ya existe
-        print('🔧 Verificando columnas de accounting_entries...');
-
-        // Verificar si existe la columna subcategory
-        try {
-          await _database!
-              .rawQuery('SELECT subcategory FROM accounting_entries LIMIT 1');
-          print('✅ Columna subcategory ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna subcategory...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN subcategory TEXT');
-          print('✅ Columna subcategory agregada');
-        }
-
-        // Verificar si existe la columna cash_session_id
-        try {
-          await _database!.rawQuery(
-              'SELECT cash_session_id FROM accounting_entries LIMIT 1');
-          print('✅ Columna cash_session_id ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna cash_session_id...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN cash_session_id INTEGER');
-          print('✅ Columna cash_session_id agregada');
-        }
-
-        // Verificar si existe la columna document_number
-        try {
-          await _database!.rawQuery(
-              'SELECT document_number FROM accounting_entries LIMIT 1');
-          print('✅ Columna document_number ya existe');
-        } catch (e) {
-          print('🔧 Agregando columna document_number...');
-          await _database!.execute(
-              'ALTER TABLE accounting_entries ADD COLUMN document_number TEXT');
-          print('✅ Columna document_number agregada');
-        }
       }
 
       // Crear tabla de movimientos de caja (si no existe)
@@ -3495,6 +3410,9 @@ FROM products
       await _insertDefaultTransactionCategories();
 
       print('✅ Tablas de contabilidad creadas exitosamente');
+      }
+
+      await ensureAccountingEntriesColumns();
     } catch (e) {
       print('❌ Error al crear tablas de contabilidad: $e');
     }

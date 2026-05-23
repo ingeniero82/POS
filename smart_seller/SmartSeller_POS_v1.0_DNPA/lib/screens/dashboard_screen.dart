@@ -5,6 +5,7 @@ import 'pos_screen.dart';
 import 'users_screen.dart';
 import 'products_screen.dart';
 import '../services/auth_service.dart';
+import '../modules/accounting/services/accounting_service.dart';
 import '../controllers/license_controller.dart';
 import '../services/contact_service.dart';
 import '../models/permissions.dart';
@@ -367,8 +368,9 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // Diálogo de confirmación para logout
-  void _showLogoutDialog() {
+  // Diálogo de confirmación para logout (no confundir con «Cerrar caja» en Contabilidad).
+  Future<void> _showLogoutDialog() async {
+    final openCash = await AccountingService.getOpenCashSession();
     Get.dialog(
       AlertDialog(
         title: const Row(
@@ -378,9 +380,14 @@ class DashboardScreen extends StatelessWidget {
             Text('Cerrar Sesión'),
           ],
         ),
-        content: const Text(
-          '¿Estás seguro de que quieres cerrar sesión?',
-          style: TextStyle(fontSize: 16),
+        content: Text(
+          openCash != null
+              ? 'Tienes la CAJA ABIERTA en el sistema.\n\n'
+                  '• «Cerrar Sesión» solo sale de tu usuario.\n'
+                  '• Para terminar el turno de caja ve a Contabilidad → Cerrar caja (arqueo).\n\n'
+                  '¿Salir del usuario igualmente?'
+              : '¿Estás seguro de que quieres cerrar sesión?',
+          style: const TextStyle(fontSize: 16),
         ),
         actions: [
           TextButton(

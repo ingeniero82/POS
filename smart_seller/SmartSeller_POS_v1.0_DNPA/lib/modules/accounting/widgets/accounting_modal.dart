@@ -400,14 +400,15 @@ class _AccountingModalState extends State<AccountingModal>
 
   Future<void> _printCashCloseTicket(int sessionId) async {
     try {
-      final data =
+      // Arqueo del TURNO que se cierra (no sumar ventas de cierres anteriores del mismo día).
+      final ticketData =
           await AccountingReportsService.getCierreDeCajaData(sessionId);
-      if (data == null) {
+      if (ticketData == null) {
         Get.snackbar(
             'Aviso', 'No se encontraron datos del cierre para imprimir.');
         return;
       }
-      final text = _buildCierreTicketText(data);
+      final text = _buildCierreTicketText(ticketData);
       final printService = PrintService.instance;
       // Mismo pipeline que liquidación/recibo (ESC/POS + impresora ya conectada).
       final ok = await printService.printTextTicket(text);
@@ -437,9 +438,7 @@ class _AccountingModalState extends State<AccountingModal>
     const w = 80;
     final sepW = '=' * w;
     final dashW = '-' * w;
-    final openDate = data['openDate'] as DateTime;
     final closeDate = data['closeDate'] as DateTime;
-    final userName = data['userName'] as String? ?? 'Cajero';
     final initialAmount = (data['initialAmount'] as num?)?.toDouble() ?? 0.0;
     final numVentas = data['numVentas'] as int? ?? 0;
     final ticketPromedio = (data['ticketPromedio'] as num?)?.toDouble() ?? 0.0;
@@ -467,7 +466,9 @@ class _AccountingModalState extends State<AccountingModal>
     final cashIncomeDetails = data['cashIncomeDetails'] as List<dynamic>? ?? [];
     final cashExpenseDetails =
         data['cashExpenseDetails'] as List<dynamic>? ?? [];
-    final sessionId = data['sessionId'] as int? ?? 0;
+    final sessionCount = data['sessionCount'] as int? ?? 1;
+    final sessionsBreakdown =
+        data['sessionsBreakdown'] as List<dynamic>? ?? [];
 
     final sb = StringBuffer();
     String fmtNum(double n) => n.toStringAsFixed(0).replaceAllMapped(
@@ -524,10 +525,34 @@ class _AccountingModalState extends State<AccountingModal>
     sb.writeln(sepW);
     lineLR('Fecha: ${DateFormat('dd/MM/yyyy').format(closeDate)}',
         'Hora cierre: ${DateFormat('HH:mm:ss').format(closeDate)}');
-    lineLR(
-        'Caja: ${sessionId.toString().padLeft(2, '0')}', 'Cajero: $userName');
-    lineLR('Turno: Mañana-Noche',
-        'Apertura: ${DateFormat('HH:mm:ss').format(openDate)}');
+    AccountingReportsService.writeCierreTicketSessionInfo(
+      sb,
+      data,
+      lineLR: lineLR,
+      fmtTime: (d) => DateFormat('HH:mm:ss').format(d),
+    );
+    if (sessionCount > 1) {
+      lineLR('Turnos en el dia:', '$sessionCount sesiones');
+    }
+    if (sessionsBreakdown.length > 1) {
+      sb.writeln(dashW);
+      sb.writeln('SESIONES DE CAJA EN EL DIA');
+      for (final raw in sessionsBreakdown) {
+        final s = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+        final sOpen = s['openDate'] as DateTime?;
+        final sClose = s['closeDate'] as DateTime?;
+        final sUser = s['userName'] as String? ?? 'Cajero';
+        final sId = s['sessionId'];
+        final sInit = (s['initialAmount'] as num?)?.toDouble() ?? 0.0;
+        final openStr =
+            sOpen != null ? DateFormat('HH:mm').format(sOpen) : '--';
+        final closeStr = sClose != null
+            ? DateFormat('HH:mm').format(sClose)
+            : '(abierta)';
+        sb.writeln(
+            '- $sUser #${sId ?? '-'} $openStr-$closeStr base \$${fmtNum(sInit)}');
+      }
+    }
     sb.writeln(sepW);
     sb.writeln('');
     sb.writeln('RESUMEN DE VENTAS');
@@ -554,6 +579,13 @@ class _AccountingModalState extends State<AccountingModal>
         'Ventas \$${fmtNum(ventaTarifa)} | Imp \$${fmtNum(ivaTarifa)}',
       );
     }
+    AccountingReportsService.writeCierreTicketSalesByCashier(
+      sb,
+      data,
+      lineVal: lineVal,
+      dashW: dashW,
+      fmtNum: fmtNum,
+    );
     sb.writeln(sepW);
     sb.writeln('');
     sb.writeln('FORMAS DE PAGO');

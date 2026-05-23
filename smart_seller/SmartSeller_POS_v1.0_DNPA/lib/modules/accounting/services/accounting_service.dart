@@ -32,6 +32,8 @@ class AccountingService {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
 
+      await SQLiteDatabaseService.ensureAccountingEntriesColumns();
+
       final id = await db.insert(_accountingTableName, entry.toMap());
 
       // Crear movimiento de caja solo cuando el medio implica efectivo físico en caja.

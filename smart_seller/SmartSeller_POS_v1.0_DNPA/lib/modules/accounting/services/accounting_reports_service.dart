@@ -197,17 +197,25 @@ class AccountingReportsService {
       final db = SQLiteDatabaseService.database;
       if (db == null) throw Exception('Base de datos no inicializada');
 
-      // Obtener sesiones de caja sin JOIN primero
+      final startDay =
+          DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final endDay = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      // Sesiones que solapan el período (incluye turnos de varios cajeros el mismo día).
       const sessionQuery = '''
         SELECT cs.*
         FROM cash_sessions cs
-        WHERE cs.open_date BETWEEN ? AND ?
+        WHERE (cs.is_active IS NULL OR cs.is_active = 1)
+          AND cs.open_date < ?
+          AND (cs.close_date IS NULL OR trim(cs.close_date) = ''
+               OR cs.close_date >= ?)
         ORDER BY cs.open_date DESC
       ''';
 
       final sessionResults = await db.rawQuery(sessionQuery, [
-        fromDate.toIso8601String(),
-        toDate.toIso8601String(),
+        endDay.toIso8601String(),
+        startDay.toIso8601String(),
       ]);
 
       // Crear resúmenes de sesiones (totales desde accounting_entries para precisión)
@@ -630,6 +638,565 @@ class AccountingReportsService {
     }
   }
 
+  static Future<Map<String, dynamic>> _aggregateSalesForCierre(
+    dynamic db,
+    List<Map<String, dynamic>> salesRows,
+  ) async {
+    int numVentas = 0;
+    int numAnuladas = 0;
+    double montoAnuladas = 0.0;
+    double ventaBruta = 0, descuentos = 0, devoluciones = 0;
+    double ivaIncluido = 0.0;
+    final byMethod = <String, Map<String, dynamic>>{};
+    final ventasPorTarifaIva = <String, double>{};
+    final ivaPorTarifa = <String, double>{};
+    final ivaByProductIdCache = <int, int>{};
+    final ivaByNameUnitCache = <String, int>{};
+
+    for (final s in salesRows) {
+      final anulada = (s['anulada'] as int? ?? 0) == 1;
+      if (anulada) {
+        numAnuladas++;
+        montoAnuladas += (s['total'] as num?)?.toDouble() ?? 0;
+        continue;
+      }
+      final isReturn = (s['isReturn'] as int? ?? 0) == 1;
+      final total = (s['total'] as num?)?.toDouble() ?? 0;
+      final discount = (s['discount'] as num?)?.toDouble() ?? 0;
+      final returned = (s['returnedAmount'] as num?)?.toDouble();
+
+      if (isReturn) {
+        devoluciones += (returned ?? total);
+        continue;
+      }
+      numVentas++;
+      ventaBruta += total;
+      descuentos += discount;
+
+      try {
+        final itemsStr = s['items'] as String?;
+        if (itemsStr != null &&
+            itemsStr.isNotEmpty &&
+            itemsStr.contains('[')) {
+          final list = jsonDecode(itemsStr) as List<dynamic>?;
+          if (list != null) {
+            for (final e in list) {
+              if (e is! Map) continue;
+              final item = Map<String, dynamic>.from(e);
+              final price = (item['price'] is num)
+                  ? (item['price'] as num).toDouble()
+                  : 0.0;
+              final qty = (item['quantity'] is int)
+                  ? item['quantity'] as int
+                  : (item['quantity'] as num?)?.toInt() ?? 0;
+              int? ivaPct = (item['ivaPercentage'] is int)
+                  ? item['ivaPercentage'] as int
+                  : (item['ivaPercentage'] as num?)?.toInt();
+              if (ivaPct == null) {
+                final productId = (item['productId'] is int)
+                    ? item['productId'] as int
+                    : (item['productId'] as num?)?.toInt();
+                if (productId != null) {
+                  ivaPct = ivaByProductIdCache[productId];
+                  if (ivaPct == null) {
+                    final productRows = await db.query(
+                      'products',
+                      columns: ['ivaPercentage'],
+                      where: 'id = ?',
+                      whereArgs: [productId],
+                      limit: 1,
+                    );
+                    ivaPct = productRows.isNotEmpty
+                        ? (productRows.first['ivaPercentage'] as num?)
+                                ?.toInt() ??
+                            0
+                        : 0;
+                    ivaByProductIdCache[productId] = ivaPct;
+                  }
+                } else {
+                  final name = (item['name'] as String? ?? '').trim();
+                  final unit = (item['unit'] as String? ?? '').trim();
+                  final key = '${name.toLowerCase()}|${unit.toLowerCase()}';
+                  ivaPct = ivaByNameUnitCache[key];
+                  if (ivaPct == null && name.isNotEmpty) {
+                    final productRows = await db.query(
+                      'products',
+                      columns: ['ivaPercentage'],
+                      where: 'LOWER(name) = ? AND LOWER(unit) = ?',
+                      whereArgs: [name.toLowerCase(), unit.toLowerCase()],
+                      limit: 1,
+                    );
+                    ivaPct = productRows.isNotEmpty
+                        ? (productRows.first['ivaPercentage'] as num?)
+                                ?.toInt() ??
+                            0
+                        : 0;
+                    ivaByNameUnitCache[key] = ivaPct;
+                  }
+                  ivaPct ??= 0;
+                }
+              }
+              final revenue = price * qty;
+              final rateKey = ivaPct.toString();
+              ventasPorTarifaIva[rateKey] =
+                  (ventasPorTarifaIva[rateKey] ?? 0.0) + revenue;
+              if (ivaPct > 0) {
+                final ivaAmount =
+                    revenue * (ivaPct / 100) / (1 + ivaPct / 100);
+                ivaPorTarifa[rateKey] =
+                    (ivaPorTarifa[rateKey] ?? 0.0) + ivaAmount;
+                ivaIncluido += revenue * (ivaPct / 100) / (1 + ivaPct / 100);
+              } else {
+                ivaPorTarifa.putIfAbsent(rateKey, () => 0.0);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      final pbStr = s['payment_breakdown'] as String?;
+      if (pbStr != null && pbStr.isNotEmpty) {
+        try {
+          final list = (jsonDecode(pbStr) as List<dynamic>?);
+          if (list != null) {
+            for (final e in list) {
+              final m = e as Map<String, dynamic>;
+              final method = m['method'] as String? ?? 'Efectivo';
+              final amount =
+                  (m['amount'] is num) ? (m['amount'] as num).toDouble() : 0.0;
+              byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
+              byMethod[method]!['amount'] =
+                  (byMethod[method]!['amount'] as double) + amount;
+              byMethod[method]!['count'] =
+                  (byMethod[method]!['count'] as int) + 1;
+            }
+          }
+        } catch (_) {}
+      } else {
+        final method = s['paymentMethod'] as String? ?? 'Efectivo';
+        byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
+        byMethod[method]!['amount'] =
+            (byMethod[method]!['amount'] as double) + total;
+        byMethod[method]!['count'] = (byMethod[method]!['count'] as int) + 1;
+      }
+    }
+
+    final ventaNeta = ventaBruta - descuentos - devoluciones;
+    final ticketPromedio = numVentas > 0 ? ventaBruta / numVentas : 0.0;
+
+    return {
+      'numVentas': numVentas,
+      'numAnuladas': numAnuladas,
+      'montoAnuladas': montoAnuladas,
+      'ticketPromedio': ticketPromedio,
+      'ventaBruta': ventaBruta,
+      'descuentos': descuentos,
+      'devoluciones': devoluciones,
+      'ventaNeta': ventaNeta,
+      'ivaIncluido': ivaIncluido,
+      'ventasPorTarifaIva': ventasPorTarifaIva,
+      'ivaPorTarifa': ivaPorTarifa,
+      'byMethod': byMethod,
+    };
+  }
+
+  static Map<String, dynamic> _aggregateCashEntriesForCierre(
+    List<Map<String, dynamic>> entries,
+  ) {
+    double otrosIngresos = 0,
+        retiros = 0,
+        gastos = 0,
+        devolucionesEfectivo = 0;
+    final retirosList = <Map<String, dynamic>>[];
+    final cashIncomeDetails = <Map<String, dynamic>>[];
+    final cashExpenseDetails = <Map<String, dynamic>>[];
+
+    for (final e in entries) {
+      final type = e['type'] as String? ?? '';
+      final category = (e['category'] as String? ?? '').toUpperCase();
+      final amount = (e['amount'] as num?)?.toDouble() ?? 0.0;
+      final desc = e['description'] as String? ?? '';
+      final paymentMethod = e['payment_method'] as String?;
+      final reference = e['reference'] as String?;
+      final documentNumber = e['document_number'] as String?;
+      final date =
+          e['date'] != null ? DateTime.parse(e['date'] as String) : null;
+      final isCashMovement = _isCashPaymentMethod(paymentMethod);
+
+      Map<String, dynamic> detailEntry() => {
+            'time': date != null
+                ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
+                : '',
+            'description': desc,
+            'category': _translateCategory(e['category'] as String? ?? ''),
+            'amount': amount,
+            'paymentMethod': paymentMethod ?? 'N/A',
+            'reference': reference,
+            'documentNumber': documentNumber,
+          };
+
+      if (type == 'income') {
+        if (category.contains('VENTA') || category.contains('SALES')) {
+          continue;
+        }
+        if (isCashMovement) {
+          otrosIngresos += amount;
+          cashIncomeDetails.add(detailEntry());
+        }
+      } else if (type == 'expense') {
+        if (category.contains('RETIRO') ||
+            desc.toLowerCase().contains('retiro')) {
+          if (isCashMovement) {
+            retiros += amount;
+            retirosList.add({
+              'time': date != null
+                  ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
+                  : '',
+              'description': desc,
+              'amount': amount,
+            });
+            cashExpenseDetails.add(detailEntry());
+          }
+        } else if (category.contains('DEVOLUCIÓN') ||
+            category.contains('RETURN')) {
+          if (isCashMovement) {
+            devolucionesEfectivo += amount;
+            cashExpenseDetails.add(detailEntry());
+          }
+        } else {
+          if (isCashMovement) {
+            gastos += amount;
+            cashExpenseDetails.add(detailEntry());
+          }
+        }
+      }
+    }
+
+    return {
+      'otrosIngresos': otrosIngresos,
+      'retiros': retiros,
+      'gastos': gastos,
+      'devolucionesEfectivo': devolucionesEfectivo,
+      'retirosList': retirosList,
+      'cashIncomeDetails': cashIncomeDetails,
+      'cashExpenseDetails': cashExpenseDetails,
+    };
+  }
+
+  /// Cierre consolidado del período: todas las sesiones y ventas de todos los cajeros.
+  /// Alineado con «Movimientos del día» (filtro por fechas, no por un solo usuario).
+  static Future<Map<String, dynamic>?> getCierreDeCajaDataForPeriod(
+      DateTime fromDate, DateTime toDate) async {
+    try {
+      final db = SQLiteDatabaseService.database;
+      if (db == null) return null;
+
+      final startDay =
+          DateTime(fromDate.year, fromDate.month, fromDate.day);
+      final endDay = DateTime(toDate.year, toDate.month, toDate.day)
+          .add(const Duration(days: 1));
+
+      // Comparación directa ISO8601 (datetime() en SQLite falla con formato ...T...).
+      final sessionRows = await db.rawQuery(
+        '''
+        SELECT cs.* FROM cash_sessions cs
+        WHERE (cs.is_active IS NULL OR cs.is_active = 1)
+          AND cs.open_date < ?
+          AND (cs.close_date IS NULL OR trim(cs.close_date) = ''
+               OR cs.close_date >= ?)
+        ORDER BY cs.open_date ASC
+        ''',
+        [endDay.toIso8601String(), startDay.toIso8601String()],
+      );
+
+      double initialAmount = 0;
+      final sessionsBreakdown = <Map<String, dynamic>>[];
+      final userNames = <String>{};
+      DateTime? firstOpen;
+      DateTime? lastClose;
+
+      for (final row in sessionRows) {
+        final openDate = DateTime.parse(row['open_date'] as String);
+        final hasClose = row['close_date'] != null &&
+            (row['close_date'] as String).trim().isNotEmpty;
+        final closeDate = hasClose
+            ? DateTime.parse(row['close_date'] as String)
+            : DateTime.now();
+        final init = (row['initial_amount'] as num?)?.toDouble() ?? 0.0;
+        initialAmount += init;
+        firstOpen ??= openDate;
+        lastClose = closeDate;
+
+        String sessionUser = 'Cajero';
+        final uid = row['user_id'] as int?;
+        if (uid != null) {
+          final u = await db.query('users',
+              columns: ['fullName', 'username'],
+              where: 'id = ?',
+              whereArgs: [uid]);
+          if (u.isNotEmpty) {
+            final full = (u.first['fullName'] as String?)?.trim();
+            final login = (u.first['username'] as String?)?.trim();
+            if (full != null && full.isNotEmpty) {
+              sessionUser = full;
+            } else if (login != null && login.isNotEmpty) {
+              sessionUser = login;
+            }
+            userNames.add(sessionUser);
+          }
+        }
+
+        sessionsBreakdown.add({
+          'sessionId': row['id'],
+          'userName': sessionUser,
+          'openDate': openDate,
+          'closeDate': hasClose ? closeDate : null,
+          'initialAmount': init,
+          'status': row['status'] as String? ?? 'open',
+        });
+      }
+
+      final userName = userNames.isEmpty
+          ? 'Sin sesión registrada'
+          : userNames.length == 1
+              ? userNames.first
+              : 'Varios cajeros (${userNames.length})';
+
+      final salesRows = await db.rawQuery(
+        "SELECT id, date, total, items, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount, anulada, user "
+        "FROM sales WHERE date >= ? AND date < ? ORDER BY date",
+        [startDay.toIso8601String(), endDay.toIso8601String()],
+      );
+
+      final salesAgg = await _aggregateSalesForCierre(db, salesRows);
+      final salesByCashierDay = _aggregateSalesByCashier(salesRows);
+
+      // Arqueo físico: solo el ÚLTIMO turno (sesión). Las ventas del día van aparte.
+      final int? arqueoSessionId = sessionRows.isNotEmpty
+          ? sessionRows.last['id'] as int?
+          : null;
+      Map<String, dynamic>? arqueoTurno;
+      if (arqueoSessionId != null) {
+        arqueoTurno = await getCierreDeCajaData(arqueoSessionId);
+      }
+
+      final arqueoInitial =
+          (arqueoTurno?['initialAmount'] as num?)?.toDouble() ?? initialAmount;
+      final arqueoVentasEfectivo =
+          (arqueoTurno?['ventasEfectivo'] as num?)?.toDouble() ?? 0.0;
+      final arqueoSaldoEsperado =
+          (arqueoTurno?['saldoEsperado'] as num?)?.toDouble() ?? arqueoInitial;
+      final arqueoSaldoReal = (arqueoTurno?['saldoReal'] as num?)?.toDouble() ??
+          (arqueoTurno?['finalAmount'] as num?)?.toDouble() ??
+          arqueoSaldoEsperado;
+      final arqueoDiferencia =
+          (arqueoTurno?['diferencia'] as num?)?.toDouble() ??
+          (arqueoSaldoReal - arqueoSaldoEsperado);
+
+      return {
+        'sessionId': arqueoSessionId,
+        'arqueoSessionId': arqueoSessionId,
+        'sessionCount': sessionRows.length,
+        'sessionsBreakdown': sessionsBreakdown,
+        'consolidated': true,
+        'openDate': arqueoTurno?['openDate'] as DateTime? ?? firstOpen ?? fromDate,
+        'closeDate': arqueoTurno?['closeDate'] as DateTime? ?? lastClose ?? toDate,
+        'periodFrom': fromDate,
+        'periodTo': toDate,
+        'userName': arqueoTurno?['userName'] as String? ?? userName,
+        'openedByUserName': arqueoTurno?['openedByUserName'],
+        'closedByUserName': arqueoTurno?['closedByUserName'],
+        'salesByCashier': arqueoTurno?['salesByCashier'] ?? salesByCashierDay,
+        'salesByCashierDia': salesByCashierDay,
+        'salesByCashierTurno': arqueoTurno?['salesByCashier'],
+        // Resumen de ventas = día completo (varios turnos).
+        ...salesAgg,
+        // Arqueo de caja = solo el turno que se está cerrando / último del período.
+        'initialAmount': arqueoInitial,
+        'finalAmount': arqueoTurno?['finalAmount'],
+        'ventasEfectivo': arqueoVentasEfectivo,
+        'otrosIngresos': (arqueoTurno?['otrosIngresos'] as num?)?.toDouble() ?? 0.0,
+        'retiros': (arqueoTurno?['retiros'] as num?)?.toDouble() ?? 0.0,
+        'gastos': (arqueoTurno?['gastos'] as num?)?.toDouble() ?? 0.0,
+        'devolucionesEfectivo':
+            (arqueoTurno?['devolucionesEfectivo'] as num?)?.toDouble() ?? 0.0,
+        'retirosList': arqueoTurno?['retirosList'] ?? <Map<String, dynamic>>[],
+        'cashIncomeDetails':
+            arqueoTurno?['cashIncomeDetails'] ?? <Map<String, dynamic>>[],
+        'cashExpenseDetails':
+            arqueoTurno?['cashExpenseDetails'] ?? <Map<String, dynamic>>[],
+        'saldoEsperado': arqueoSaldoEsperado,
+        'saldoReal': arqueoSaldoReal,
+        'diferencia': arqueoDiferencia,
+      };
+    } catch (e) {
+      print('❌ Error getCierreDeCajaDataForPeriod: $e');
+      return null;
+    }
+  }
+
+  static Future<String> _resolveUserDisplayName(
+    dynamic db,
+    int? userId,
+  ) async {
+    if (userId == null) return 'Cajero';
+    final userRows = await db.query(
+      'users',
+      columns: ['fullName', 'username'],
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    if (userRows.isEmpty) return 'Cajero';
+    final full = (userRows.first['fullName'] as String?)?.trim();
+    final login = (userRows.first['username'] as String?)?.trim();
+    if (full != null && full.isNotEmpty) return full;
+    if (login != null && login.isNotEmpty) return login;
+    return 'Cajero';
+  }
+
+  static List<MapEntry<String, double>> _paymentAmountsFromSale(
+    Map<String, dynamic> s,
+  ) {
+    final total = (s['total'] as num?)?.toDouble() ?? 0.0;
+    final pbStr = s['payment_breakdown'] as String?;
+    if (pbStr != null && pbStr.isNotEmpty) {
+      try {
+        final list = jsonDecode(pbStr) as List<dynamic>?;
+        if (list != null && list.isNotEmpty) {
+          return list.map((e) {
+            final m = Map<String, dynamic>.from(e as Map);
+            final method = (m['method'] as String?)?.trim().isNotEmpty == true
+                ? (m['method'] as String).trim()
+                : 'Efectivo';
+            final amount = (m['amount'] is num)
+                ? (m['amount'] as num).toDouble()
+                : 0.0;
+            return MapEntry(method, amount);
+          }).toList();
+        }
+      } catch (_) {}
+    }
+    final method = (s['paymentMethod'] as String?)?.trim().isNotEmpty == true
+        ? (s['paymentMethod'] as String).trim()
+        : 'Efectivo';
+    return [MapEntry(method, total)];
+  }
+
+  static List<Map<String, dynamic>> _aggregateSalesByCashier(
+    List<Map<String, dynamic>> salesRows,
+  ) {
+    final map = <String, Map<String, dynamic>>{};
+    for (final s in salesRows) {
+      if ((s['anulada'] as int? ?? 0) == 1) continue;
+      if ((s['isReturn'] as int? ?? 0) == 1) continue;
+      final raw = (s['user'] as String?)?.trim();
+      final key =
+          (raw == null || raw.isEmpty) ? 'Sin cajero registrado' : raw;
+      map.putIfAbsent(
+        key,
+        () => {
+          'userName': key,
+          'count': 0,
+          'total': 0.0,
+          'byMethod': <String, Map<String, dynamic>>{},
+        },
+      );
+      map[key]!['count'] = (map[key]!['count'] as int) + 1;
+      map[key]!['total'] = (map[key]!['total'] as double) +
+          ((s['total'] as num?)?.toDouble() ?? 0.0);
+
+      final methodsMap =
+          map[key]!['byMethod'] as Map<String, Map<String, dynamic>>;
+      for (final pay in _paymentAmountsFromSale(s)) {
+        methodsMap.putIfAbsent(
+          pay.key,
+          () => {'amount': 0.0, 'count': 0},
+        );
+        methodsMap[pay.key]!['amount'] =
+            (methodsMap[pay.key]!['amount'] as double) + pay.value;
+        methodsMap[pay.key]!['count'] =
+            (methodsMap[pay.key]!['count'] as int) + 1;
+      }
+    }
+    final list = map.values.toList()
+      ..sort(
+          (a, b) => (a['userName'] as String).compareTo(b['userName'] as String));
+    for (final row in list) {
+      final methodsMap =
+          row['byMethod'] as Map<String, Map<String, dynamic>>;
+      row['byMethod'] = methodsMap.map(
+        (k, v) => MapEntry(k, Map<String, dynamic>.from(v)),
+      );
+    }
+    return list;
+  }
+
+  /// Cabecera del ticket: quién abrió la caja vs quién cierra/arquea.
+  static void writeCierreTicketSessionInfo(
+    StringBuffer sb,
+    Map<String, dynamic> data, {
+    required void Function(String left, String right) lineLR,
+    required String Function(DateTime) fmtTime,
+  }) {
+    final sessionId = data['sessionId'] as int? ?? 0;
+    final openDate = data['openDate'] as DateTime?;
+    final openedBy = data['openedByUserName'] as String?;
+    final closedBy = data['closedByUserName'] as String? ??
+        data['userName'] as String? ??
+        'Cajero';
+    final samePerson = openedBy != null &&
+        openedBy.toLowerCase().trim() == closedBy.toLowerCase().trim();
+
+    if (openedBy != null && !samePerson) {
+      lineLR('Sesion caja #${sessionId.toString().padLeft(2, '0')}', '');
+      lineLR('Caja abierta por:', openedBy);
+      lineLR('Cierre / arqueo:', closedBy);
+      if (openDate != null) {
+        lineLR('Hora apertura:', fmtTime(openDate));
+      }
+      lineLR('Nota:', 'Misma caja fisica del turno');
+    } else {
+      lineLR('Caja: ${sessionId.toString().padLeft(2, '0')}',
+          'Cajero: $closedBy');
+      if (openDate != null) {
+        lineLR('Turno:', 'Apertura ${fmtTime(openDate)}');
+      }
+    }
+  }
+
+  static void writeCierreTicketSalesByCashier(
+    StringBuffer sb,
+    Map<String, dynamic> data, {
+    required void Function(String label, String value) lineVal,
+    required String dashW,
+    required String Function(double) fmtNum,
+  }) {
+    final list = data['salesByCashier'] as List<dynamic>? ?? [];
+    if (list.isEmpty) return;
+    sb.writeln('');
+    sb.writeln('VENTAS POR CAJERO Y MEDIO DE PAGO');
+    sb.writeln(dashW);
+    for (final raw in list) {
+      if (raw is! Map) continue;
+      final name = raw['userName'] as String? ?? '?';
+      final count = raw['count'] as int? ?? 0;
+      final total = (raw['total'] as num?)?.toDouble() ?? 0.0;
+      final ventas = count == 1 ? '1 venta' : '$count ventas';
+      lineVal('  $name', '$ventas · \$${fmtNum(total)}');
+      final byMethod = raw['byMethod'] as Map<String, dynamic>? ?? {};
+      if (byMethod.isEmpty) continue;
+      final methods = byMethod.keys.toList()..sort();
+      for (final method in methods) {
+        final bucket = byMethod[method];
+        if (bucket is! Map) continue;
+        final amt = (bucket['amount'] as num?)?.toDouble() ?? 0.0;
+        final cnt = bucket['count'] as int? ?? 0;
+        final cntStr = cnt == 1 ? '1 venta' : '$cnt ventas';
+        lineVal('    · $method', '\$${fmtNum(amt)} ($cntStr)');
+      }
+    }
+  }
+
   /// Datos para imprimir reporte de Cierre de Caja (una sesión).
   /// Requiere: ventas del período de la sesión, sesión, y movimientos contables de la sesión.
   static Future<Map<String, dynamic>?> getCierreDeCajaData(
@@ -652,194 +1219,26 @@ class AccountingReportsService {
           : DateTime.now();
       final initialAmount = (row['initial_amount'] as num?)?.toDouble() ?? 0.0;
       final finalAmount = (row['final_amount'] as num?)?.toDouble();
-      final userId = row['user_id'] as int?;
+      final openedByUserId = row['user_id'] as int?;
+      final closedByUserId = row['closed_by_user_id'] as int?;
 
-      String userName = 'Cajero';
-      String? sessionUsername;
-      if (userId != null) {
-        final userRows = await db.query('users',
-            columns: ['fullName', 'username'],
-            where: 'id = ?',
-            whereArgs: [userId]);
-        if (userRows.isNotEmpty) {
-          if (userRows.first['fullName'] != null) {
-            userName = userRows.first['fullName'] as String;
-          }
-          final u = (userRows.first['username'] as String?)?.trim();
-          if (u != null && u.isNotEmpty) {
-            sessionUsername = u;
-          }
-        }
-      }
+      final openedByUserName =
+          await _resolveUserDisplayName(db, openedByUserId);
+      final closedByUserName =
+          await _resolveUserDisplayName(db, closedByUserId ?? openedByUserId);
+      final userName = closedByUserName;
 
-      final startDay = DateTime(openDate.year, openDate.month, openDate.day);
-      final endDay = DateTime(closeDate.year, closeDate.month, closeDate.day)
-          .add(const Duration(days: 1));
-
-      // Importante: discriminar por cajero de la sesión para no mezclar ventas
-      // de otros usuarios en el mismo día.
+      // Ventas solo dentro del intervalo real de la sesión (apertura → cierre).
       final salesRows = await db.rawQuery(
-        "SELECT id, date, total, items, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount, anulada "
-        "FROM sales WHERE date >= ? AND date < ? ${sessionUsername != null ? 'AND user = ?' : ''} ORDER BY date",
-        sessionUsername != null
-            ? [startDay.toIso8601String(), endDay.toIso8601String(), sessionUsername]
-            : [startDay.toIso8601String(), endDay.toIso8601String()],
+        "SELECT id, date, total, items, paymentMethod, payment_breakdown, discount, isReturn, returnedAmount, anulada, user "
+        "FROM sales WHERE date >= ? AND date <= ? ORDER BY date",
+        [openDate.toIso8601String(), closeDate.toIso8601String()],
       );
 
-      int numVentas = 0;
-      int numAnuladas = 0;
-      double montoAnuladas = 0.0;
-      double ventaBruta = 0, descuentos = 0, devoluciones = 0;
-      double ivaIncluido = 0.0; // Suma de IVA real por ítem (0% = exento)
-      final byMethod =
-          <String, Map<String, dynamic>>{}; // method -> { amount, count }
-      final ventasPorTarifaIva = <String, double>{};
-      final ivaPorTarifa = <String, double>{};
-      final ivaByProductIdCache = <int, int>{};
-      final ivaByNameUnitCache = <String, int>{};
+      final salesByCashier = _aggregateSalesByCashier(salesRows);
 
-      for (final s in salesRows) {
-        final anulada = (s['anulada'] as int? ?? 0) == 1;
-        if (anulada) {
-          numAnuladas++;
-          montoAnuladas += (s['total'] as num?)?.toDouble() ?? 0;
-          continue;
-        }
-        final isReturn = (s['isReturn'] as int? ?? 0) == 1;
-        final total = (s['total'] as num?)?.toDouble() ?? 0;
-        final discount = (s['discount'] as num?)?.toDouble() ?? 0;
-        final returned = (s['returnedAmount'] as num?)?.toDouble();
-
-        if (isReturn) {
-          devoluciones += (returned ?? total);
-          continue;
-        }
-        numVentas++;
-        ventaBruta += total;
-        descuentos += discount;
-
-        // IVA incluido según IVA de cada ítem (si producto 0% IVA -> no suma)
-        try {
-          final itemsStr = s['items'] as String?;
-          if (itemsStr != null &&
-              itemsStr.isNotEmpty &&
-              itemsStr.contains('[')) {
-            final list = jsonDecode(itemsStr) as List<dynamic>?;
-            if (list != null) {
-              for (final e in list) {
-                if (e is! Map) continue;
-                final item = Map<String, dynamic>.from(e);
-                final price = (item['price'] is num)
-                    ? (item['price'] as num).toDouble()
-                    : 0.0;
-                final qty = (item['quantity'] is int)
-                    ? item['quantity'] as int
-                    : (item['quantity'] as num?)?.toInt() ?? 0;
-                int? ivaPct = (item['ivaPercentage'] is int)
-                    ? item['ivaPercentage'] as int
-                    : (item['ivaPercentage'] as num?)?.toInt();
-                if (ivaPct == null) {
-                  final productId = (item['productId'] is int)
-                      ? item['productId'] as int
-                      : (item['productId'] as num?)?.toInt();
-                  if (productId != null) {
-                    ivaPct = ivaByProductIdCache[productId];
-                    if (ivaPct == null) {
-                      final productRows = await db.query(
-                        'products',
-                        columns: ['ivaPercentage'],
-                        where: 'id = ?',
-                        whereArgs: [productId],
-                        limit: 1,
-                      );
-                      if (productRows.isNotEmpty) {
-                        ivaPct = (productRows.first['ivaPercentage'] as num?)
-                                ?.toInt() ??
-                            0;
-                      } else {
-                        ivaPct = 0;
-                      }
-                      ivaByProductIdCache[productId] = ivaPct;
-                    }
-                  } else {
-                    final name = (item['name'] as String? ?? '').trim();
-                    final unit = (item['unit'] as String? ?? '').trim();
-                    final key = '${name.toLowerCase()}|${unit.toLowerCase()}';
-                    ivaPct = ivaByNameUnitCache[key];
-                    if (ivaPct == null && name.isNotEmpty) {
-                      final productRows = await db.query(
-                        'products',
-                        columns: ['ivaPercentage'],
-                        where: 'LOWER(name) = ? AND LOWER(unit) = ?',
-                        whereArgs: [name.toLowerCase(), unit.toLowerCase()],
-                        limit: 1,
-                      );
-                      if (productRows.isNotEmpty) {
-                        ivaPct = (productRows.first['ivaPercentage'] as num?)
-                                ?.toInt() ??
-                            0;
-                      } else {
-                        ivaPct = 0;
-                      }
-                      ivaByNameUnitCache[key] = ivaPct;
-                    }
-                    ivaPct ??= 0;
-                  }
-                }
-                final revenue = price * qty;
-                final rateKey = ivaPct.toString();
-                ventasPorTarifaIva[rateKey] =
-                    (ventasPorTarifaIva[rateKey] ?? 0.0) + revenue;
-                if (ivaPct > 0) {
-                  final ivaAmount =
-                      revenue * (ivaPct / 100) / (1 + ivaPct / 100);
-                  ivaPorTarifa[rateKey] =
-                      (ivaPorTarifa[rateKey] ?? 0.0) + ivaAmount;
-                  ivaIncluido += revenue * (ivaPct / 100) / (1 + ivaPct / 100);
-                } else {
-                  ivaPorTarifa.putIfAbsent(rateKey, () => 0.0);
-                }
-              }
-            }
-          } else {
-            // Sin detalle de IVA por ítem, se asume exento para no sobreestimar.
-            ivaIncluido += 0.0;
-          }
-        } catch (_) {
-          // Si no se puede parsear el detalle, evitar inflar IVA por defecto.
-          ivaIncluido += 0.0;
-        }
-
-        final pbStr = s['payment_breakdown'] as String?;
-        if (pbStr != null && pbStr.isNotEmpty) {
-          try {
-            final list = (jsonDecode(pbStr) as List<dynamic>?);
-            if (list != null) {
-              for (final e in list) {
-                final m = e as Map<String, dynamic>;
-                final method = m['method'] as String? ?? 'Efectivo';
-                final amount = (m['amount'] is num)
-                    ? (m['amount'] as num).toDouble()
-                    : 0.0;
-                byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
-                byMethod[method]!['amount'] =
-                    (byMethod[method]!['amount'] as double) + amount;
-                byMethod[method]!['count'] =
-                    (byMethod[method]!['count'] as int) + 1;
-              }
-            }
-          } catch (_) {}
-        } else {
-          final method = s['paymentMethod'] as String? ?? 'Efectivo';
-          byMethod.putIfAbsent(method, () => {'amount': 0.0, 'count': 0});
-          byMethod[method]!['amount'] =
-              (byMethod[method]!['amount'] as double) + total;
-          byMethod[method]!['count'] = (byMethod[method]!['count'] as int) + 1;
-        }
-      }
-
-      final ventaNeta = ventaBruta - descuentos - devoluciones;
-      final ticketPromedio = numVentas > 0 ? ventaBruta / numVentas : 0.0;
+      final salesAgg = await _aggregateSalesForCierre(db, salesRows);
+      final byMethod = salesAgg['byMethod'] as Map<String, dynamic>;
 
       final entries = await db.rawQuery(
         'SELECT type, category, amount, description, date, payment_method, reference, document_number '
@@ -847,75 +1246,16 @@ class AccountingReportsService {
         [sessionId],
       );
 
-      double otrosIngresos = 0,
-          retiros = 0,
-          gastos = 0,
-          devolucionesEfectivo = 0;
-      final retirosList = <Map<String, dynamic>>[];
-      final cashIncomeDetails = <Map<String, dynamic>>[];
-      final cashExpenseDetails = <Map<String, dynamic>>[];
-
-      for (final e in entries) {
-        final type = e['type'] as String? ?? '';
-        final category = (e['category'] as String? ?? '').toUpperCase();
-        final amount = (e['amount'] as num?)?.toDouble() ?? 0.0;
-        final desc = e['description'] as String? ?? '';
-        final paymentMethod = e['payment_method'] as String?;
-        final reference = e['reference'] as String?;
-        final documentNumber = e['document_number'] as String?;
-        final date =
-            e['date'] != null ? DateTime.parse(e['date'] as String) : null;
-        final isCashMovement = _isCashPaymentMethod(paymentMethod);
-
-        Map<String, dynamic> detailEntry() => {
-              'time': date != null
-                  ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
-                  : '',
-              'description': desc,
-              'category':
-                  _translateCategory(e['category'] as String? ?? ''),
-              'amount': amount,
-              'paymentMethod': paymentMethod ?? 'N/A',
-              'reference': reference,
-              'documentNumber': documentNumber,
-            };
-
-        if (type == 'income') {
-          if (category.contains('VENTA') || category.contains('SALES')) {
-            continue;
-          }
-          if (isCashMovement) {
-            otrosIngresos += amount;
-            cashIncomeDetails.add(detailEntry());
-          }
-        } else if (type == 'expense') {
-          if (category.contains('RETIRO') ||
-              desc.toLowerCase().contains('retiro')) {
-            if (isCashMovement) {
-              retiros += amount;
-              retirosList.add({
-                'time': date != null
-                    ? '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
-                    : '',
-                'description': desc,
-                'amount': amount
-              });
-              cashExpenseDetails.add(detailEntry());
-            }
-          } else if (category.contains('DEVOLUCIÓN') ||
-              category.contains('RETURN')) {
-            if (isCashMovement) {
-              devolucionesEfectivo += amount;
-              cashExpenseDetails.add(detailEntry());
-            }
-          } else {
-            if (isCashMovement) {
-              gastos += amount;
-              cashExpenseDetails.add(detailEntry());
-            }
-          }
-        }
-      }
+      final cashAgg = _aggregateCashEntriesForCierre(entries);
+      final otrosIngresos = cashAgg['otrosIngresos'] as double;
+      final retiros = cashAgg['retiros'] as double;
+      final gastos = cashAgg['gastos'] as double;
+      final devolucionesEfectivo = cashAgg['devolucionesEfectivo'] as double;
+      final retirosList = cashAgg['retirosList'] as List<Map<String, dynamic>>;
+      final cashIncomeDetails =
+          cashAgg['cashIncomeDetails'] as List<Map<String, dynamic>>;
+      final cashExpenseDetails =
+          cashAgg['cashExpenseDetails'] as List<Map<String, dynamic>>;
 
       final ventasEfectivo =
           (byMethod['Efectivo']?['amount'] as num?)?.toDouble() ?? 0.0;
@@ -930,22 +1270,17 @@ class AccountingReportsService {
 
       return {
         'sessionId': sessionId,
+        'consolidated': false,
+        'sessionCount': 1,
         'openDate': openDate,
         'closeDate': closeDate,
         'userName': userName,
+        'openedByUserName': openedByUserName,
+        'closedByUserName': closedByUserName,
+        'salesByCashier': salesByCashier,
         'initialAmount': initialAmount,
         'finalAmount': finalAmount,
-        'numVentas': numVentas,
-        'numAnuladas': numAnuladas,
-        'montoAnuladas': montoAnuladas,
-        'ticketPromedio': ticketPromedio,
-        'ventaBruta': ventaBruta,
-        'descuentos': descuentos,
-        'devoluciones': devoluciones,
-        'ventaNeta': ventaNeta,
-        'ivaIncluido': ivaIncluido,
-        'ventasPorTarifaIva': ventasPorTarifaIva,
-        'ivaPorTarifa': ivaPorTarifa,
+        ...salesAgg,
         'byMethod': byMethod,
         'ventasEfectivo': ventasEfectivo,
         'otrosIngresos': otrosIngresos,
